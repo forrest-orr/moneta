@@ -61,18 +61,71 @@ list<MEMORY_BASIC_INFORMATION*> QueryProcessMem(uint32_t dwPid) {
 
 void EnumProcessMem(uint32_t dwTargetPid, uint8_t* pBaseAddress = (uint8_t*)0x00400000) {
 	list<MEMORY_BASIC_INFORMATION*> ProcessMem = QueryProcessMem(dwTargetPid);
+	bool bFileRange = false, bImageRange = false;
 
 	for (list<MEMORY_BASIC_INFORMATION*>::const_iterator RecordItr = ProcessMem.begin(); RecordItr != ProcessMem.end(); ++RecordItr) {
 		if (pBaseAddress == (uint8_t*)-1 || (*RecordItr)->AllocationBase == (void*)pBaseAddress) {
+			if ((*RecordItr)->Type == MEM_MAPPED || (*RecordItr)->Type == MEM_IMAGE) {
+				if ((*RecordItr)->AllocationBase == (*RecordItr)->BaseAddress) {
+					bFileRange = true;
+					wchar_t FileName[MAX_PATH] = { 0 };
+					HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, dwTargetPid);
+
+					if (hProcess != nullptr) {
+						if ((*RecordItr)->Type == MEM_MAPPED) {
+							if (GetMappedFileNameW(hProcess, (*RecordItr)->AllocationBase, FileName, MAX_PATH)) {
+								//printf("%ws\r\n", MappedFileName);
+							}
+							else {
+								wcscpy_s(FileName, MAX_PATH, L"Page file");
+							}
+						}
+						else {
+							bImageRange = true;
+							if (GetModuleFileNameExW(hProcess, (HMODULE)(*RecordItr)->AllocationBase, FileName, MAX_PATH)) {
+								//printf("%ws\r\n", ModuleFileName);
+							}
+							else {
+								wcscpy_s(FileName, MAX_PATH, L"?");
+								printf("!!!! FAILED to get module name\r\n");
+							}
+						}
+
+						CloseHandle(hProcess);
+					}
+					else {
+						wcscpy_s(FileName, MAX_PATH, L"Access denied");
+					}
+
+					printf("======[ 0x%p : %ws\r\n", (*RecordItr)->BaseAddress, FileName);
+				}
+			}
+			else {
+				bFileRange = false;
+				bImageRange = false;
+				printf("======[ 0x%p\r\n", (*RecordItr)->BaseAddress);
+			}
+
+			wchar_t Indent[40] = { 0 };
+
+			wcscpy_s(Indent, 40, L"  ");
+
+			if (bImageRange) {
+				wcscat_s(Indent, 40, L"  ");
+			}
+
 			printf(
-				"* Allocated base 0x%p\r\n"
-				"  Base: 0x%p\r\n"
-				"  Size: %d\r\n",
+				"%wsAllocated base 0x%p\r\n"
+				"%wsBase: 0x%p\r\n"
+				"%wsSize: %d\r\n",
+				Indent,
 				(*RecordItr)->AllocationBase,
+				Indent,
 				(*RecordItr)->BaseAddress,
+				Indent,
 				(*RecordItr)->RegionSize);
 
-			printf("  State: ");
+			printf("%wsState: ", Indent);
 			switch ((*RecordItr)->State)
 			{
 			case MEM_COMMIT:
@@ -88,7 +141,7 @@ void EnumProcessMem(uint32_t dwTargetPid, uint8_t* pBaseAddress = (uint8_t*)0x00
 				printf("?\r\n");
 			}
 
-			printf("  Type: ");
+			printf("%wsType: ", Indent);
 			switch ((*RecordItr)->Type)
 			{
 			case MEM_IMAGE:
@@ -104,36 +157,18 @@ void EnumProcessMem(uint32_t dwTargetPid, uint8_t* pBaseAddress = (uint8_t*)0x00
 				printf("N/A\r\n");
 			}
 
-			printf("  Current permissions: 0x%08x\r\n", (*RecordItr)->Protect);
-			printf("  Original permissions: 0x%08x\r\n", (*RecordItr)->AllocationProtect);
+			printf("%wsCurrent permissions: 0x%08x\r\n", Indent, (*RecordItr)->Protect);
+			printf("%wsOriginal permissions: 0x%08x\r\n\r\n", Indent, (*RecordItr)->AllocationProtect);
 		}
 	}
 }
-
-enum class SelectedProcessType { // Class can isolate the scope of the enum values to prevent compiler-time collisions
-	InvalidPid = 0,
-	SpecificPid,
-	AllPids,
-	SelfPid
-};
-
-enum class SelectedOutputType {
-	InvalidOutput = 0,
-	Raw,
-	Statistics
-};
 
 class MemoryPermissionRecord { // Record takes list of mem basic info structs, and sorts them into a map. Class can be used to show the map.
 protected:
 	map<uint32_t, map<uint32_t, uint32_t>>* MemPermMap; // Primary key is the memory type, secondary map key is the permission attribute (and its pair value is the count).
 
 public:
-	~MemoryPermissionRecord() {
-		//
-	}
-
-	MemoryPermissionRecord(list<MEMORY_BASIC_INFORMATION*> MemBasicRecords) {
-		MemPermMap = new map<uint32_t, map<uint32_t, uint32_t>>(); // For now the map is always overwritten. Initialized once.
+	void UpdateMap(list<MEMORY_BASIC_INFORMATION*> MemBasicRecords) {
 		for (list<MEMORY_BASIC_INFORMATION*>::const_iterator RecordItr = MemBasicRecords.begin(); RecordItr != MemBasicRecords.end(); ++RecordItr) {
 			if (!MemPermMap->count((*RecordItr)->Type)) {
 				MemPermMap->insert(make_pair((*RecordItr)->Type, map<uint32_t, uint32_t>()));
@@ -149,10 +184,17 @@ public:
 		}
 	}
 
+	~MemoryPermissionRecord() {
+		//
+	}
+
+	MemoryPermissionRecord(list<MEMORY_BASIC_INFORMATION*> MemBasicRecords) {
+		MemPermMap = new map<uint32_t, map<uint32_t, uint32_t>>();
+		UpdateMap(MemBasicRecords);
+	}
+
 	void ShowRecords() {
 		for (map<uint32_t, map<uint32_t, uint32_t>>::const_iterator Itr = MemPermMap->begin(); Itr != MemPermMap->end(); ++Itr) {
-			//printf("Type 0x%08x\r\n", Itr->first);
-
 			switch (Itr->first) {
 			case MEM_IMAGE:
 				printf("~ Image memory:\r\n");
@@ -209,6 +251,19 @@ public:
 			}
 		}
 	}
+};
+
+enum class SelectedProcessType {
+	InvalidPid = 0,
+	SpecificPid,
+	AllPids,
+	SelfPid
+};
+
+enum class SelectedOutputType {
+	InvalidOutput = 0,
+	Raw,
+	Statistics
 };
 
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
@@ -271,22 +326,25 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		else {
 			PROCESSENTRY32W ProcEntry = { 0 };
 			HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+			MemoryPermissionRecord* MemPermRec = nullptr;
 
-			if (hSnapshot != nullptr)
-			{
+			if (hSnapshot != nullptr) {
 				ProcEntry.dwSize = sizeof(PROCESSENTRY32W);
 
-				if (Process32FirstW(hSnapshot, &ProcEntry))
-				{
+				if (Process32FirstW(hSnapshot, &ProcEntry)) {
 					do
 					{
 						if (OutputType == SelectedOutputType::Raw) {
 							EnumProcessMem(ProcEntry.th32ProcessID, (uint8_t*)-1);
 						}
-						else if (OutputType == SelectedOutputType::Statistics) { // TODO: map can be added to, not just constructed
+						else if (OutputType == SelectedOutputType::Statistics) {
 							list<MEMORY_BASIC_INFORMATION*> ProcessMem = QueryProcessMem(ProcEntry.th32ProcessID);
-							MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(ProcessMem);
-							MemPermRec->ShowRecords();
+							if (MemPermRec == nullptr) {
+								MemPermRec = new MemoryPermissionRecord(ProcessMem);
+							}
+							else {
+								MemPermRec->UpdateMap(ProcessMem);
+							}
 						}
 					} while (Process32NextW(hSnapshot, &ProcEntry));
 				}
@@ -296,6 +354,10 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			else
 			{
 				printf("- Failed to create process list snapshot (error %d)\r\n", GetLastError());
+			}
+
+			if (MemPermRec != nullptr) {
+				MemPermRec->ShowRecords();
 			}
 		}
 	}

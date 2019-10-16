@@ -1,11 +1,11 @@
 ﻿  Moneta.cpp
-C:\Users\forre\Desktop\Moneta\Moneta.cpp(68,5): warning C4477: 'printf' : format string '%d' requires an argument of type 'int', but variadic argument 3 has type 'SIZE_T'
-C:\Users\forre\Desktop\Moneta\Moneta.cpp(68,5): message : consider using '%lld' in the format string
-C:\Users\forre\Desktop\Moneta\Moneta.cpp(68,5): message : consider using '%Id' in the format string
-C:\Users\forre\Desktop\Moneta\Moneta.cpp(68,5): message : consider using '%I64d' in the format string
+C:\Users\forre\Documents\GitHub\moneta\Moneta.cpp(118,5): warning C4477: 'printf' : format string '%d' requires an argument of type 'int', but variadic argument 6 has type 'SIZE_T'
+C:\Users\forre\Documents\GitHub\moneta\Moneta.cpp(118,5): message : consider using '%lld' in the format string
+C:\Users\forre\Documents\GitHub\moneta\Moneta.cpp(118,5): message : consider using '%Id' in the format string
+C:\Users\forre\Documents\GitHub\moneta\Moneta.cpp(118,5): message : consider using '%I64d' in the format string
   Generating code
+  1 of 341 functions ( 0.3%) were compiled, the rest were copied from previous compilation.
   Finished generating code
-  73 of 340 functions (21.5%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
-    8 functions had inline decision re-evaluated but remain unchanged
-  Moneta.vcxproj -> C:\Users\forre\Desktop\Moneta\x64\Release\Moneta.exe
+    1 functions had inline decision re-evaluated but remain unchanged
+  Moneta.vcxproj -> C:\Users\forre\Documents\GitHub\moneta\x64\Release\Moneta.exe

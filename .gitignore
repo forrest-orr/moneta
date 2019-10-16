@@ -1,0 +1,16 @@
+
+*.tlog
+*.lastbuildstate
+*.tlog
+*.tlog
+*.db
+.vs/Moneta/v16/Browse.VC.opendb
+*.ipch
+.vs/Moneta/v16/.suo
+x64/Release/Moneta.ipdb
+*.iobj
+x64/Release/Moneta.ipdb
+*.log
+x64/Release/Moneta.log
+*.pdb
+x64/Release/Moneta.pdb
