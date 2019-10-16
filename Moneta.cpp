@@ -163,6 +163,53 @@ void EnumProcessMem(uint32_t dwTargetPid, uint8_t* pBaseAddress = (uint8_t*)0x00
 	}
 }
 
+#define MemoryBasicInformation 0x0
+#define MemoryWorkingSetInformation 0x1
+#define MemoryMappedFilenameInformation 0x2
+#define MemoryRegionInformation 0x3
+
+typedef struct _MEMORY_REGION_INFORMATION
+{
+	PVOID AllocationBase;
+	ULONG AllocationProtect;
+	union
+	{
+		ULONG RegionType;
+		struct
+		{
+			ULONG Private : 1;
+			ULONG MappedDataFile : 1;
+			ULONG MappedImage : 1;
+			ULONG MappedPageFile : 1;
+			ULONG MappedPhysical : 1;
+			ULONG DirectMapped : 1;
+			ULONG SoftwareEnclave : 1; // REDSTONE3
+			ULONG PageSize64K : 1;
+			ULONG PlaceholderReservation : 1; // REDSTONE4
+			ULONG Reserved : 23;
+		};
+	};
+	SIZE_T RegionSize;
+	SIZE_T CommitSize;
+	ULONG_PTR PartitionId; // 19H1
+} MEMORY_REGION_INFORMATION, * PMEMORY_REGION_INFORMATION;
+
+class MemoryRegionDetail {
+protected:
+	MEMORY_BASIC_INFORMATION* Basic;
+	MEMORY_REGION_INFORMATION* Region;
+
+public:
+	MemoryRegionDetail(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION *pMemRegionInfo) {
+		this->Basic = pMemBasicInfo;
+		this->Region = pMemRegionInfo;
+	}
+};
+
+class MemoryBaseRecord {
+protected:
+	map<void*, MemoryRegionDetail*> MemBaseMap;
+};
 class MemoryPermissionRecord { // Record takes list of mem basic info structs, and sorts them into a map. Class can be used to show the map.
 protected:
 	map<uint32_t, map<uint32_t, uint32_t>>* MemPermMap; // Primary key is the memory type, secondary map key is the permission attribute (and its pair value is the count).
