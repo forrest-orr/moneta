@@ -29,3 +29,9 @@ x64/Release/vc142.pdb
 *.obj
 *.iobj
 *.log
+*.iobj
+*.iobj
+*.ipdb
+*.log
+*.tlog
+*.tlog

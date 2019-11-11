@@ -1,10 +1,9 @@
 ﻿/*
- *    •1▌1▄1·.11111111▐1▄1▄▄▄1.▄▄▄▄▄1▄▄▄·1
- *    ·██1▐███▪▪11111•█▌▐█▀▄.▀·•██11▐█1▀█1
- *    ▐█1▌▐▌▐█·1▄█▀▄1▐█▐▐▌▐▀▀▪▄1▐█.▪▄█▀▀█1
- *    ██1██▌▐█▌▐█▌.▐▌██▐█▌▐█▄▄▌1▐█▌·▐█1▪▐▌
- *    ▀▀11█▪▀▀▀1▀█▄▀▪▀▀1█▪1▀▀▀11▀▀▀11▀11▀1
 ____________________________________________________________________________________
+| _______  _____  __   _ _______ _______ _______                                   |
+| |  |  | |     | | \  | |______    |    |_____|                                   |
+| |  |  | |_____| |  \_| |______    |    |     |                                   |                                                               |
+|__________________________________________________________________________________|
 | Moneta ~ Usermode memory scanner & malware hunter                                |
 |----------------------------------------------------------------------------------|
 | https://www.forrest-orr.net/post/malicious-memory-artifacts-part-i-dll-hollowing |
@@ -15,24 +14,62 @@ ________________________________________________________________________________
 |----------------------------------------------------------------------------------|
 | Licensed under GNU GPLv3                                                         |
 |__________________________________________________________________________________|
-
-## Features
-
-~ Query the memory attributes of any accessible process(es).
-~ Enumerate harvested memory attributes for display to the user:
-	+ On a per-process basis.
-	+ On a per-address basis.
-	+ On a per-permission basis.
-	+ On a per-module basis.
-
-~ Flags processes with suspicious memory artifacts.
+| ## Features                                                                      |           
+|                                                                                  |
+| ~ Query the memory attributes of any accessible process(es).                     |
+| ~ Identify private, mapped and image memory.                                     |
+| ~ Correlate regions of memory to their underlying file on disks.                 |
+| ~ Identify PE headers and sections corresponding to image memory.                |
+| ~ Identify modified regions of mapped image memory.                              |
+| ~ Identify abnormal memory attributes indicative of malware.                     |
+|__________________________________________________________________________________|
 
 */
-
 
 #include "StdAfx.h"
 
 using namespace std;
+
+list<WIN32_MEMORY_REGION_INFORMATION> QueryProcessRegions(uint32_t dwPid) {
+	list<MEMORY_REGION_INFORMATION*> RegionMem;
+	static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"Ntdll.dll"), "NtQueryVirtualMemory");
+	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, dwPid);
+
+	if (hProcess != nullptr) {
+		uint64_t qwRegionSize = 0;
+		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += qwRegionSize) {
+			MEMORY_BASIC_INFORMATION64* pMemInfo = nullptr;
+
+			pMemInfo = new MEMORY_BASIC_INFORMATION64;
+
+			if (VirtualQueryEx(hProcess, pBaseAddr, (MEMORY_BASIC_INFORMATION *)pMemInfo, sizeof(MEMORY_BASIC_INFORMATION64)) == sizeof(MEMORY_BASIC_INFORMATION64)) {
+				qwRegionSize = pMemInfo->RegionSize;
+				printf("* 0x%p region size: %I64u\r\n", pBaseAddr, qwRegionSize);
+				//if (!dwRegionSize) {
+				//	dwRegionSize = 0x1000;
+				//}
+				
+				MEMORY_REGION_INFORMATION* pRegionInfo = nullptr;
+							//SIZE_T cbRetLen = 0;
+				pRegionInfo = new MEMORY_REGION_INFORMATION;
+				NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, pBaseAddr, MemoryRegionInformation, pRegionInfo, sizeof(MEMORY_REGION_INFORMATION), nullptr);
+
+				if (NT_SUCCESS(NtStatus)) { // NtQueryVirtualMemory fails with error 0xc0000141 (invalid address) on MEM_FREE regions.
+					printf("+ Successfully queried region info at 0x%p\r\n", pBaseAddr);
+					//dwRegionSize = pRegionInfo->RegionSize;
+				}
+				else {
+					printf("- Failed to query region info at 0x%p (error 0x%08x)\r\n", pBaseAddr, NtStatus);
+				}
+			}
+			else {
+				break;
+			}
+		}
+
+		CloseHandle(hProcess);
+	}
+}
 
 list<MEMORY_BASIC_INFORMATION*> QueryProcessMem(uint32_t dwPid) {
 	list<MEMORY_BASIC_INFORMATION*> ProcessMem;
@@ -117,7 +154,7 @@ void EnumProcessMem(uint32_t dwTargetPid, uint8_t* pBaseAddress = (uint8_t*)0x00
 			printf(
 				"%wsAllocated base 0x%p\r\n"
 				"%wsBase: 0x%p\r\n"
-				"%wsSize: %d\r\n",
+				"%wsSize: %zu\r\n",
 				Indent,
 				(*RecordItr)->AllocationBase,
 				Indent,
@@ -162,37 +199,6 @@ void EnumProcessMem(uint32_t dwTargetPid, uint8_t* pBaseAddress = (uint8_t*)0x00
 		}
 	}
 }
-
-#define MemoryBasicInformation 0x0
-#define MemoryWorkingSetInformation 0x1
-#define MemoryMappedFilenameInformation 0x2
-#define MemoryRegionInformation 0x3
-
-typedef struct _MEMORY_REGION_INFORMATION
-{
-	PVOID AllocationBase;
-	ULONG AllocationProtect;
-	union
-	{
-		ULONG RegionType;
-		struct
-		{
-			ULONG Private : 1;
-			ULONG MappedDataFile : 1;
-			ULONG MappedImage : 1;
-			ULONG MappedPageFile : 1;
-			ULONG MappedPhysical : 1;
-			ULONG DirectMapped : 1;
-			ULONG SoftwareEnclave : 1; // REDSTONE3
-			ULONG PageSize64K : 1;
-			ULONG PlaceholderReservation : 1; // REDSTONE4
-			ULONG Reserved : 23;
-		};
-	};
-	SIZE_T RegionSize;
-	SIZE_T CommitSize;
-	ULONG_PTR PartitionId; // 19H1
-} MEMORY_REGION_INFORMATION, * PMEMORY_REGION_INFORMATION;
 
 class MemoryRegionDetail {
 protected:
@@ -314,6 +320,8 @@ enum class SelectedOutputType {
 };
 
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
+	QueryProcessRegions(GetCurrentProcessId());
+	return 0;
 	if (nArgc < 5) {
 		printf("* Usage: %ws --target (PID) --output-type (see remarks) --base-address (scans only the memory in the region address specified)\r\n\r\n"
 			   "  Remarks:\r\n"

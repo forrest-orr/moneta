@@ -11,5 +11,8 @@
 #include <Tlhelp32.h>
 #endif
 #include <Psapi.h>
+#include <winternl.h>
+//#include <ntdef.h>
 #include <list>
 #include <map>
+#include "NtMem.h"
