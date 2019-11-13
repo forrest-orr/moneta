@@ -35,3 +35,5 @@ x64/Release/vc142.pdb
 *.log
 *.tlog
 *.tlog
+*.pdb
+*.tlog

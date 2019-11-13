@@ -30,28 +30,50 @@ ________________________________________________________________________________
 
 using namespace std;
 
-list<WIN32_MEMORY_REGION_INFORMATION> QueryProcessRegions(uint32_t dwPid) {
-	list<MEMORY_REGION_INFORMATION*> RegionMem;
+class MemoryRegionDetail {
+protected:
+	MEMORY_BASIC_INFORMATION* Basic;
+	MEMORY_REGION_INFORMATION* Region;
+
+public:
+	MemoryRegionDetail(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo) {
+		this->Basic = pMemBasicInfo;
+		this->Region = pMemRegionInfo;
+	}
+
+	~MemoryRegionDetail() {
+		if (Basic != nullptr) {
+			delete Basic;
+		}
+
+		if (Region != nullptr) {
+			delete Basic;
+		}
+	}
+
+	MEMORY_BASIC_INFORMATION* GetBasic() {
+		return Basic;
+	}
+
+	MEMORY_REGION_INFORMATION* GetRegion() {
+		return Region;
+	}
+};
+
+list<MemoryRegionDetail *> QueryProcessMem(uint32_t dwPid) {
+	list<MemoryRegionDetail *> Regions;
 	static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"Ntdll.dll"), "NtQueryVirtualMemory");
 	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, dwPid);
 
 	if (hProcess != nullptr) {
 		uint64_t qwRegionSize = 0;
 		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += qwRegionSize) {
-			MEMORY_BASIC_INFORMATION64* pMemInfo = nullptr;
+			MEMORY_BASIC_INFORMATION64* pBasicInfo = new MEMORY_BASIC_INFORMATION64;
 
-			pMemInfo = new MEMORY_BASIC_INFORMATION64;
-
-			if (VirtualQueryEx(hProcess, pBaseAddr, (MEMORY_BASIC_INFORMATION *)pMemInfo, sizeof(MEMORY_BASIC_INFORMATION64)) == sizeof(MEMORY_BASIC_INFORMATION64)) {
-				qwRegionSize = pMemInfo->RegionSize;
-				printf("* 0x%p region size: %I64u\r\n", pBaseAddr, qwRegionSize);
-				//if (!dwRegionSize) {
-				//	dwRegionSize = 0x1000;
-				//}
+			if (VirtualQueryEx(hProcess, pBaseAddr, (MEMORY_BASIC_INFORMATION *)pBasicInfo, sizeof(MEMORY_BASIC_INFORMATION64)) == sizeof(MEMORY_BASIC_INFORMATION64)) {
+				qwRegionSize = pBasicInfo->RegionSize;
 				
-				MEMORY_REGION_INFORMATION* pRegionInfo = nullptr;
-							//SIZE_T cbRetLen = 0;
-				pRegionInfo = new MEMORY_REGION_INFORMATION;
+				MEMORY_REGION_INFORMATION* pRegionInfo = new MEMORY_REGION_INFORMATION;
 				NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, pBaseAddr, MemoryRegionInformation, pRegionInfo, sizeof(MEMORY_REGION_INFORMATION), nullptr);
 
 				if (NT_SUCCESS(NtStatus)) { // NtQueryVirtualMemory fails with error 0xc0000141 (invalid address) on MEM_FREE regions.
@@ -60,7 +82,11 @@ list<WIN32_MEMORY_REGION_INFORMATION> QueryProcessRegions(uint32_t dwPid) {
 				}
 				else {
 					printf("- Failed to query region info at 0x%p (error 0x%08x)\r\n", pBaseAddr, NtStatus);
+					delete pRegionInfo;
+					pRegionInfo = nullptr;
 				}
+
+				Regions.push_back(new MemoryRegionDetail((MEMORY_BASIC_INFORMATION *)pBasicInfo, pRegionInfo));
 			}
 			else {
 				break;
@@ -69,8 +95,11 @@ list<WIN32_MEMORY_REGION_INFORMATION> QueryProcessRegions(uint32_t dwPid) {
 
 		CloseHandle(hProcess);
 	}
+
+	return Regions;
 }
 
+/*
 list<MEMORY_BASIC_INFORMATION*> QueryProcessMem(uint32_t dwPid) {
 	list<MEMORY_BASIC_INFORMATION*> ProcessMem;
 	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, dwPid);
@@ -94,123 +123,109 @@ list<MEMORY_BASIC_INFORMATION*> QueryProcessMem(uint32_t dwPid) {
 	}
 
 	return ProcessMem;
-}
+}*/
 
-void EnumProcessMem(uint32_t dwTargetPid, uint8_t* pBaseAddress = (uint8_t*)0x00400000) {
-	list<MEMORY_BASIC_INFORMATION*> ProcessMem = QueryProcessMem(dwTargetPid);
+void EnumProcessMem(uint32_t dwTargetPid) {
+	list<MemoryRegionDetail*> Regions = QueryProcessMem(dwTargetPid);
 	bool bFileRange = false, bImageRange = false;
 
-	for (list<MEMORY_BASIC_INFORMATION*>::const_iterator RecordItr = ProcessMem.begin(); RecordItr != ProcessMem.end(); ++RecordItr) {
-		if (pBaseAddress == (uint8_t*)-1 || (*RecordItr)->AllocationBase == (void*)pBaseAddress) {
-			if ((*RecordItr)->Type == MEM_MAPPED || (*RecordItr)->Type == MEM_IMAGE) {
-				if ((*RecordItr)->AllocationBase == (*RecordItr)->BaseAddress) {
-					bFileRange = true;
-					wchar_t FileName[MAX_PATH] = { 0 };
-					HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, dwTargetPid);
+	for (list<MemoryRegionDetail*>::const_iterator RecordItr = Regions.begin(); RecordItr != Regions.end(); ++RecordItr) {
+		if ((*RecordItr)->GetBasic()->Type == MEM_MAPPED || (*RecordItr)->GetBasic()->Type == MEM_IMAGE) {
+			if ((*RecordItr)->GetBasic()->AllocationBase == (*RecordItr)->GetBasic()->BaseAddress) {
+				bFileRange = true;
+				wchar_t FileName[MAX_PATH] = { 0 };
+				HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, dwTargetPid);
 
-					if (hProcess != nullptr) {
-						if ((*RecordItr)->Type == MEM_MAPPED) {
-							if (GetMappedFileNameW(hProcess, (*RecordItr)->AllocationBase, FileName, MAX_PATH)) {
-								//printf("%ws\r\n", MappedFileName);
-							}
-							else {
-								wcscpy_s(FileName, MAX_PATH, L"Page file");
-							}
+				if (hProcess != nullptr) {
+					if ((*RecordItr)->GetBasic()->Type == MEM_MAPPED) {
+						if (GetMappedFileNameW(hProcess, (*RecordItr)->GetBasic()->AllocationBase, FileName, MAX_PATH)) {
+							//printf("%ws\r\n", MappedFileName);
 						}
 						else {
-							bImageRange = true;
-							if (GetModuleFileNameExW(hProcess, (HMODULE)(*RecordItr)->AllocationBase, FileName, MAX_PATH)) {
-								//printf("%ws\r\n", ModuleFileName);
-							}
-							else {
-								wcscpy_s(FileName, MAX_PATH, L"?");
-								printf("!!!! FAILED to get module name\r\n");
-							}
+							wcscpy_s(FileName, MAX_PATH, L"Page file");
 						}
-
-						CloseHandle(hProcess);
 					}
 					else {
-						wcscpy_s(FileName, MAX_PATH, L"Access denied");
+						bImageRange = true;
+						if (GetModuleFileNameExW(hProcess, (HMODULE)(*RecordItr)->GetBasic()->AllocationBase, FileName, MAX_PATH)) {
+							//printf("%ws\r\n", ModuleFileName);
+						}
+						else {
+							wcscpy_s(FileName, MAX_PATH, L"?");
+							printf("!!!! FAILED to get module name\r\n");
+						}
 					}
 
-					printf("======[ 0x%p : %ws\r\n", (*RecordItr)->BaseAddress, FileName);
+					CloseHandle(hProcess);
 				}
+				else {
+					wcscpy_s(FileName, MAX_PATH, L"Access denied");
+				}
+
+				printf("======[ 0x%p : %ws\r\n", (*RecordItr)->GetBasic()->BaseAddress, FileName);
 			}
-			else {
-				bFileRange = false;
-				bImageRange = false;
-				printf("======[ 0x%p\r\n", (*RecordItr)->BaseAddress);
-			}
-
-			wchar_t Indent[40] = { 0 };
-
-			wcscpy_s(Indent, 40, L"  ");
-
-			if (bImageRange) {
-				wcscat_s(Indent, 40, L"  ");
-			}
-
-			printf(
-				"%wsAllocated base 0x%p\r\n"
-				"%wsBase: 0x%p\r\n"
-				"%wsSize: %zu\r\n",
-				Indent,
-				(*RecordItr)->AllocationBase,
-				Indent,
-				(*RecordItr)->BaseAddress,
-				Indent,
-				(*RecordItr)->RegionSize);
-
-			printf("%wsState: ", Indent);
-			switch ((*RecordItr)->State)
-			{
-			case MEM_COMMIT:
-				printf("MEM_COMMIT\r\n");
-				break;
-			case MEM_RESERVE:
-				printf("MEM_RESERVE\r\n");
-				break;
-			case MEM_FREE:
-				printf("MEM_FREE\r\n");
-				break;
-			default:
-				printf("?\r\n");
-			}
-
-			printf("%wsType: ", Indent);
-			switch ((*RecordItr)->Type)
-			{
-			case MEM_IMAGE:
-				printf("MEM_IMAGE\r\n");
-				break;
-			case MEM_MAPPED:
-				printf("MEM_MAPPED\r\n");
-				break;
-			case MEM_PRIVATE:
-				printf("MEM_PRIVATE\r\n");
-				break;
-			default:
-				printf("N/A\r\n");
-			}
-
-			printf("%wsCurrent permissions: 0x%08x\r\n", Indent, (*RecordItr)->Protect);
-			printf("%wsOriginal permissions: 0x%08x\r\n\r\n", Indent, (*RecordItr)->AllocationProtect);
 		}
+		else {
+			bFileRange = false;
+			bImageRange = false;
+			printf("======[ 0x%p\r\n", (*RecordItr)->GetBasic()->BaseAddress);
+		}
+
+		wchar_t Indent[40] = { 0 };
+
+		wcscpy_s(Indent, 40, L"  ");
+
+		if (bImageRange) {
+			wcscat_s(Indent, 40, L"  ");
+		}
+
+		printf(
+			"%wsAllocated base 0x%p\r\n"
+			"%wsBase: 0x%p\r\n"
+			"%wsSize: %zu\r\n",
+			Indent,
+			(*RecordItr)->GetBasic()->AllocationBase,
+			Indent,
+			(*RecordItr)->GetBasic()->BaseAddress,
+			Indent,
+			(*RecordItr)->GetBasic()->RegionSize);
+
+		printf("%wsState: ", Indent);
+		switch ((*RecordItr)->GetBasic()->State)
+		{
+		case MEM_COMMIT:
+			printf("MEM_COMMIT\r\n");
+			break;
+		case MEM_RESERVE:
+			printf("MEM_RESERVE\r\n");
+			break;
+		case MEM_FREE:
+			printf("MEM_FREE\r\n");
+			break;
+		default:
+			printf("?\r\n");
+		}
+
+		printf("%wsType: ", Indent);
+		switch ((*RecordItr)->GetBasic()->Type)
+		{
+		case MEM_IMAGE:
+			printf("MEM_IMAGE\r\n");
+			break;
+		case MEM_MAPPED:
+			printf("MEM_MAPPED\r\n");
+			break;
+		case MEM_PRIVATE:
+			printf("MEM_PRIVATE\r\n");
+			break;
+		default:
+			printf("N/A\r\n");
+		}
+
+		printf("%wsCurrent permissions: 0x%08x\r\n", Indent, (*RecordItr)->GetBasic()->Protect);
+		printf("%wsOriginal permissions: 0x%08x\r\n\r\n", Indent, (*RecordItr)->GetBasic()->AllocationProtect);
 	}
 }
-
-class MemoryRegionDetail {
-protected:
-	MEMORY_BASIC_INFORMATION* Basic;
-	MEMORY_REGION_INFORMATION* Region;
-
-public:
-	MemoryRegionDetail(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION *pMemRegionInfo) {
-		this->Basic = pMemBasicInfo;
-		this->Region = pMemRegionInfo;
-	}
-};
 
 class MemoryBaseRecord {
 protected:
@@ -221,19 +236,19 @@ protected:
 	map<uint32_t, map<uint32_t, uint32_t>>* MemPermMap; // Primary key is the memory type, secondary map key is the permission attribute (and its pair value is the count).
 
 public:
-	void UpdateMap(list<MEMORY_BASIC_INFORMATION*> MemBasicRecords) {
-		for (list<MEMORY_BASIC_INFORMATION*>::const_iterator RecordItr = MemBasicRecords.begin(); RecordItr != MemBasicRecords.end(); ++RecordItr) {
-			if (!MemPermMap->count((*RecordItr)->Type)) {
-				MemPermMap->insert(make_pair((*RecordItr)->Type, map<uint32_t, uint32_t>()));
+	void UpdateMap(list<MemoryRegionDetail*> MemBasicRecords) {
+		for (list<MemoryRegionDetail*>::const_iterator RecordItr = MemBasicRecords.begin(); RecordItr != MemBasicRecords.end(); ++RecordItr) {
+			if (!MemPermMap->count((*RecordItr)->GetBasic()->Type)) {
+				MemPermMap->insert(make_pair((*RecordItr)->GetBasic()->Type, map<uint32_t, uint32_t>()));
 			}
 
-			map<uint32_t, uint32_t>& CountMap = MemPermMap->at((*RecordItr)->Type);
+			map<uint32_t, uint32_t>& CountMap = MemPermMap->at((*RecordItr)->GetBasic()->Type);
 
-			if (!CountMap.count((*RecordItr)->Protect)) {
-				CountMap.insert(make_pair((*RecordItr)->Protect, 0));
+			if (!CountMap.count((*RecordItr)->GetBasic()->Protect)) {
+				CountMap.insert(make_pair((*RecordItr)->GetBasic()->Protect, 0));
 			}
 
-			CountMap[(*RecordItr)->Protect]++;
+			CountMap[(*RecordItr)->GetBasic()->Protect]++;
 		}
 	}
 
@@ -241,7 +256,7 @@ public:
 		//
 	}
 
-	MemoryPermissionRecord(list<MEMORY_BASIC_INFORMATION*> MemBasicRecords) {
+	MemoryPermissionRecord(list<MemoryRegionDetail*> MemBasicRecords) {
 		MemPermMap = new map<uint32_t, map<uint32_t, uint32_t>>();
 		UpdateMap(MemBasicRecords);
 	}
@@ -320,8 +335,6 @@ enum class SelectedOutputType {
 };
 
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
-	QueryProcessRegions(GetCurrentProcessId());
-	return 0;
 	if (nArgc < 5) {
 		printf("* Usage: %ws --target (PID) --output-type (see remarks) --base-address (scans only the memory in the region address specified)\r\n\r\n"
 			   "  Remarks:\r\n"
@@ -368,10 +381,10 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		}
 
 		if (ProcType == SelectedProcessType::SpecificPid || ProcType == SelectedProcessType::SelfPid) {
-			list<MEMORY_BASIC_INFORMATION*> ProcessMem = QueryProcessMem(dwSelectedPid);
+			list<MemoryRegionDetail*> ProcessMem = QueryProcessMem(dwSelectedPid);
 
 			if (OutputType == SelectedOutputType::Raw) {
-				EnumProcessMem(dwSelectedPid, (uint8_t*)-1);
+				EnumProcessMem(dwSelectedPid);
 			}
 			else if (OutputType == SelectedOutputType::Statistics) {
 				MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(ProcessMem);
@@ -390,10 +403,10 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 					do
 					{
 						if (OutputType == SelectedOutputType::Raw) {
-							EnumProcessMem(ProcEntry.th32ProcessID, (uint8_t*)-1);
+							EnumProcessMem(ProcEntry.th32ProcessID);
 						}
 						else if (OutputType == SelectedOutputType::Statistics) {
-							list<MEMORY_BASIC_INFORMATION*> ProcessMem = QueryProcessMem(ProcEntry.th32ProcessID);
+							list<MemoryRegionDetail*> ProcessMem = QueryProcessMem(ProcEntry.th32ProcessID);
 							if (MemPermRec == nullptr) {
 								MemPermRec = new MemoryPermissionRecord(ProcessMem);
 							}
