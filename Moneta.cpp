@@ -243,8 +243,9 @@ void EnumProcessMem(uint32_t dwTargetPid) {
 				printf("%wsRegion type: software enclave\r\n", Indent);
 			}
 			*/
-			printf("\r\n");
 		}
+
+		printf("\r\n");
 	}
 }
 
