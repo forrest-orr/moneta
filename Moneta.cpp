@@ -73,6 +73,12 @@ list<MemoryRegionDetail *> QueryProcessMem(uint32_t dwPid) {
 			if (VirtualQueryEx(hProcess, pBaseAddr, (MEMORY_BASIC_INFORMATION *)pBasicInfo, sizeof(MEMORY_BASIC_INFORMATION64)) == sizeof(MEMORY_BASIC_INFORMATION64)) {
 				qwRegionSize = pBasicInfo->RegionSize;
 				
+				//
+				// The undocumented region information structure, while useful for identifying detailed type information (page file mapped, image mapped, direct mapped, data mapped, private)
+				// is unsuitable for gathering information on private copy-on-write data, as its "commit size" field gives only the total private size for an entire region.
+				// It would for example be impossible to determine using region information structures whether or not it was the .text or .data section of an image which was modified.
+				//
+
 				MEMORY_REGION_INFORMATION* pRegionInfo = new MEMORY_REGION_INFORMATION;
 				NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, pBaseAddr, MemoryRegionInformation, pRegionInfo, sizeof(MEMORY_REGION_INFORMATION), nullptr);
 
@@ -98,32 +104,6 @@ list<MemoryRegionDetail *> QueryProcessMem(uint32_t dwPid) {
 
 	return Regions;
 }
-
-/*
-list<MEMORY_BASIC_INFORMATION*> QueryProcessMem(uint32_t dwPid) {
-	list<MEMORY_BASIC_INFORMATION*> ProcessMem;
-	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, dwPid);
-
-	if (hProcess != nullptr) {
-		MEMORY_BASIC_INFORMATION* pMemInfo = nullptr;
-
-		for (uint8_t* p = nullptr;; p += pMemInfo->RegionSize) {
-			pMemInfo = new MEMORY_BASIC_INFORMATION;
-
-			if (VirtualQueryEx(hProcess, p, pMemInfo, sizeof(MEMORY_BASIC_INFORMATION)) == sizeof(MEMORY_BASIC_INFORMATION)) {
-				ProcessMem.push_back(pMemInfo);
-			}
-			else {
-				delete pMemInfo;
-				break;
-			}
-		}
-
-		CloseHandle(hProcess);
-	}
-
-	return ProcessMem;
-}*/
 
 void EnumProcessMem(uint32_t dwTargetPid) {
 	list<MemoryRegionDetail*> Regions = QueryProcessMem(dwTargetPid);
@@ -223,7 +203,48 @@ void EnumProcessMem(uint32_t dwTargetPid) {
 		}
 
 		printf("%wsCurrent permissions: 0x%08x\r\n", Indent, (*RecordItr)->GetBasic()->Protect);
-		printf("%wsOriginal permissions: 0x%08x\r\n\r\n", Indent, (*RecordItr)->GetBasic()->AllocationProtect);
+		printf("%wsOriginal permissions: 0x%08x\r\n", Indent, (*RecordItr)->GetBasic()->AllocationProtect);
+
+		if ((*RecordItr)->GetRegion() != nullptr) {
+			printf("%wsRegion allocation base: 0x%p\r\n", Indent, (*RecordItr)->GetRegion()->AllocationBase);
+			printf("%wsRegion size: %d\r\n", Indent, (*RecordItr)->GetRegion()->RegionSize);
+			printf("%wsCommit size: %d\r\n", Indent, (*RecordItr)->GetRegion()->CommitSize);
+			printf("%wsRegion type literal: 0x%08x\r\n", Indent, (*RecordItr)->GetRegion()->RegionType); // These fields do not match struct declaration, likely different across Windows versions. Ignore them for now.
+			/*
+			if ((*RecordItr)->GetRegion()->MappedImage) {
+				printf("%wsRegion type: mapped image\r\n", Indent);
+			}
+
+			if ((*RecordItr)->GetRegion()->MappedDataFile) {
+				printf("%wsRegion type: mapped data file\r\n", Indent);
+			}
+
+			if ((*RecordItr)->GetRegion()->DirectMapped) {
+				printf("%wsRegion type: direct mapped\r\n", Indent);
+			}
+
+			if ((*RecordItr)->GetRegion()->MappedPageFile) {
+				printf("%wsRegion type: mapped page file\r\n", Indent);
+			}
+
+			if ((*RecordItr)->GetRegion()->MappedPhysical) {
+				printf("%wsRegion type: mapped physical\r\n", Indent);
+			}
+
+			if ((*RecordItr)->GetRegion()->Private) {
+				printf("%wsRegion type: private\r\n", Indent);
+			}
+
+			if ((*RecordItr)->GetRegion()->PageSize64K) {
+				printf("%wsRegion type: page size 64K\r\n", Indent);
+			}
+
+			if ((*RecordItr)->GetRegion()->SoftwareEnclave) {
+				printf("%wsRegion type: software enclave\r\n", Indent);
+			}
+			*/
+			printf("\r\n");
+		}
 	}
 }
 
