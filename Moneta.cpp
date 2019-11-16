@@ -105,12 +105,38 @@ list<MemoryRegionDetail *> QueryProcessMem(uint32_t dwPid) {
 	return Regions;
 }
 
+uint32_t GetPrivateSize(uint8_t *pBaseAddress, uint32_t dwSize) {
+	PSAPI_WORKING_SET_EX_INFORMATION* pWorkingSets = new PSAPI_WORKING_SET_EX_INFORMATION;
+	uint32_t dwWorkingSetsSize = sizeof(PSAPI_WORKING_SET_EX_INFORMATION);
+	uint32_t dwPrivateSize = 0;
+
+	for (uint32_t dwPageOffset = 0; dwPageOffset < dwSize; dwPageOffset += 0x1000) {
+		pWorkingSets->VirtualAddress = (pBaseAddress + dwPageOffset);
+		if (K32QueryWorkingSetEx(GetCurrentProcess(), pWorkingSets, dwWorkingSetsSize)) {
+			//printf("+ Successfully queried working set at 0x%p\r\n", pWorkingSets->VirtualAddress);
+
+			if (!pWorkingSets->VirtualAttributes.Shared) {
+				//printf("* Page at 0x%p is shared\r\n", pWorkingSets->VirtualAddress);
+				dwPrivateSize += 0x1000;
+			}
+		}
+		else {
+			printf("- Failed to query working set at 0x%p\r\n", pWorkingSets->VirtualAddress);
+		}
+	}
+
+	return dwPrivateSize;
+}
+
 void EnumProcessMem(uint32_t dwTargetPid) {
 	list<MemoryRegionDetail*> Regions = QueryProcessMem(dwTargetPid);
 	bool bFileRange = false, bImageRange = false;
 
 	for (list<MemoryRegionDetail*>::const_iterator RecordItr = Regions.begin(); RecordItr != Regions.end(); ++RecordItr) {
+		uint32_t dwPrivateSize = 0;
+
 		if ((*RecordItr)->GetBasic()->Type == MEM_MAPPED || (*RecordItr)->GetBasic()->Type == MEM_IMAGE) {
+			dwPrivateSize = GetPrivateSize((uint8_t*)(*RecordItr)->GetBasic()->BaseAddress, (*RecordItr)->GetBasic()->RegionSize);
 			if ((*RecordItr)->GetBasic()->AllocationBase == (*RecordItr)->GetBasic()->BaseAddress) {
 				bFileRange = true;
 				wchar_t FileName[MAX_PATH] = { 0 };
@@ -202,6 +228,7 @@ void EnumProcessMem(uint32_t dwTargetPid) {
 			printf("N/A\r\n");
 		}
 
+		printf("%wsPrivate size: %d\r\n", Indent, dwPrivateSize);
 		printf("%wsCurrent permissions: 0x%08x\r\n", Indent, (*RecordItr)->GetBasic()->Protect);
 		printf("%wsOriginal permissions: 0x%08x\r\n", Indent, (*RecordItr)->GetBasic()->AllocationProtect);
 
