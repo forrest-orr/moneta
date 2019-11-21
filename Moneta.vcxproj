@@ -123,9 +123,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Memory.cpp" />
     <ClCompile Include="Moneta.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Memory.hpp" />
     <ClInclude Include="NtMem.h" />
     <ClInclude Include="StdAfx.h" />
   </ItemGroup>

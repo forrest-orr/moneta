@@ -27,38 +27,9 @@ ________________________________________________________________________________
 */
 
 #include "StdAfx.h"
+#include "Memory.hpp"
 
 using namespace std;
-
-class MemoryRegionDetail {
-protected:
-	MEMORY_BASIC_INFORMATION* Basic;
-	MEMORY_REGION_INFORMATION* Region;
-
-public:
-	MemoryRegionDetail(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo) {
-		this->Basic = pMemBasicInfo;
-		this->Region = pMemRegionInfo;
-	}
-
-	~MemoryRegionDetail() {
-		if (Basic != nullptr) {
-			delete Basic;
-		}
-
-		if (Region != nullptr) {
-			delete Basic;
-		}
-	}
-
-	MEMORY_BASIC_INFORMATION* GetBasic() {
-		return Basic;
-	}
-
-	MEMORY_REGION_INFORMATION* GetRegion() {
-		return Region;
-	}
-};
 
 list<MemoryRegionDetail *> QueryProcessMem(uint32_t dwPid) {
 	list<MemoryRegionDetail *> Regions;
@@ -73,18 +44,17 @@ list<MemoryRegionDetail *> QueryProcessMem(uint32_t dwPid) {
 			if (VirtualQueryEx(hProcess, pBaseAddr, (MEMORY_BASIC_INFORMATION *)pBasicInfo, sizeof(MEMORY_BASIC_INFORMATION64)) == sizeof(MEMORY_BASIC_INFORMATION64)) {
 				qwRegionSize = pBasicInfo->RegionSize;
 				
-				//
-				// The undocumented region information structure, while useful for identifying detailed type information (page file mapped, image mapped, direct mapped, data mapped, private)
-				// is unsuitable for gathering information on private copy-on-write data, as its "commit size" field gives only the total private size for an entire region.
-				// It would for example be impossible to determine using region information structures whether or not it was the .text or .data section of an image which was modified.
-				//
+				/*
+				The undocumented region information structure, while useful for identifying detailed type information (page file mapped, image mapped, direct mapped, data mapped, private)
+				is unsuitable for gathering information on private copy-on-write data, as its "commit size" field gives only the total private size for an entire region.
+				It would for example be impossible to determine using region information structures whether or not it was the .text or .data section of an image which was modified.
+				*/
 
 				MEMORY_REGION_INFORMATION* pRegionInfo = new MEMORY_REGION_INFORMATION;
 				NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, pBaseAddr, MemoryRegionInformation, pRegionInfo, sizeof(MEMORY_REGION_INFORMATION), nullptr);
 
 				if (NT_SUCCESS(NtStatus)) { // NtQueryVirtualMemory fails with error 0xc0000141 (invalid address) on MEM_FREE regions.
-					printf("+ Successfully queried region info at 0x%p\r\n", pBaseAddr);
-					//dwRegionSize = pRegionInfo->RegionSize;
+					//printf("+ Successfully queried region info at 0x%p\r\n", pBaseAddr);
 				}
 				else {
 					printf("- Failed to query region info at 0x%p (error 0x%08x)\r\n", pBaseAddr, NtStatus);
@@ -280,7 +250,7 @@ class MemoryBaseRecord {
 protected:
 	map<void*, MemoryRegionDetail*> MemBaseMap;
 };
-class MemoryPermissionRecord { // Record takes list of mem basic info structs, and sorts them into a map. Class can be used to show the map.
+class MemoryPermissionRecord { // Record takes basic/region memory structures, and sorts them into a map. Class can be used to show the map.
 protected:
 	map<uint32_t, map<uint32_t, uint32_t>>* MemPermMap; // Primary key is the memory type, secondary map key is the permission attribute (and its pair value is the count).
 
@@ -369,113 +339,3 @@ public:
 		}
 	}
 };
-
-enum class SelectedProcessType {
-	InvalidPid = 0,
-	SpecificPid,
-	AllPids,
-	SelfPid
-};
-
-enum class SelectedOutputType {
-	InvalidOutput = 0,
-	Raw,
-	Statistics
-};
-
-int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
-	if (nArgc < 5) {
-		printf("* Usage: %ws --target (PID) --output-type (see remarks) --base-address (scans only the memory in the region address specified)\r\n\r\n"
-			   "  Remarks:\r\n"
-			   "  ~ PID field may be \"self\" to target the current process, an arbitrart PID, or \"*\" to target all accessible processes.\r\n"
-			   "  ~ Output type field may be \"raw\" to display all queried memory info for each region, or may be \"stats\" to gather statistically common memory characteristics among the target(s)\r\n", pArgv[0]);
-	}
-	else {
-		SelectedProcessType ProcType = SelectedProcessType::InvalidPid;
-		SelectedOutputType OutputType = SelectedOutputType::InvalidOutput;
-		uint32_t dwSelectedPid = 0;
-
-		for (int32_t nX = 0; nX < nArgc; nX++) {
-			if (_wcsicmp(pArgv[nX], L"--target") == 0) {
-				if (_wcsicmp(pArgv[nX + 1], L"self") == 0) {
-					ProcType = SelectedProcessType::SelfPid;
-					dwSelectedPid = GetCurrentProcessId();
-				}
-				else if (_wcsicmp(pArgv[nX + 1], L"*") == 0) {
-					ProcType = SelectedProcessType::AllPids;
-				}
-				else {
-					ProcType = SelectedProcessType::SpecificPid;
-					dwSelectedPid = _wtoi(pArgv[nX + 1]);
-				}
-			}
-			else if (_wcsicmp(pArgv[nX], L"--output-type") == 0) {
-				if (_wcsicmp(pArgv[nX + 1], L"raw") == 0) {
-					OutputType = SelectedOutputType::Raw;
-				}
-				else if (_wcsicmp(pArgv[nX + 1], L"stats") == 0) {
-					OutputType = SelectedOutputType::Statistics;
-				}
-			}
-		}
-
-		if (ProcType == SelectedProcessType::InvalidPid) {
-			printf("- Invalid target process type selected\r\n");
-			return 0;
-		}
-
-		if (OutputType == SelectedOutputType::InvalidOutput) {
-			printf("- Invalid scan output type selected\r\n");
-			return 0;
-		}
-
-		if (ProcType == SelectedProcessType::SpecificPid || ProcType == SelectedProcessType::SelfPid) {
-			list<MemoryRegionDetail*> ProcessMem = QueryProcessMem(dwSelectedPid);
-
-			if (OutputType == SelectedOutputType::Raw) {
-				EnumProcessMem(dwSelectedPid);
-			}
-			else if (OutputType == SelectedOutputType::Statistics) {
-				MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(ProcessMem);
-				MemPermRec->ShowRecords();
-			}
-		}
-		else {
-			PROCESSENTRY32W ProcEntry = { 0 };
-			HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-			MemoryPermissionRecord* MemPermRec = nullptr;
-
-			if (hSnapshot != nullptr) {
-				ProcEntry.dwSize = sizeof(PROCESSENTRY32W);
-
-				if (Process32FirstW(hSnapshot, &ProcEntry)) {
-					do
-					{
-						if (OutputType == SelectedOutputType::Raw) {
-							EnumProcessMem(ProcEntry.th32ProcessID);
-						}
-						else if (OutputType == SelectedOutputType::Statistics) {
-							list<MemoryRegionDetail*> ProcessMem = QueryProcessMem(ProcEntry.th32ProcessID);
-							if (MemPermRec == nullptr) {
-								MemPermRec = new MemoryPermissionRecord(ProcessMem);
-							}
-							else {
-								MemPermRec->UpdateMap(ProcessMem);
-							}
-						}
-					} while (Process32NextW(hSnapshot, &ProcEntry));
-				}
-
-				CloseHandle(hSnapshot);
-			}
-			else
-			{
-				printf("- Failed to create process list snapshot (error %d)\r\n", GetLastError());
-			}
-
-			if (MemPermRec != nullptr) {
-				MemPermRec->ShowRecords();
-			}
-		}
-	}
-}
