@@ -27,7 +27,9 @@ ________________________________________________________________________________
 */
 
 #include "StdAfx.h"
-#include "Memory.hpp"
+#include "Moneta.hpp"
+
+using namespace std;
 
 enum class SelectedProcessType {
 	InvalidPid = 0,
@@ -89,7 +91,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		}
 
 		if (ProcType == SelectedProcessType::SpecificPid || ProcType == SelectedProcessType::SelfPid) {
-			list<MemoryRegionDetail*> ProcessMem = QueryProcessMem(dwSelectedPid);
+			list<MemoryBlock*> ProcessMem = QueryProcessMem(dwSelectedPid);
 
 			if (OutputType == SelectedOutputType::Raw) {
 				EnumProcessMem(dwSelectedPid);
@@ -98,7 +100,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(ProcessMem);
 				MemPermRec->ShowRecords();
 			}
-		}
+		}/*
 		else {
 			PROCESSENTRY32W ProcEntry = { 0 };
 			HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -114,7 +116,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 							EnumProcessMem(ProcEntry.th32ProcessID);
 						}
 						else if (OutputType == SelectedOutputType::Statistics) {
-							list<MemoryRegionDetail*> ProcessMem = QueryProcessMem(ProcEntry.th32ProcessID);
+							list<MemoryBlock*> ProcessMem = QueryProcessMem(ProcEntry.th32ProcessID);
 							if (MemPermRec == nullptr) {
 								MemPermRec = new MemoryPermissionRecord(ProcessMem);
 							}
@@ -135,6 +137,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			if (MemPermRec != nullptr) {
 				MemPermRec->ShowRecords();
 			}
-		}
+		}*/
 	}
 }

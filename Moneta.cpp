@@ -1,4 +1,4 @@
-﻿/*
+/*
 ____________________________________________________________________________________
 | _______  _____  __   _ _______ _______ _______                                   |
 | |  |  | |     | | \  | |______    |    |_____|                                   |
@@ -14,7 +14,7 @@ ________________________________________________________________________________
 |----------------------------------------------------------------------------------|
 | Licensed under GNU GPLv3                                                         |
 |__________________________________________________________________________________|
-| ## Features                                                                      |           
+| ## Features                                                                      |
 |                                                                                  |
 | ~ Query the memory attributes of any accessible process(es).                     |
 | ~ Identify private, mapped and image memory.                                     |
@@ -27,12 +27,34 @@ ________________________________________________________________________________
 */
 
 #include "StdAfx.h"
-#include "Memory.hpp"
+#include "Moneta.hpp"
 
 using namespace std;
 
-list<MemoryRegionDetail *> QueryProcessMem(uint32_t dwPid) {
-	list<MemoryRegionDetail *> Regions;
+MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo) {
+	this->Basic = pMemBasicInfo;
+	this->Region = pMemRegionInfo;
+}
+
+MemoryBlock::~MemoryBlock() {
+	if (Basic != nullptr) {
+		delete Basic;
+	}
+
+	if (Region != nullptr) {
+		delete Basic;
+	}
+}
+
+MEMORY_BASIC_INFORMATION* MemoryBlock::GetBasic() {
+	return Basic;
+}
+
+MEMORY_REGION_INFORMATION* MemoryBlock::GetRegion() {
+	return Region;
+}
+
+ProcessMemory::ProcessMemory(uint32_t dwPid) {
 	static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"Ntdll.dll"), "NtQueryVirtualMemory");
 	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, dwPid);
 
@@ -41,9 +63,9 @@ list<MemoryRegionDetail *> QueryProcessMem(uint32_t dwPid) {
 		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += qwRegionSize) {
 			MEMORY_BASIC_INFORMATION64* pBasicInfo = new MEMORY_BASIC_INFORMATION64;
 
-			if (VirtualQueryEx(hProcess, pBaseAddr, (MEMORY_BASIC_INFORMATION *)pBasicInfo, sizeof(MEMORY_BASIC_INFORMATION64)) == sizeof(MEMORY_BASIC_INFORMATION64)) {
+			if (VirtualQueryEx(hProcess, pBaseAddr, (MEMORY_BASIC_INFORMATION*)pBasicInfo, sizeof(MEMORY_BASIC_INFORMATION64)) == sizeof(MEMORY_BASIC_INFORMATION64)) {
 				qwRegionSize = pBasicInfo->RegionSize;
-				
+
 				/*
 				The undocumented region information structure, while useful for identifying detailed type information (page file mapped, image mapped, direct mapped, data mapped, private)
 				is unsuitable for gathering information on private copy-on-write data, as its "commit size" field gives only the total private size for an entire region.
@@ -62,7 +84,7 @@ list<MemoryRegionDetail *> QueryProcessMem(uint32_t dwPid) {
 					pRegionInfo = nullptr;
 				}
 
-				Regions.push_back(new MemoryRegionDetail((MEMORY_BASIC_INFORMATION *)pBasicInfo, pRegionInfo));
+				this->Blocks.push_back(new MemoryBlock((MEMORY_BASIC_INFORMATION*)pBasicInfo, pRegionInfo));
 			}
 			else {
 				break;
@@ -71,38 +93,10 @@ list<MemoryRegionDetail *> QueryProcessMem(uint32_t dwPid) {
 
 		CloseHandle(hProcess);
 	}
-
-	return Regions;
-}
-
-uint32_t GetPrivateSize(uint8_t *pBaseAddress, uint32_t dwSize) {
-	PSAPI_WORKING_SET_EX_INFORMATION* pWorkingSets = new PSAPI_WORKING_SET_EX_INFORMATION;
-	uint32_t dwWorkingSetsSize = sizeof(PSAPI_WORKING_SET_EX_INFORMATION);
-	uint32_t dwPrivateSize = 0;
-
-	for (uint32_t dwPageOffset = 0; dwPageOffset < dwSize; dwPageOffset += 0x1000) {
-		pWorkingSets->VirtualAddress = (pBaseAddress + dwPageOffset);
-		if (K32QueryWorkingSetEx(GetCurrentProcess(), pWorkingSets, dwWorkingSetsSize)) {
-			//printf("+ Successfully queried working set at 0x%p\r\n", pWorkingSets->VirtualAddress);
-
-			if (!pWorkingSets->VirtualAttributes.Shared) {
-				//printf("* Page at 0x%p is shared\r\n", pWorkingSets->VirtualAddress);
-				dwPrivateSize += 0x1000;
-			}
-		}
-		else {
-			printf("- Failed to query working set at 0x%p\r\n", pWorkingSets->VirtualAddress);
-		}
-	}
-
-	return dwPrivateSize;
-}
-
-void EnumProcessMem(uint32_t dwTargetPid) {
-	list<MemoryRegionDetail*> Regions = QueryProcessMem(dwTargetPid);
+}void ProcessMemory::Enumerate() {
 	bool bFileRange = false, bImageRange = false;
 
-	for (list<MemoryRegionDetail*>::const_iterator RecordItr = Regions.begin(); RecordItr != Regions.end(); ++RecordItr) {
+	for (list<MemoryBlock*>::const_iterator RecordItr = this->Blocks.begin(); RecordItr != this->Blocks.end(); ++RecordItr) {
 		uint32_t dwPrivateSize = 0;
 
 		if ((*RecordItr)->GetBasic()->Type == MEM_MAPPED || (*RecordItr)->GetBasic()->Type == MEM_IMAGE) {
@@ -207,135 +201,114 @@ void EnumProcessMem(uint32_t dwTargetPid) {
 			printf("%wsRegion size: %d\r\n", Indent, (*RecordItr)->GetRegion()->RegionSize);
 			printf("%wsCommit size: %d\r\n", Indent, (*RecordItr)->GetRegion()->CommitSize);
 			printf("%wsRegion type literal: 0x%08x\r\n", Indent, (*RecordItr)->GetRegion()->RegionType); // These fields do not match struct declaration, likely different across Windows versions. Ignore them for now.
-			/*
-			if ((*RecordItr)->GetRegion()->MappedImage) {
-				printf("%wsRegion type: mapped image\r\n", Indent);
-			}
-
-			if ((*RecordItr)->GetRegion()->MappedDataFile) {
-				printf("%wsRegion type: mapped data file\r\n", Indent);
-			}
-
-			if ((*RecordItr)->GetRegion()->DirectMapped) {
-				printf("%wsRegion type: direct mapped\r\n", Indent);
-			}
-
-			if ((*RecordItr)->GetRegion()->MappedPageFile) {
-				printf("%wsRegion type: mapped page file\r\n", Indent);
-			}
-
-			if ((*RecordItr)->GetRegion()->MappedPhysical) {
-				printf("%wsRegion type: mapped physical\r\n", Indent);
-			}
-
-			if ((*RecordItr)->GetRegion()->Private) {
-				printf("%wsRegion type: private\r\n", Indent);
-			}
-
-			if ((*RecordItr)->GetRegion()->PageSize64K) {
-				printf("%wsRegion type: page size 64K\r\n", Indent);
-			}
-
-			if ((*RecordItr)->GetRegion()->SoftwareEnclave) {
-				printf("%wsRegion type: software enclave\r\n", Indent);
-			}
-			*/
 		}
 
 		printf("\r\n");
 	}
 }
 
-class MemoryBaseRecord {
-protected:
-	map<void*, MemoryRegionDetail*> MemBaseMap;
-};
-class MemoryPermissionRecord { // Record takes basic/region memory structures, and sorts them into a map. Class can be used to show the map.
-protected:
-	map<uint32_t, map<uint32_t, uint32_t>>* MemPermMap; // Primary key is the memory type, secondary map key is the permission attribute (and its pair value is the count).
+uint32_t ProcessMemory::GetPrivateSize(uint8_t* pBaseAddress, uint32_t dwSize) {
+	PSAPI_WORKING_SET_EX_INFORMATION* pWorkingSets = new PSAPI_WORKING_SET_EX_INFORMATION;
+	uint32_t dwWorkingSetsSize = sizeof(PSAPI_WORKING_SET_EX_INFORMATION);
+	uint32_t dwPrivateSize = 0;
 
-public:
-	void UpdateMap(list<MemoryRegionDetail*> MemBasicRecords) {
-		for (list<MemoryRegionDetail*>::const_iterator RecordItr = MemBasicRecords.begin(); RecordItr != MemBasicRecords.end(); ++RecordItr) {
-			if (!MemPermMap->count((*RecordItr)->GetBasic()->Type)) {
-				MemPermMap->insert(make_pair((*RecordItr)->GetBasic()->Type, map<uint32_t, uint32_t>()));
+	for (uint32_t dwPageOffset = 0; dwPageOffset < dwSize; dwPageOffset += 0x1000) {
+		pWorkingSets->VirtualAddress = (pBaseAddress + dwPageOffset);
+		if (K32QueryWorkingSetEx(GetCurrentProcess(), pWorkingSets, dwWorkingSetsSize)) {
+			//printf("+ Successfully queried working set at 0x%p\r\n", pWorkingSets->VirtualAddress);
+
+			if (!pWorkingSets->VirtualAttributes.Shared) {
+				//printf("* Page at 0x%p is shared\r\n", pWorkingSets->VirtualAddress);
+				dwPrivateSize += 0x1000;
 			}
-
-			map<uint32_t, uint32_t>& CountMap = MemPermMap->at((*RecordItr)->GetBasic()->Type);
-
-			if (!CountMap.count((*RecordItr)->GetBasic()->Protect)) {
-				CountMap.insert(make_pair((*RecordItr)->GetBasic()->Protect, 0));
-			}
-
-			CountMap[(*RecordItr)->GetBasic()->Protect]++;
+		}
+		else {
+			printf("- Failed to query working set at 0x%p\r\n", pWorkingSets->VirtualAddress);
 		}
 	}
 
-	~MemoryPermissionRecord() {
-		//
-	}
+	return dwPrivateSize;
+}
 
-	MemoryPermissionRecord(list<MemoryRegionDetail*> MemBasicRecords) {
-		MemPermMap = new map<uint32_t, map<uint32_t, uint32_t>>();
-		UpdateMap(MemBasicRecords);
-	}
 
-	void ShowRecords() {
-		for (map<uint32_t, map<uint32_t, uint32_t>>::const_iterator Itr = MemPermMap->begin(); Itr != MemPermMap->end(); ++Itr) {
-			switch (Itr->first) {
-			case MEM_IMAGE:
-				printf("~ Image memory:\r\n");
+///////
+
+void MemoryPermissionRecord::UpdateMap(list<MemoryBlock*> MemBasicRecords) {
+	for (list<MemoryBlock*>::const_iterator RecordItr = MemBasicRecords.begin(); RecordItr != MemBasicRecords.end(); ++RecordItr) {
+		if (!MemPermMap->count((*RecordItr)->GetBasic()->Type)) {
+			MemPermMap->insert(make_pair((*RecordItr)->GetBasic()->Type, map<uint32_t, uint32_t>()));
+		}
+
+		map<uint32_t, uint32_t>& CountMap = MemPermMap->at((*RecordItr)->GetBasic()->Type);
+
+		if (!CountMap.count((*RecordItr)->GetBasic()->Protect)) {
+			CountMap.insert(make_pair((*RecordItr)->GetBasic()->Protect, 0));
+		}
+
+		CountMap[(*RecordItr)->GetBasic()->Protect]++;
+	}
+}
+
+MemoryPermissionRecord::MemoryPermissionRecord(list<MemoryBlock*> MemBasicRecords) {
+	MemPermMap = new map<uint32_t, map<uint32_t, uint32_t>>();
+	UpdateMap(MemBasicRecords);
+}
+
+void MemoryPermissionRecord::ShowRecords() {
+	for (map<uint32_t, map<uint32_t, uint32_t>>::const_iterator Itr = MemPermMap->begin(); Itr != MemPermMap->end(); ++Itr) {
+		switch (Itr->first) {
+		case MEM_IMAGE:
+			printf("~ Image memory:\r\n");
+			break;
+		case MEM_MAPPED:
+			printf("~ Mapped memory:\r\n");
+			break;
+		case MEM_PRIVATE:
+			printf("~ Private memory:\r\n");
+			break;
+		default:
+			printf("~ Unknown memory (type 0x%08x):\r\n", Itr->first);
+			break;
+		}
+
+		int32_t nTotalRegions = 0;
+
+		for (map<uint32_t, uint32_t>::const_iterator Itr2 = Itr->second.begin(); Itr2 != Itr->second.end(); ++Itr2) {
+			nTotalRegions += Itr2->second;
+		}
+
+		printf("  Total: %d\r\n", nTotalRegions);
+
+		for (map<uint32_t, uint32_t>::const_iterator Itr2 = Itr->second.begin(); Itr2 != Itr->second.end(); ++Itr2) {
+			switch (Itr2->first) {
+			case PAGE_READONLY:
+				printf("  PAGE_READONLY: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
 				break;
-			case MEM_MAPPED:
-				printf("~ Mapped memory:\r\n");
+			case PAGE_READWRITE:
+				printf("  PAGE_READWRITE: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
 				break;
-			case MEM_PRIVATE:
-				printf("~ Private memory:\r\n");
+			case PAGE_EXECUTE_READ:
+				printf("  PAGE_EXECUTE_READ: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				break;
+			case PAGE_EXECUTE_READWRITE:
+				printf("  PAGE_EXECUTE_READWRITE: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				break;
+			case PAGE_EXECUTE_WRITECOPY:
+				printf("  PAGE_EXECUTE_WRITECOPY: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				break;
+			case PAGE_WRITECOPY:
+				printf("  PAGE_WRITECOPY: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				break;
+			case PAGE_EXECUTE:
+				printf("  PAGE_EXECUTE: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				break;
+			case PAGE_NOACCESS:
+				printf("  PAGE_NOACCESS: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
 				break;
 			default:
-				printf("~ Unknown memory (type 0x%08x):\r\n", Itr->first);
+				printf("  0x%08x: %d (%f%%)\r\n", Itr2->first, Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
 				break;
-			}
-
-			int32_t nTotalRegions = 0;
-
-			for (map<uint32_t, uint32_t>::const_iterator Itr2 = Itr->second.begin(); Itr2 != Itr->second.end(); ++Itr2) {
-				nTotalRegions += Itr2->second;
-			}
-
-			printf("  Total: %d\r\n", nTotalRegions);
-
-			for (map<uint32_t, uint32_t>::const_iterator Itr2 = Itr->second.begin(); Itr2 != Itr->second.end(); ++Itr2) {
-				switch (Itr2->first) {
-				case PAGE_READONLY:
-					printf("  PAGE_READONLY: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
-					break;
-				case PAGE_READWRITE:
-					printf("  PAGE_READWRITE: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
-					break;
-				case PAGE_EXECUTE_READ:
-					printf("  PAGE_EXECUTE_READ: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
-					break;
-				case PAGE_EXECUTE_READWRITE:
-					printf("  PAGE_EXECUTE_READWRITE: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
-					break;
-				case PAGE_EXECUTE_WRITECOPY:
-					printf("  PAGE_EXECUTE_WRITECOPY: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
-					break;
-				case PAGE_WRITECOPY:
-					printf("  PAGE_WRITECOPY: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
-					break;
-				case PAGE_EXECUTE:
-					printf("  PAGE_EXECUTE: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
-					break;
-				case PAGE_NOACCESS:
-					printf("  PAGE_NOACCESS: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
-					break;
-				default:
-					printf("  0x%08x: %d (%f%%)\r\n", Itr2->first, Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
-					break;
-				}
 			}
 		}
 	}
-};
+}

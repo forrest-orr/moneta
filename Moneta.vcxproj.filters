@@ -21,10 +21,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Moneta.cpp">
+    <ClCompile Include="Interface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Memory.cpp">
+    <ClCompile Include="Moneta.cpp">
       <Filter>Source Files\Classes</Filter>
     </ClCompile>
   </ItemGroup>
@@ -35,7 +35,7 @@
     <ClInclude Include="NtMem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Memory.hpp">
+    <ClInclude Include="Moneta.hpp">
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
   </ItemGroup>
