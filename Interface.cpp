@@ -91,13 +91,14 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		}
 
 		if (ProcType == SelectedProcessType::SpecificPid || ProcType == SelectedProcessType::SelfPid) {
-			list<MemoryBlock*> ProcessMem = QueryProcessMem(dwSelectedPid);
+			Moneta ProcAddressSpace(dwSelectedPid);
+			//list<MemoryBlock*> ProcessMem = QueryProcessMem(dwSelectedPid);
 
 			if (OutputType == SelectedOutputType::Raw) {
-				EnumProcessMem(dwSelectedPid);
+				ProcAddressSpace.Enumerate();
 			}
 			else if (OutputType == SelectedOutputType::Statistics) {
-				MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(ProcessMem);
+				MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(ProcAddressSpace.GetBlocks());
 				MemPermRec->ShowRecords();
 			}
 		}/*

@@ -12,21 +12,22 @@ public:
 
 class MemoryPermissionRecord { // Record takes basic/region memory structures, and sorts them into a map. Class can be used to show the map.
 protected:
-	map<uint32_t, map<uint32_t, uint32_t>>* MemPermMap; // Primary key is the memory type, secondary map key is the permission attribute (and its pair value is the count).
+	std::map<uint32_t, std::map<uint32_t, uint32_t>>* MemPermMap; // Primary key is the memory type, secondary map key is the permission attribute (and its pair value is the count).
 
 public:
-	void UpdateMap(list<MemoryBlock*> MemBasicRecords);
-	MemoryPermissionRecord(list<MemoryBlock*> MemBasicRecords);
+	void UpdateMap(std::list<MemoryBlock*> MemBasicRecords);
+	MemoryPermissionRecord(std::list<MemoryBlock*> MemBasicRecords);
 	void ShowRecords();
 };
 
-class ProcessMemory {
+class Moneta { // This should be named something else. It is PID-specific, and multiple instances of it are needed to gather data on multiple processes
 protected:
 	uint32_t Pid;
-	MemoryPermissionRecord PermissionRecords;
-	list<MemoryBlock*> Blocks;
+	//MemoryPermissionRecord *PermissionRecords;
+	std::list<MemoryBlock*> Blocks;
 public:
-	ProcessMemory(uint32_t dwPid);
+	Moneta(uint32_t dwPid);
 	void Enumerate();
 	uint32_t GetPrivateSize(uint8_t* pBaseAddress, uint32_t dwSize); // Should this be static?
+	std::list<MemoryBlock*> GetBlocks();
 };

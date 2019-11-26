@@ -54,7 +54,7 @@ MEMORY_REGION_INFORMATION* MemoryBlock::GetRegion() {
 	return Region;
 }
 
-ProcessMemory::ProcessMemory(uint32_t dwPid) {
+Moneta::Moneta(uint32_t dwPid) {
 	static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"Ntdll.dll"), "NtQueryVirtualMemory");
 	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, dwPid);
 
@@ -91,9 +91,16 @@ ProcessMemory::ProcessMemory(uint32_t dwPid) {
 			}
 		}
 
+		//this->PermissionRecords = new MemoryPermissionRecord(this->Blocks); // Initialize 
 		CloseHandle(hProcess);
 	}
-}void ProcessMemory::Enumerate() {
+}
+
+list<MemoryBlock*> Moneta::GetBlocks() {
+	return this->Blocks;
+}
+
+void Moneta::Enumerate() {
 	bool bFileRange = false, bImageRange = false;
 
 	for (list<MemoryBlock*>::const_iterator RecordItr = this->Blocks.begin(); RecordItr != this->Blocks.end(); ++RecordItr) {
@@ -104,7 +111,7 @@ ProcessMemory::ProcessMemory(uint32_t dwPid) {
 			if ((*RecordItr)->GetBasic()->AllocationBase == (*RecordItr)->GetBasic()->BaseAddress) {
 				bFileRange = true;
 				wchar_t FileName[MAX_PATH] = { 0 };
-				HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, dwTargetPid);
+				HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, this->Pid);
 
 				if (hProcess != nullptr) {
 					if ((*RecordItr)->GetBasic()->Type == MEM_MAPPED) {
@@ -207,7 +214,7 @@ ProcessMemory::ProcessMemory(uint32_t dwPid) {
 	}
 }
 
-uint32_t ProcessMemory::GetPrivateSize(uint8_t* pBaseAddress, uint32_t dwSize) {
+uint32_t Moneta::GetPrivateSize(uint8_t* pBaseAddress, uint32_t dwSize) {
 	PSAPI_WORKING_SET_EX_INFORMATION* pWorkingSets = new PSAPI_WORKING_SET_EX_INFORMATION;
 	uint32_t dwWorkingSetsSize = sizeof(PSAPI_WORKING_SET_EX_INFORMATION);
 	uint32_t dwPrivateSize = 0;
