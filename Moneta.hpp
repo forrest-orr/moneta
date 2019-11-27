@@ -20,6 +20,15 @@ public:
 	void ShowRecords();
 };
 
+/*
+- New class initialized from PID, all basic info and region structs are stored in a list.
+- Analyze method in class can be called which will create a map, the key of which is the alloc base and the value will indicate:
+1) All blocks which share this alloc base
+2) An extended info class, the base of which will contain a file name (for non-image map) which could also be "Page file"
+and there will be an image class which inherits from it which will also indicate which blocks associated with alloc base
+correspond to which sections in the PE by name (also shown will be their initial permissions in the section header).
+
+*/
 class Moneta { // This should be named something else. It is PID-specific, and multiple instances of it are needed to gather data on multiple processes
 protected:
 	uint32_t Pid;
