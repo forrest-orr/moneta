@@ -37,6 +37,6 @@ protected:
 public:
 	Moneta(uint32_t dwPid);
 	void Enumerate();
-	uint32_t GetPrivateSize(uint8_t* pBaseAddress, uint32_t dwSize); // Should this be static?
+	static uint32_t GetPrivateSize(uint8_t* pBaseAddress, uint32_t dwSize); // GetPrivateSize does not utilize any of the other members of this class and therefore can be declared independent of them as a static method
 	std::list<MemoryBlock*> GetBlocks();
 };

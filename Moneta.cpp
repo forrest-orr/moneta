@@ -31,10 +31,7 @@ ________________________________________________________________________________
 
 using namespace std;
 
-MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo) {
-	this->Basic = pMemBasicInfo;
-	this->Region = pMemRegionInfo;
-}
+MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo) : Basic(pMemBasicInfo), Region(pMemRegionInfo) {}
 
 MemoryBlock::~MemoryBlock() {
 	if (Basic != nullptr) {
@@ -54,7 +51,7 @@ MEMORY_REGION_INFORMATION* MemoryBlock::GetRegion() {
 	return Region;
 }
 
-Moneta::Moneta(uint32_t dwPid) {
+Moneta::Moneta(uint32_t dwPid) : Pid(dwPid) {
 	static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"Ntdll.dll"), "NtQueryVirtualMemory");
 	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, dwPid);
 
@@ -107,7 +104,7 @@ void Moneta::Enumerate() {
 		uint32_t dwPrivateSize = 0;
 
 		if ((*RecordItr)->GetBasic()->Type == MEM_MAPPED || (*RecordItr)->GetBasic()->Type == MEM_IMAGE) {
-			dwPrivateSize = GetPrivateSize((uint8_t*)(*RecordItr)->GetBasic()->BaseAddress, (*RecordItr)->GetBasic()->RegionSize);
+			dwPrivateSize = Moneta::GetPrivateSize((uint8_t*)(*RecordItr)->GetBasic()->BaseAddress, (*RecordItr)->GetBasic()->RegionSize);
 			if ((*RecordItr)->GetBasic()->AllocationBase == (*RecordItr)->GetBasic()->BaseAddress) {
 				bFileRange = true;
 				wchar_t FileName[MAX_PATH] = { 0 };
