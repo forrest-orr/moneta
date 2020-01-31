@@ -53,11 +53,19 @@ MEMORY_REGION_INFORMATION* MemoryBlock::GetRegion() {
 	return Region;
 }
 
-void Entity::SetSBlocks(list<MemoryBlock*> SBlocks) {
+void MappedFile::SetSBlocks(list<MemoryBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
 }
 
-Unknown::Unknown() {}
+void PE::SetSBlocks(list<MemoryBlock*> SBlocks) {
+	this->SBlocks = SBlocks;
+}
+
+void Unknown::SetSBlocks(list<MemoryBlock*> SBlocks) {
+	this->SBlocks = SBlocks;
+}
+
+//Unknown::Unknown() {}
 
 /*
 Unknown::Unknown(list<MemoryBlock*> SBlocks) {
@@ -68,26 +76,28 @@ PE::PE(list<MemoryBlock*> SBlocks, const wchar_t *pFilePath) : FilePath(pFilePat
 	this->SBlocks = SBlocks; // This must be done since it is inheritted from the abstract base class (it can't be auto-set like FilePath was)
 }*/
 
-PE::PE(const wchar_t* pFilePath) : FilePath(pFilePath) {}
+void MappedFile::SetFilePath(const wchar_t* pFilePath) {
+	this->FilePath = pFilePath;
+}
 
-wstring PE::GetFilePath() {
+wstring MappedFile::GetFilePath() {
 	return this->FilePath;
 }
 
+/*
 AddressSpace::~AddressSpace() {
 	//
 }
 
 AddressSpace::AddressSpace() {
 	//
-}
+}*/
 
 Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	//
 	// Initialize a new entity for each allocation base and add it to this process address space map
 	//
 	this->Entities = new map<uint8_t*, Entity*>();
-	static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"Ntdll.dll"), "NtQueryVirtualMemory");
 	HANDLE hProcess = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
 
 	if (hProcess != nullptr) {
@@ -128,10 +138,23 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 					if (pBasicInfo->Type == MEM_IMAGE) {
 						wchar_t ModFileName[MAX_PATH + 1] = { 0 };
 						if (GetModuleFileNameExW(hProcess, (HMODULE)pBasicInfo->AllocationBase, ModFileName, MAX_PATH)) {
-							printf("%ws\r\n", ModFileName);
+							//printf("%ws\r\n", ModFileName);
 						}
 
-						CurrentEntity = new PE(ModFileName);
+						CurrentEntity = new PE();
+						((PE*)CurrentEntity)->SetFilePath(ModFileName);
+					}
+					else if (pBasicInfo->Type == MEM_MAPPED) {
+						wchar_t ModFileName[MAX_PATH + 1] = { 0 };
+						if (GetMappedFileNameW(hProcess, (HMODULE)pBasicInfo->AllocationBase, ModFileName, MAX_PATH)) {
+							//printf("%ws\r\n", ModFileName);
+						}
+						else {
+							wcscpy_s(ModFileName, MAX_PATH + 1, L"Page File");
+						}
+
+						CurrentEntity = new MappedFile();
+						((MappedFile*)CurrentEntity)->SetFilePath(ModFileName);
 					}
 					else {
 						CurrentEntity = new Unknown();
@@ -169,6 +192,10 @@ void AddressSpace::Enumerate() {
 		if (Itr->second->Type() == EntityType::PE) {
 			printf("Entity type: PE\r\n");
 			printf("File path: %ws\r\n", ((PE *)Itr->second)->GetFilePath().c_str());
+		}
+		else if (Itr->second->Type() == EntityType::MAPPED_FILE) {
+			printf("Entity type: Mapped file\r\n");
+			printf("File path: %ws\r\n", ((MappedFile*)Itr->second)->GetFilePath().c_str());
 		}
 		else {
 			printf("Entity type: Unknown\r\n");

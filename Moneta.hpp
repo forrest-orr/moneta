@@ -21,13 +21,13 @@ public:
 };
 
 namespace Moneta {
-	enum class EntityType{UNKNOWN, PE};
+	enum class EntityType{UNKNOWN, PE, MAPPED_FILE};
 	class Entity {
 	protected:
 		std::list<MemoryBlock*> SBlocks;
 	public:
 		std::list<MemoryBlock*> GetSBlocks();
-		void SetSBlocks(std::list<MemoryBlock*>);
+		virtual void SetSBlocks(std::list<MemoryBlock*>) = 0; // In addition to initializing the sblocks list, derivations of this class are expected to implement this method so as to process the sblocks as input, analyze them and generate additional child entities (if applicable)
 		virtual EntityType Type() = 0;
 	};
 
@@ -35,8 +35,8 @@ namespace Moneta {
 	protected:
 		std::map<uint8_t*, Entity *> *Entities; // An ablock can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
 	public:
-		AddressSpace();
-		~AddressSpace();
+		//AddressSpace();
+		//~AddressSpace();
 		void Enumerate();
 	};
 
@@ -49,24 +49,34 @@ namespace Moneta {
 	};
 
 	class Section : public Entity {
+	protected:
 		IMAGE_SECTION_HEADER Hdr;
 		std::list<MemoryBlock*> SBlocks; // These sblocks will be duplicates within the derived parent PE entity
 	};
 
-	class PE : public Entity {
+	class MappedFile : public Entity {
 	public:
-		//PE(std::list<MemoryBlock*> SBlocks, const wchar_t *pFilePath);
-		PE(const wchar_t* pFilePath);
+		void SetSBlocks(std::list<MemoryBlock*>);
+		void SetFilePath(const wchar_t* pFilePath);
 		std::wstring GetFilePath();
-		EntityType Type() { return EntityType::PE; }
+		EntityType Type() { return EntityType::MAPPED_FILE; }
 	protected:
 		std::wstring FilePath;
+	};
+
+	class PE : public MappedFile {
+	public:
+		EntityType Type() { return EntityType::PE; }
+		void SetSBlocks(std::list<MemoryBlock*>);
+	protected:
+		//
 	};
 
 	class Unknown : public Entity {
 	public:
 		//Unknown(std::list<MemoryBlock*> SBlocks);
-		Unknown();
+		void SetSBlocks(std::list<MemoryBlock*>);
+		//Unknown();
 		EntityType Type() { return EntityType::UNKNOWN; }
 	};
 
