@@ -12,10 +12,11 @@
 #endif
 #include <Psapi.h>
 #include <winternl.h>
+#include <assert.h>
+#include <ImageHlp.h>
 //#include <ntdef.h>
 #include <list>
 #include <map>
 #include <string>
-#include <typeinfo>
 #include <iostream>
 #include "NtMem.h"

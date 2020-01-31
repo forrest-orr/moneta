@@ -25,6 +25,7 @@ namespace Moneta {
 	class Entity {
 	protected:
 		std::list<MemoryBlock*> SBlocks;
+		uint8_t* StartVa, * EndVa;
 	public:
 		std::list<MemoryBlock*> GetSBlocks();
 		virtual void SetSBlocks(std::list<MemoryBlock*>) = 0; // In addition to initializing the sblocks list, derivations of this class are expected to implement this method so as to process the sblocks as input, analyze them and generate additional child entities (if applicable)
@@ -56,18 +57,21 @@ namespace Moneta {
 
 	class MappedFile : public Entity {
 	public:
+		MappedFile();
 		void SetSBlocks(std::list<MemoryBlock*>);
-		void SetFilePath(const wchar_t* pFilePath);
+		void SetFile(const wchar_t* pFilePath);
 		std::wstring GetFilePath();
 		EntityType Type() { return EntityType::MAPPED_FILE; }
 	protected:
-		std::wstring FilePath;
+		FileBase *File = nullptr;
+		//std::wstring FilePath;
 	};
 
 	class PE : public MappedFile {
 	public:
 		EntityType Type() { return EntityType::PE; }
 		void SetSBlocks(std::list<MemoryBlock*>);
+		PE();
 	protected:
 		//
 	};

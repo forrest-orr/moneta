@@ -123,12 +123,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="FileIo.cpp" />
     <ClCompile Include="Interface.cpp" />
     <ClCompile Include="Moneta.cpp" />
+    <ClCompile Include="PE.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="FileIo.hpp" />
     <ClInclude Include="Moneta.hpp" />
     <ClInclude Include="NtMem.h" />
+    <ClInclude Include="PE.hpp" />
     <ClInclude Include="StdAfx.h" />
   </ItemGroup>
   <ItemGroup>

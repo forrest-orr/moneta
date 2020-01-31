@@ -27,6 +27,7 @@ ________________________________________________________________________________
 */
 
 #include "StdAfx.h"
+#include "FileIo.hpp"
 #include "Moneta.hpp"
 
 using namespace std;

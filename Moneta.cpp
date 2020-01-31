@@ -27,10 +27,13 @@ ________________________________________________________________________________
 */
 
 #include "StdAfx.h"
+#include "FileIo.hpp"
 #include "Moneta.hpp"
+#include "PE.hpp"
 
 using namespace std;
 using namespace Moneta;
+using namespace PE;
 
 MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION64* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo) : Basic(pMemBasicInfo), Region(pMemRegionInfo) {}
 
@@ -57,8 +60,19 @@ void MappedFile::SetSBlocks(list<MemoryBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
 }
 
-void PE::SetSBlocks(list<MemoryBlock*> SBlocks) {
+Moneta::PE::PE() {}
+MappedFile::MappedFile() {}
+
+void Moneta::PE::SetSBlocks(list<MemoryBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
+	//list<MemoryBlock*> test = SBlocks;
+	//printf("x\r\n");
+	this->StartVa = (uint8_t *)(SBlocks.front())->GetBasic()->BaseAddress;
+	//printf("x.1: %d\r\n", test.size());
+	//this->EndVa = (uint8_t*)(test.back())->GetBasic()->BaseAddress;
+	this->EndVa = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize);
+	//printf("y\r\n");
+	//PeBase* TargetPe = PeBase::Load(this->File->GetData(), this->File->GetSize());
 }
 
 void Unknown::SetSBlocks(list<MemoryBlock*> SBlocks) {
@@ -76,12 +90,18 @@ PE::PE(list<MemoryBlock*> SBlocks, const wchar_t *pFilePath) : FilePath(pFilePat
 	this->SBlocks = SBlocks; // This must be done since it is inheritted from the abstract base class (it can't be auto-set like FilePath was)
 }*/
 
-void MappedFile::SetFilePath(const wchar_t* pFilePath) {
-	this->FilePath = pFilePath;
+void MappedFile::SetFile(const wchar_t* pFilePath) {
+	try {
+		this->File = new FileBase(pFilePath, false);
+	}
+	catch (...) {
+		printf("- Failed to open %ws\r\n", pFilePath);
+		this->File = nullptr;
+	}
 }
 
 wstring MappedFile::GetFilePath() {
-	return this->FilePath;
+	return this->File == nullptr ? L"?" : this->File->GetPath();
 }
 
 /*
@@ -99,7 +119,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	//
 	this->Entities = new map<uint8_t*, Entity*>();
 	HANDLE hProcess = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
-
+	
 	if (hProcess != nullptr) {
 		uint64_t qwRegionSize = 0;
 		list<MemoryBlock *> SBlocks;
@@ -136,25 +156,29 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				if (SBlocks.size() == 1) {
 					ABlock = SBlocks.begin();
 					if (pBasicInfo->Type == MEM_IMAGE) {
+						//printf("img\r\n");
 						wchar_t ModFileName[MAX_PATH + 1] = { 0 };
 						if (GetModuleFileNameExW(hProcess, (HMODULE)pBasicInfo->AllocationBase, ModFileName, MAX_PATH)) {
-							//printf("%ws\r\n", ModFileName);
+							printf("%ws\r\n", ModFileName);
 						}
 
-						CurrentEntity = new PE();
-						((PE*)CurrentEntity)->SetFilePath(ModFileName);
+						CurrentEntity = new Moneta::PE();
+						((Moneta::PE*)CurrentEntity)->SetFile(ModFileName);
+						//printf("1\r\n");
 					}
 					else if (pBasicInfo->Type == MEM_MAPPED) {
+						//printf("map\r\n");
 						wchar_t ModFileName[MAX_PATH + 1] = { 0 };
+						CurrentEntity = new MappedFile();
+
 						if (GetMappedFileNameW(hProcess, (HMODULE)pBasicInfo->AllocationBase, ModFileName, MAX_PATH)) {
-							//printf("%ws\r\n", ModFileName);
+							printf("%ws\r\n", ModFileName);
 						}
 						else {
 							wcscpy_s(ModFileName, MAX_PATH + 1, L"Page File");
 						}
 
-						CurrentEntity = new MappedFile();
-						((MappedFile*)CurrentEntity)->SetFilePath(ModFileName);
+						((MappedFile*)CurrentEntity)->SetFile(ModFileName);
 					}
 					else {
 						CurrentEntity = new Unknown();
@@ -191,7 +215,7 @@ void AddressSpace::Enumerate() {
 		
 		if (Itr->second->Type() == EntityType::PE) {
 			printf("Entity type: PE\r\n");
-			printf("File path: %ws\r\n", ((PE *)Itr->second)->GetFilePath().c_str());
+			printf("File path: %ws\r\n", ((Moneta::PE *)Itr->second)->GetFilePath().c_str());
 		}
 		else if (Itr->second->Type() == EntityType::MAPPED_FILE) {
 			printf("Entity type: Mapped file\r\n");
