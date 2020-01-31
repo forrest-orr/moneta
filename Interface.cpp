@@ -30,6 +30,7 @@ ________________________________________________________________________________
 #include "Moneta.hpp"
 
 using namespace std;
+using namespace Moneta;
 
 enum class SelectedProcessType {
 	InvalidPid = 0,
@@ -91,15 +92,15 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		}
 
 		if (ProcType == SelectedProcessType::SpecificPid || ProcType == SelectedProcessType::SelfPid) {
-			Moneta ProcAddressSpace(dwSelectedPid);
+			Process TargetProc(dwSelectedPid);
 			//list<MemoryBlock*> ProcessMem = QueryProcessMem(dwSelectedPid);
 
 			if (OutputType == SelectedOutputType::Raw) {
-				ProcAddressSpace.Enumerate();
+				TargetProc.Enumerate();
 			}
 			else if (OutputType == SelectedOutputType::Statistics) {
-				MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(ProcAddressSpace.GetBlocks());
-				MemPermRec->ShowRecords();
+				//MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(TargetProc.GetBlocks());
+				//MemPermRec->ShowRecords();
 			}
 		}/*
 		else {

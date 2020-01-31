@@ -30,10 +30,12 @@ ________________________________________________________________________________
 #include "Moneta.hpp"
 
 using namespace std;
+using namespace Moneta;
 
-MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo) : Basic(pMemBasicInfo), Region(pMemRegionInfo) {}
+MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION64* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo) : Basic(pMemBasicInfo), Region(pMemRegionInfo) {}
 
 MemoryBlock::~MemoryBlock() {
+	printf("! Memory block destructor\r\n");
 	if (Basic != nullptr) {
 		delete Basic;
 	}
@@ -43,7 +45,7 @@ MemoryBlock::~MemoryBlock() {
 	}
 }
 
-MEMORY_BASIC_INFORMATION* MemoryBlock::GetBasic() {
+MEMORY_BASIC_INFORMATION64* MemoryBlock::GetBasic() {
 	return Basic;
 }
 
@@ -51,39 +53,98 @@ MEMORY_REGION_INFORMATION* MemoryBlock::GetRegion() {
 	return Region;
 }
 
-Moneta::Moneta(uint32_t dwPid) : Pid(dwPid) {
+void Entity::SetSBlocks(list<MemoryBlock*> SBlocks) {
+	this->SBlocks = SBlocks;
+}
+
+Unknown::Unknown() {}
+
+/*
+Unknown::Unknown(list<MemoryBlock*> SBlocks) {
+	this->SBlocks = SBlocks;
+}
+
+PE::PE(list<MemoryBlock*> SBlocks, const wchar_t *pFilePath) : FilePath(pFilePath) {
+	this->SBlocks = SBlocks; // This must be done since it is inheritted from the abstract base class (it can't be auto-set like FilePath was)
+}*/
+
+PE::PE(const wchar_t* pFilePath) : FilePath(pFilePath) {}
+
+wstring PE::GetFilePath() {
+	return this->FilePath;
+}
+
+AddressSpace::~AddressSpace() {
+	//
+}
+
+AddressSpace::AddressSpace() {
+	//
+}
+
+Process::Process(uint32_t dwPid) : Pid(dwPid) {
+	//
+	// Initialize a new entity for each allocation base and add it to this process address space map
+	//
+	this->Entities = new map<uint8_t*, Entity*>();
 	static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"Ntdll.dll"), "NtQueryVirtualMemory");
-	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, dwPid);
+	HANDLE hProcess = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
 
 	if (hProcess != nullptr) {
 		uint64_t qwRegionSize = 0;
+		list<MemoryBlock *> SBlocks;
+		list<MemoryBlock*>::iterator ABlock;
+		Entity* CurrentEntity = nullptr;
+
+		//Loop memory, building list of SBlocks. Once a block is found which does not match the "current" allocation base, create a new entity containing the corresponding sblock list, and insert it into the address space entities map using the ablock as the key.
+
 		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += qwRegionSize) {
 			MEMORY_BASIC_INFORMATION64* pBasicInfo = new MEMORY_BASIC_INFORMATION64;
 
 			if (VirtualQueryEx(hProcess, pBaseAddr, (MEMORY_BASIC_INFORMATION*)pBasicInfo, sizeof(MEMORY_BASIC_INFORMATION64)) == sizeof(MEMORY_BASIC_INFORMATION64)) {
 				qwRegionSize = pBasicInfo->RegionSize;
 
-				/*
-				The undocumented region information structure, while useful for identifying detailed type information (page file mapped, image mapped, direct mapped, data mapped, private)
-				is unsuitable for gathering information on private copy-on-write data, as its "commit size" field gives only the total private size for an entire region.
-				It would for example be impossible to determine using region information structures whether or not it was the .text or .data section of an image which was modified.
-				*/
-
-				MEMORY_REGION_INFORMATION* pRegionInfo = new MEMORY_REGION_INFORMATION;
-				NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, pBaseAddr, MemoryRegionInformation, pRegionInfo, sizeof(MEMORY_REGION_INFORMATION), nullptr);
-
-				if (NT_SUCCESS(NtStatus)) { // NtQueryVirtualMemory fails with error 0xc0000141 (invalid address) on MEM_FREE regions.
-					//printf("+ Successfully queried region info at 0x%p\r\n", pBaseAddr);
+				if (!SBlocks.empty()) { // If the sblock list is empty then there is no ablock for comparison
+					//
+					// In the event that this is a new ablock, create a map pair and insert it into the entities map
+					//
+					//printf("Sblock list not empty\r\n");
+					if (pBasicInfo->AllocationBase != (*ABlock)->GetBasic()->AllocationBase) {
+						//printf("Found a new ablock. Saving sblock list to new entity entry.");
+						CurrentEntity->SetSBlocks(SBlocks);
+						this->Entities->insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, CurrentEntity));
+						SBlocks.clear();
+					}
 				}
-				else {
-					printf("- Failed to query region info at 0x%p (error 0x%08x)\r\n", pBaseAddr, NtStatus);
-					delete pRegionInfo;
-					pRegionInfo = nullptr;
-				}
+				//printf("Addomg mew sblock to list\r\n");
+				SBlocks.push_back(new MemoryBlock((MEMORY_BASIC_INFORMATION64*)pBasicInfo, nullptr));
 
-				this->Blocks.push_back(new MemoryBlock((MEMORY_BASIC_INFORMATION*)pBasicInfo, pRegionInfo));
+				//
+				// Potentially initialize a new polymorphic entity class based upon the memory characteristics
+				//
+
+				if (SBlocks.size() == 1) {
+					ABlock = SBlocks.begin();
+					if (pBasicInfo->Type == MEM_IMAGE) {
+						wchar_t ModFileName[MAX_PATH + 1] = { 0 };
+						if (GetModuleFileNameExW(hProcess, (HMODULE)pBasicInfo->AllocationBase, ModFileName, MAX_PATH)) {
+							printf("%ws\r\n", ModFileName);
+						}
+
+						CurrentEntity = new PE(ModFileName);
+					}
+					else {
+						CurrentEntity = new Unknown();
+					}
+					//printf("Set current ABlock to 0x%p due to sblock list size of 1 after insert\n", (*ABlock)->GetBasic()->AllocationBase);
+				}
 			}
 			else {
+				if (!SBlocks.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
+					CurrentEntity->SetSBlocks(SBlocks);
+					this->Entities->insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, CurrentEntity));
+				}
+
 				break;
 			}
 		}
@@ -93,18 +154,45 @@ Moneta::Moneta(uint32_t dwPid) : Pid(dwPid) {
 	}
 }
 
-list<MemoryBlock*> Moneta::GetBlocks() {
-	return this->Blocks;
+list<MemoryBlock*> Entity::GetSBlocks() {
+	return this->SBlocks;
 }
 
-void Moneta::Enumerate() {
+void AddressSpace::Enumerate() {
+	//
+	// Walk ablocks (entities) and list the corresponding sblocks of each.
+	//
+
+	for (map<uint8_t *, Entity *>::iterator Itr = this->Entities->begin(); Itr != this->Entities->end(); ++Itr) {
+		printf("A-Block 0x%p\r\n", Itr->first);
+		
+		if (Itr->second->Type() == EntityType::PE) {
+			printf("Entity type: PE\r\n");
+			printf("File path: %ws\r\n", ((PE *)Itr->second)->GetFilePath().c_str());
+		}
+		else {
+			printf("Entity type: Unknown\r\n");
+		}
+
+		printf("S-Blocks:\r\n");
+
+		list<MemoryBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
+		if (SBlocks.empty()) {
+			printf("Empty SBlock list");
+		}
+
+		for (list<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
+			printf("  0x%p\r\n", (*SBlockItr)->GetBasic()->BaseAddress);
+		}
+	}
+	/*
 	bool bFileRange = false, bImageRange = false;
 
-	for (list<MemoryBlock*>::const_iterator RecordItr = this->Blocks.begin(); RecordItr != this->Blocks.end(); ++RecordItr) {
+	for (list<MemoryBlock*>::const_iterator RecordItr = this->SBlocks.begin(); RecordItr != this->SBlocks.end(); ++RecordItr) {
 		uint32_t dwPrivateSize = 0;
 
 		if ((*RecordItr)->GetBasic()->Type == MEM_MAPPED || (*RecordItr)->GetBasic()->Type == MEM_IMAGE) {
-			dwPrivateSize = Moneta::GetPrivateSize((uint8_t*)(*RecordItr)->GetBasic()->BaseAddress, (*RecordItr)->GetBasic()->RegionSize);
+			dwPrivateSize = VmProcess::GetPrivateSize((uint8_t*)(*RecordItr)->GetBasic()->BaseAddress, (*RecordItr)->GetBasic()->RegionSize);
 			if ((*RecordItr)->GetBasic()->AllocationBase == (*RecordItr)->GetBasic()->BaseAddress) {
 				bFileRange = true;
 				wchar_t FileName[MAX_PATH] = { 0 };
@@ -208,10 +296,10 @@ void Moneta::Enumerate() {
 		}
 
 		printf("\r\n");
-	}
+	}*/
 }
 
-uint32_t Moneta::GetPrivateSize(uint8_t* pBaseAddress, uint32_t dwSize) {
+uint32_t GetPrivateSize(uint8_t* pBaseAddress, uint32_t dwSize) {
 	PSAPI_WORKING_SET_EX_INFORMATION* pWorkingSets = new PSAPI_WORKING_SET_EX_INFORMATION;
 	uint32_t dwWorkingSetsSize = sizeof(PSAPI_WORKING_SET_EX_INFORMATION);
 	uint32_t dwPrivateSize = 0;

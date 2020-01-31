@@ -15,4 +15,7 @@
 //#include <ntdef.h>
 #include <list>
 #include <map>
+#include <string>
+#include <typeinfo>
+#include <iostream>
 #include "NtMem.h"

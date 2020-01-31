@@ -1,12 +1,12 @@
 class MemoryBlock {
 protected:
-	MEMORY_BASIC_INFORMATION* Basic;
+	MEMORY_BASIC_INFORMATION64* Basic;
 	MEMORY_REGION_INFORMATION* Region;
 
 public:
-	MemoryBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo);
+	MemoryBlock(MEMORY_BASIC_INFORMATION64* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo);
 	~MemoryBlock();
-	MEMORY_BASIC_INFORMATION* GetBasic();
+	MEMORY_BASIC_INFORMATION64* GetBasic();
 	MEMORY_REGION_INFORMATION* GetRegion();
 };
 
@@ -20,23 +20,55 @@ public:
 	void ShowRecords();
 };
 
-/*
-- New class initialized from PID, all basic info and region structs are stored in a list.
-- Analyze method in class can be called which will create a map, the key of which is the alloc base and the value will indicate:
-1) All blocks which share this alloc base
-2) An extended info class, the base of which will contain a file name (for non-image map) which could also be "Page file"
-and there will be an image class which inherits from it which will also indicate which blocks associated with alloc base
-correspond to which sections in the PE by name (also shown will be their initial permissions in the section header).
+namespace Moneta {
+	enum class EntityType{UNKNOWN, PE};
+	class Entity {
+	protected:
+		std::list<MemoryBlock*> SBlocks;
+	public:
+		std::list<MemoryBlock*> GetSBlocks();
+		void SetSBlocks(std::list<MemoryBlock*>);
+		virtual EntityType Type() = 0;
+	};
 
-*/
-class Moneta { // This should be named something else. It is PID-specific, and multiple instances of it are needed to gather data on multiple processes
-protected:
-	uint32_t Pid;
-	//MemoryPermissionRecord *PermissionRecords;
-	std::list<MemoryBlock*> Blocks;
-public:
-	Moneta(uint32_t dwPid);
-	void Enumerate();
-	static uint32_t GetPrivateSize(uint8_t* pBaseAddress, uint32_t dwSize); // GetPrivateSize does not utilize any of the other members of this class and therefore can be declared independent of them as a static method
-	std::list<MemoryBlock*> GetBlocks();
-};
+	class AddressSpace {
+	protected:
+		std::map<uint8_t*, Entity *> *Entities; // An ablock can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
+	public:
+		AddressSpace();
+		~AddressSpace();
+		void Enumerate();
+	};
+
+	class Process : public AddressSpace {
+	protected:
+		uint32_t Pid;
+	public:
+		uint32_t GetPid();
+		Process(uint32_t);
+	};
+
+	class Section : public Entity {
+		IMAGE_SECTION_HEADER Hdr;
+		std::list<MemoryBlock*> SBlocks; // These sblocks will be duplicates within the derived parent PE entity
+	};
+
+	class PE : public Entity {
+	public:
+		//PE(std::list<MemoryBlock*> SBlocks, const wchar_t *pFilePath);
+		PE(const wchar_t* pFilePath);
+		std::wstring GetFilePath();
+		EntityType Type() { return EntityType::PE; }
+	protected:
+		std::wstring FilePath;
+	};
+
+	class Unknown : public Entity {
+	public:
+		//Unknown(std::list<MemoryBlock*> SBlocks);
+		Unknown();
+		EntityType Type() { return EntityType::UNKNOWN; }
+	};
+
+	uint32_t GetPrivateSize(uint8_t* pBaseAddress, uint32_t dwSize);
+}
