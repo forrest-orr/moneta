@@ -4,6 +4,8 @@ namespace PeFile
 	{
 	protected: // Allows inheritance from any derived class but no direct access from outside of base or derived classes.
 		IMAGE_DOS_HEADER* DosHdr;
+		IMAGE_FILE_HEADER* FileHdr;
+		IMAGE_SECTION_HEADER* SectHdrs;
 		uint8_t* Base;
 		uint32_t Size;
 		uint16_t PeMagic;
@@ -31,6 +33,8 @@ namespace PeFile
 		uint8_t* GetBase();
 		uint32_t GetSize();
 		PIMAGE_DOS_HEADER GetDosHdr();
+		IMAGE_FILE_HEADER* GetFileHdr();
+		IMAGE_SECTION_HEADER* GetSectHdrs();
 
 		static PeBase* Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize); // Factory method for derived 32/64-bit classes
 	};

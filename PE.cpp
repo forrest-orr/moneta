@@ -13,8 +13,9 @@ PeBase::PeBase(
 	Base(new uint8_t[dwPeFileSize]),
 	Size(dwPeFileSize)
 {
-	this->DosHdr = (IMAGE_DOS_HEADER*)this->Base;
 	memcpy(this->Base, pPeFileBuf, dwPeFileSize);
+	this->DosHdr = (IMAGE_DOS_HEADER*)this->Base;
+	this->FileHdr = (IMAGE_FILE_HEADER*)((uint8_t*)this->DosHdr + this->DosHdr->e_lfanew + sizeof(LONG));
 }
 
 PeBase* PeBase::Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) // Factory method for derived 32/64-bit classes
@@ -63,6 +64,14 @@ PIMAGE_DOS_HEADER PeBase::GetDosHdr() {
 	return this->DosHdr;
 }
 
+IMAGE_FILE_HEADER* PeBase::GetFileHdr() {
+	return this->FileHdr;
+}
+
+IMAGE_SECTION_HEADER* PeBase::GetSectHdrs() {
+	return this->SectHdrs;
+}
+
 //
 // Primary derived architecture class
 //
@@ -81,6 +90,7 @@ template<typename NtHdrType> NtHdrType* PeArch<NtHdrType>::GetNtHdrs() {
 	if (pNtHdr->Signature == 'EP') {
 		if (pNtHdr->FileHeader.Machine == GetPeArch()) {
 			if (pNtHdr->OptionalHeader.Magic == GetPeMagic()) {
+				this->SectHdrs = (IMAGE_SECTION_HEADER *)((uint8_t *)pNtHdr + sizeof(NtHdrType));
 				return pNtHdr;
 			}
 		}

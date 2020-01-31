@@ -70,14 +70,14 @@ MappedFile::MappedFile() {}
 
 void Moneta::PE::SetSBlocks(list<MemoryBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
-	//list<MemoryBlock*> test = SBlocks;
-	//printf("x\r\n");
 	this->StartVa = (uint8_t *)(SBlocks.front())->GetBasic()->BaseAddress;
-	//printf("x.1: %d\r\n", test.size());
-	//this->EndVa = (uint8_t*)(test.back())->GetBasic()->BaseAddress;
 	this->EndVa = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize);
-	//printf("y\r\n");
 	this->Pe = PeBase::Load(this->File->GetData(), this->File->GetSize());
+
+	//IMAGE_SECTION_HEADER* pSectHdr = this->Pe->GetSectHdrs();
+	for (int32_t nX = 0; nX < this->Pe->GetFileHdr()->NumberOfSections; nX++) {
+		printf("%s\r\n", (this->Pe->GetSectHdrs() + nX)->Name);
+	}
 }
 
 void Unknown::SetSBlocks(list<MemoryBlock*> SBlocks) {
