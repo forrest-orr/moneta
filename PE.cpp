@@ -3,7 +3,7 @@
 
 #pragma comment (lib, "Imagehlp.lib")
 
-using namespace PE;
+using namespace PeFile;
 
 // PeBase
 

@@ -1,4 +1,4 @@
-namespace PE
+namespace PeFile
 {
 	class PeBase
 	{
@@ -15,6 +15,7 @@ namespace PE
 
 	public:
 		virtual uint16_t GetPeArch() = 0;
+		virtual uint16_t GetPeMagic() = 0;
 		virtual bool Validate() = 0;
 		virtual bool GetDataDir(int8_t nIndex, uint32_t* pdwRva, uint32_t* pdwSize) = 0;
 		virtual uint32_t RefreshCrc32() = 0;
@@ -50,7 +51,7 @@ namespace PE
 			uint32_t dwPeFileSize);
 
 	public:
-		virtual uint16_t GetPeMagic() = 0;
+		//virtual uint16_t GetPeMagic() = 0;
 		bool Validate();
 		NtHdrType* GetNtHdrs();
 		uint32_t RefreshCrc32();

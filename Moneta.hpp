@@ -71,9 +71,10 @@ namespace Moneta {
 	public:
 		EntityType Type() { return EntityType::PE; }
 		void SetSBlocks(std::list<MemoryBlock*>);
+		PeFile::PeBase* GetPe();
 		PE();
 	protected:
-		//
+		PeFile::PeBase* Pe;
 	};
 
 	class Unknown : public Entity {

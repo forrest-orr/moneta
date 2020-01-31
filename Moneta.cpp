@@ -28,12 +28,12 @@ ________________________________________________________________________________
 
 #include "StdAfx.h"
 #include "FileIo.hpp"
-#include "Moneta.hpp"
 #include "PE.hpp"
+#include "Moneta.hpp"
 
 using namespace std;
+using namespace PeFile;
 using namespace Moneta;
-using namespace PE;
 
 MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION64* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo) : Basic(pMemBasicInfo), Region(pMemRegionInfo) {}
 
@@ -61,6 +61,11 @@ void MappedFile::SetSBlocks(list<MemoryBlock*> SBlocks) {
 }
 
 Moneta::PE::PE() {}
+
+PeBase* Moneta::PE::GetPe() {
+	return this->Pe;
+}
+
 MappedFile::MappedFile() {}
 
 void Moneta::PE::SetSBlocks(list<MemoryBlock*> SBlocks) {
@@ -72,7 +77,7 @@ void Moneta::PE::SetSBlocks(list<MemoryBlock*> SBlocks) {
 	//this->EndVa = (uint8_t*)(test.back())->GetBasic()->BaseAddress;
 	this->EndVa = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize);
 	//printf("y\r\n");
-	//PeBase* TargetPe = PeBase::Load(this->File->GetData(), this->File->GetSize());
+	this->Pe = PeBase::Load(this->File->GetData(), this->File->GetSize());
 }
 
 void Unknown::SetSBlocks(list<MemoryBlock*> SBlocks) {
@@ -215,7 +220,7 @@ void AddressSpace::Enumerate() {
 		
 		if (Itr->second->Type() == EntityType::PE) {
 			printf("Entity type: PE\r\n");
-			printf("File path: %ws\r\n", ((Moneta::PE *)Itr->second)->GetFilePath().c_str());
+			printf("File path: %ws (%ws)\r\n", ((Moneta::PE *)Itr->second)->GetFilePath().c_str(), ((Moneta::PE*)Itr->second)->GetPe()->GetPeMagic() == IMAGE_NT_OPTIONAL_HDR64_MAGIC ? L"64-bit" : L"32-bit");
 		}
 		else if (Itr->second->Type() == EntityType::MAPPED_FILE) {
 			printf("Entity type: Mapped file\r\n");
