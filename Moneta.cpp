@@ -56,7 +56,11 @@ MEMORY_REGION_INFORMATION* MemoryBlock::GetRegion() {
 	return Region;
 }
 
-void MappedFile::SetSBlocks(list<MemoryBlock*> SBlocks) {
+void MappedFile::SetSBlocks(vector<MemoryBlock*> SBlocks) {
+	this->SBlocks = SBlocks;
+}
+
+void Section::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
 }
 
@@ -66,21 +70,71 @@ PeBase* Moneta::PE::GetPe() {
 	return this->Pe;
 }
 
+std::vector<Section*> Moneta::PE::GetSections() {
+	return this->Sections;
+}
+
 MappedFile::MappedFile() {}
 
-void Moneta::PE::SetSBlocks(list<MemoryBlock*> SBlocks) {
+Section::Section(IMAGE_SECTION_HEADER *pHdr) {
+	memcpy(&this->Hdr, pHdr, sizeof(IMAGE_SECTION_HEADER));
+}
+
+IMAGE_SECTION_HEADER *Section::GetHeader() {
+	return &this->Hdr;
+}
+
+/*
+[ Image
+[ 0x00040000:761383 | program.exe <- Size here does not correspond to sblock, it corresponds to entire total size in region sharing ablock
+  0x00040000:4096   | R   | PE headers
+  0xb2345678:4096   | RX  | .test
+  0xc2345678:4096   | RWX |
+  0xd2345678:8192   | RX  |
+  0xe2345678 | RW  | .data
+  0xf2345678 | R   | .rdata
+  0xf2345678 | R   | .rsrc
+
+[ Image
+[ 0x00040000 | kernel32.dll
+  0xa2345678 | R   | PE headers
+  0xb2345678 | RX  | .test
+  0xc2345678 | RWX |
+  0xd2345678 | RX  |
+  0xe2345678 | RW  | .data
+  0xf2345678 | R   | .rdata
+  0xf2345678 | R   | .rsrc
+
+[ Mapped
+[ 0x71627:4096 | c:\abc.nls
+  0x71627:4096 | R
+
+*/
+void Moneta::PE::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
 	this->StartVa = (uint8_t *)(SBlocks.front())->GetBasic()->BaseAddress;
 	this->EndVa = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize);
 	this->Pe = PeBase::Load(this->File->GetData(), this->File->GetSize());
-
-	//IMAGE_SECTION_HEADER* pSectHdr = this->Pe->GetSectHdrs();
+;
+	// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
 	for (int32_t nX = 0; nX < this->Pe->GetFileHdr()->NumberOfSections; nX++) {
-		printf("%s\r\n", (this->Pe->GetSectHdrs() + nX)->Name);
+		//printf("%s\r\n", (this->Pe->GetSectHdrs() + nX)->Name);
+
+		//
+		// Generate an image section header entity to and add it to the section vector for the PE entity
+		//
+
+		Section* Sect = new Section((this->Pe->GetSectHdrs() + nX));
+
+		//
+		// Calculate the sblocks overlapping between this PE entity and the current section.
+		//
+
+		this->Sections.push_back(Sect);
 	}
 }
 
-void Unknown::SetSBlocks(list<MemoryBlock*> SBlocks) {
+void Unknown::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
 }
 
@@ -109,26 +163,17 @@ wstring MappedFile::GetFilePath() {
 	return this->File == nullptr ? L"?" : this->File->GetPath();
 }
 
-/*
-AddressSpace::~AddressSpace() {
-	//
-}
-
-AddressSpace::AddressSpace() {
-	//
-}*/
-
 Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	//
 	// Initialize a new entity for each allocation base and add it to this process address space map
 	//
-	this->Entities = new map<uint8_t*, Entity*>();
+	
 	HANDLE hProcess = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
 	
 	if (hProcess != nullptr) {
 		uint64_t qwRegionSize = 0;
-		list<MemoryBlock *> SBlocks;
-		list<MemoryBlock*>::iterator ABlock;
+		vector<MemoryBlock *> SBlocks;
+		vector<MemoryBlock*>::iterator ABlock;
 		Entity* CurrentEntity = nullptr;
 
 		//Loop memory, building list of SBlocks. Once a block is found which does not match the "current" allocation base, create a new entity containing the corresponding sblock list, and insert it into the address space entities map using the ablock as the key.
@@ -147,7 +192,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 					if (pBasicInfo->AllocationBase != (*ABlock)->GetBasic()->AllocationBase) {
 						//printf("Found a new ablock. Saving sblock list to new entity entry.");
 						CurrentEntity->SetSBlocks(SBlocks);
-						this->Entities->insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, CurrentEntity));
+						this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, CurrentEntity));
 						SBlocks.clear();
 					}
 				}
@@ -194,7 +239,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 			else {
 				if (!SBlocks.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
 					CurrentEntity->SetSBlocks(SBlocks);
-					this->Entities->insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, CurrentEntity));
+					this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, CurrentEntity));
 				}
 
 				break;
@@ -206,7 +251,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	}
 }
 
-list<MemoryBlock*> Entity::GetSBlocks() {
+vector<MemoryBlock*> Entity::GetSBlocks() {
 	return this->SBlocks;
 }
 
@@ -215,12 +260,17 @@ void AddressSpace::Enumerate() {
 	// Walk ablocks (entities) and list the corresponding sblocks of each.
 	//
 
-	for (map<uint8_t *, Entity *>::iterator Itr = this->Entities->begin(); Itr != this->Entities->end(); ++Itr) {
+	for (map<uint8_t *, Entity *>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		printf("A-Block 0x%p\r\n", Itr->first);
 		
-		if (Itr->second->Type() == EntityType::PE) {
+		if (Itr->second->Type() == EntityType::PE_FILE) {
 			printf("Entity type: PE\r\n");
 			printf("File path: %ws (%ws)\r\n", ((Moneta::PE *)Itr->second)->GetFilePath().c_str(), ((Moneta::PE*)Itr->second)->GetPe()->GetPeMagic() == IMAGE_NT_OPTIONAL_HDR64_MAGIC ? L"64-bit" : L"32-bit");
+
+			vector<Section*> Sections = ((Moneta::PE*)Itr->second)->GetSections();
+			for (vector<Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
+				printf("  %s\r\n", (*SectItr)->GetHeader()->Name);
+			}
 		}
 		else if (Itr->second->Type() == EntityType::MAPPED_FILE) {
 			printf("Entity type: Mapped file\r\n");
@@ -232,12 +282,12 @@ void AddressSpace::Enumerate() {
 
 		printf("S-Blocks:\r\n");
 
-		list<MemoryBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
+		vector<MemoryBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 		if (SBlocks.empty()) {
 			printf("Empty SBlock list");
 		}
 
-		for (list<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
+		for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
 			printf("  0x%p\r\n", (*SBlockItr)->GetBasic()->BaseAddress);
 		}
 	}

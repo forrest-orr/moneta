@@ -21,23 +21,21 @@ public:
 };
 
 namespace Moneta {
-	enum class EntityType{UNKNOWN, PE, MAPPED_FILE};
+	enum class EntityType{UNKNOWN, PE_FILE, MAPPED_FILE, PE_SECTION};
 	class Entity {
 	protected:
-		std::list<MemoryBlock*> SBlocks;
+		std::vector<MemoryBlock*> SBlocks;
 		uint8_t* StartVa, * EndVa;
 	public:
-		std::list<MemoryBlock*> GetSBlocks();
-		virtual void SetSBlocks(std::list<MemoryBlock*>) = 0; // In addition to initializing the sblocks list, derivations of this class are expected to implement this method so as to process the sblocks as input, analyze them and generate additional child entities (if applicable)
+		std::vector<MemoryBlock*> GetSBlocks();
+		virtual void SetSBlocks(std::vector<MemoryBlock*>) = 0; // In addition to initializing the sblocks list, derivations of this class are expected to implement this method so as to process the sblocks as input, analyze them and generate additional child entities (if applicable)
 		virtual EntityType Type() = 0;
 	};
 
 	class AddressSpace {
 	protected:
-		std::map<uint8_t*, Entity *> *Entities; // An ablock can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
+		std::map<uint8_t*, Entity *> Entities; // An ablock can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
 	public:
-		//AddressSpace();
-		//~AddressSpace();
 		void Enumerate();
 	};
 
@@ -50,37 +48,42 @@ namespace Moneta {
 	};
 
 	class Section : public Entity {
+	public:
+		Section(IMAGE_SECTION_HEADER* pHdr);
+		void SetSBlocks(std::vector<MemoryBlock*>);
+		IMAGE_SECTION_HEADER* GetHeader();
+		EntityType Type() { return EntityType::PE_SECTION; }
 	protected:
 		IMAGE_SECTION_HEADER Hdr;
-		std::list<MemoryBlock*> SBlocks; // These sblocks will be duplicates within the derived parent PE entity
 	};
 
 	class MappedFile : public Entity {
 	public:
 		MappedFile();
-		void SetSBlocks(std::list<MemoryBlock*>);
+		void SetSBlocks(std::vector<MemoryBlock*>);
 		void SetFile(const wchar_t* pFilePath);
 		std::wstring GetFilePath();
 		EntityType Type() { return EntityType::MAPPED_FILE; }
 	protected:
 		FileBase *File = nullptr;
-		//std::wstring FilePath;
 	};
 
 	class PE : public MappedFile {
 	public:
-		EntityType Type() { return EntityType::PE; }
-		void SetSBlocks(std::list<MemoryBlock*>);
+		EntityType Type() { return EntityType::PE_FILE; }
+		void SetSBlocks(std::vector<MemoryBlock*>);
 		PeFile::PeBase* GetPe();
 		PE();
+		std::vector<Section*> GetSections();
 	protected:
+		std::vector<Section *> Sections;
 		PeFile::PeBase* Pe;
 	};
 
 	class Unknown : public Entity {
 	public:
 		//Unknown(std::list<MemoryBlock*> SBlocks);
-		void SetSBlocks(std::list<MemoryBlock*>);
+		void SetSBlocks(std::vector<MemoryBlock*>);
 		//Unknown();
 		EntityType Type() { return EntityType::UNKNOWN; }
 	};

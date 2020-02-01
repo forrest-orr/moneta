@@ -55,7 +55,6 @@ namespace PeFile
 			uint32_t dwPeFileSize);
 
 	public:
-		//virtual uint16_t GetPeMagic() = 0;
 		bool Validate();
 		NtHdrType* GetNtHdrs();
 		uint32_t RefreshCrc32();
