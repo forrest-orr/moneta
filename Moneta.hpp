@@ -1,7 +1,7 @@
 class MemoryBlock {
 protected:
-	MEMORY_BASIC_INFORMATION64* Basic;
-	MEMORY_REGION_INFORMATION* Region;
+	MEMORY_BASIC_INFORMATION64* Basic = nullptr;
+	MEMORY_REGION_INFORMATION* Region = nullptr;
 
 public:
 	MemoryBlock(MEMORY_BASIC_INFORMATION64* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo);

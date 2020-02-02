@@ -38,24 +38,29 @@ using namespace Moneta;
 MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION64* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo) : Basic(pMemBasicInfo), Region(pMemRegionInfo) {}
 
 MemoryBlock::~MemoryBlock() {
-	if (Basic != nullptr) {
+	//printf("mem destructor\r\n");
+	if (this->Basic != nullptr) {
 		delete Basic;
 	}
 
-	if (Region != nullptr) {
-		delete Basic;
+	if (this->Region != nullptr) {
+		delete Region;
 	}
+	//printf("mem destructor2\r\n");
 }
 
 Entity::~Entity() {
-	printf("Entity destructor\r\n");
+	//printf("Entity destructor\r\n");
+	//if (SBlocks.empty()) printf("empty\r\n");
 	for (vector<MemoryBlock*>::const_iterator Itr = this->SBlocks.begin(); Itr != this->SBlocks.end(); ++Itr) {
+		//if(!(*Itr)) printf("null itr\r\n");
 		delete * Itr;
 	}
+	//printf("Entity destructor2\r\n");
 }
 
 Moneta::PE::~PE() {
-	printf("PE destructor\r\n");
+	//printf("PE destructor\r\n");
 	for (vector<Section*>::const_iterator Itr = this->Sections.begin(); Itr != this->Sections.end(); ++Itr) {
 		delete* Itr;
 	}
@@ -63,12 +68,13 @@ Moneta::PE::~PE() {
 }
 
 MappedFile::~MappedFile() {
-	printf("Mapped file destructor\r\n");
+	//printf("Mapped file destructor\r\n");
 	delete this->File;
+	//printf("Mapped file destructor2\r\n");
 }
 
 AddressSpace::~AddressSpace() {
-	printf("AddressSpace destructor\r\n");
+	//printf("AddressSpace destructor\r\n");
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		if (Itr->second->Type() == EntityType::PE_FILE) {
 			delete (PE*)Itr->second; // This will call the destructors for PE, mapped file and entity all to be called in inheritted order.
@@ -80,11 +86,12 @@ AddressSpace::~AddressSpace() {
 			delete (Unknown *)Itr->second;
 		}
 	}
+	//printf("AddressSpace destructor2\r\n");
 }
 
 Process::~Process() {
 	CloseHandle(this->Handle);
-	printf("Process destructor\r\n");
+	//printf("Process destructor\r\n");
 }
 
 MEMORY_BASIC_INFORMATION64* MemoryBlock::GetBasic() {
@@ -183,7 +190,9 @@ void Moneta::PE::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 
 			if ((pSBlockStartVa >= Sect->GetStartVa() && pSBlockStartVa < Sect->GetEndVa()) || (pSBlockEndVa > Sect->GetStartVa()&& pSBlockEndVa <= Sect->GetEndVa()) || (pSBlockStartVa < Sect->GetStartVa() && pSBlockEndVa > Sect->GetEndVa())) {
 				//printf("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, Sect->GetStartVa(), Sect->GetEndVa(), pSBlockStartVa, pSBlockEndVa);
-				OverlapSBlock.push_back(*SBlockItr);
+				MEMORY_BASIC_INFORMATION64* pBasicInfo = new MEMORY_BASIC_INFORMATION64; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
+				memcpy(pBasicInfo, (*SBlockItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION64));
+				OverlapSBlock.push_back(new MemoryBlock(pBasicInfo, nullptr));
 			}
 
 			Sect->SetSBlocks(OverlapSBlock);
@@ -282,6 +291,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	this->Handle = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
 	
 	if (this->Handle != nullptr) {
+		//system("pause");
 		uint64_t qwRegionSize = 0;
 		vector<MemoryBlock *> SBlocks;
 		vector<MemoryBlock*>::iterator ABlock;
@@ -289,7 +299,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 
 		//Loop memory, building list of SBlocks. Once a block is found which does not match the "current" allocation base, create a new entity containing the corresponding sblock list, and insert it into the address space entities map using the ablock as the key.
 
-		if (this->Pid == 3272) system("pause");
+		//if (this->Pid == 3272) system("pause");
 
 		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += qwRegionSize) {
 			MEMORY_BASIC_INFORMATION64* pBasicInfo = new MEMORY_BASIC_INFORMATION64;
@@ -308,10 +318,11 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 						this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, CurrentEntity));
 						SBlocks.clear();
 					}
+					//printf("done2\r\n");
 				}
 				//printf("Addomg mew sblock to list\r\n");
 				SBlocks.push_back(new MemoryBlock((MEMORY_BASIC_INFORMATION64*)pBasicInfo, nullptr));
-
+				ABlock = SBlocks.begin(); // This DOES fix a bug.
 				//
 				// Potentially initialize a new polymorphic entity class based upon the memory characteristics
 				//
@@ -366,13 +377,15 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				}
 			}
 			else {
-				printf("VirtualQuery failed\r\n");
+				//printf("VirtualQuery failed\r\n");
+				//system("pause");
+				delete pBasicInfo;
 				if (!SBlocks.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
 					CurrentEntity->SetSBlocks(SBlocks);
 					this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, CurrentEntity));
-					SBlocks.clear();
+					//SBlocks.clear();
 				}
-				printf("done\r\n");
+				//printf("done\r\n");
 				break;
 			}
 		}
