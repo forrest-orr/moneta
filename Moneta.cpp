@@ -137,26 +137,9 @@ void Moneta::PE::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 		vector<MemoryBlock*> OverlapSBlock;
 
 		for (vector<MemoryBlock*>::const_iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
-			//if ((uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress >= pSectStartVa && ((uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress + (*SBlockItr)->GetBasic()->RegionSize) < pSectEndVa) {
-			// sblock 0x2000 encompasses .rdata and .rsrc 0x1000 each.
-			//sblock within section? section within sblock?
-			// does the sblock start fall in the section bounds? does the end fall within the section bounds?
-			// check which is bigger, the section or the sblock. Whichever is bigger, check if the other's start falls within its range, or end falls within its range.
-			// 0x2000 is bigger than 0x1000. Is 0x0 >= 0x0? yes. Is 0x0+0x1000 (0x1000) < 0x2000? yes.
-
-
-			// Other scenario: .text is 0x8000 in size starting at 0x1000. It has 3 sblocks overlapping with it. One beginning at 0x0 with a size of 0x2000, the next with a size of 0x1000 at 0x2000, the last with a size of 0x9000 at 0x3000.
-			// First sblock: smaller than section. Does its start fall within the section? no. Does its end? yes.
-			// Second sblock: smaller than section. Start falls within section? yes.
-			// Third sblock: bigger than section. Does section start fall within sblock? no. Does section end fall within sblock? yes.
-			
-			//When finding overlap it does not matter which is bigger. Checking if the start or end of either a section or sblock falls within the start/end range of another is sufficient.
-			//sblock end address matches section start address
 			uint8_t* pSBlockStartVa = (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress;
 			uint8_t* pSBlockEndVa = (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress + (*SBlockItr)->GetBasic()->RegionSize;
-			//printf("Current itr: 0x%p:0x%p\r\n", pSBlockStartVa, pSBlockEndVa);
-			//printf("Current itr: 0x%p:0x%p\r\n", pSBlockStartVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase, pSBlockEndVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase);
-			//case: sblock begins before the section and ends after it.
+
 			if ((pSBlockStartVa >= pSectStartVa && pSBlockStartVa < pSectEndVa) || (pSBlockEndVa > pSectStartVa && pSBlockEndVa <= pSectEndVa) || (pSBlockStartVa < pSectStartVa && pSBlockEndVa > pSectEndVa)) {
 				printf("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", (this->Pe->GetSectHdrs() + nX)->Name, pSectStartVa, pSectEndVa, pSBlockStartVa, pSBlockEndVa);
 				OverlapSBlock.push_back(*SBlockItr);
