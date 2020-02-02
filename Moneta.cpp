@@ -102,7 +102,7 @@ void Moneta::PE::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 	this->PeBase = (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress;
 	this->StartVa = this->PeBase;
 	this->EndVa = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize);
-	printf("* Runtime image base: 0x%p for %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, this->File->GetPath().c_str());
+	//printf("* Runtime image base: 0x%p for %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, this->File->GetPath().c_str());
 	this->Pe = PeBase::Load(this->File->GetData(), this->File->GetSize());
 
 	//
@@ -152,7 +152,6 @@ void Moneta::PE::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 
 		this->Sections.push_back(Sect);
 	}
-	printf("done\r\n");
 }
 
 uint8_t* Moneta::PE::GetPeBase() {
@@ -190,9 +189,10 @@ wstring MappedFile::GetFilePath() {
 	return this->File == nullptr ? L"?" : this->File->GetPath();
 }
 
-bool TranslateDevicePath(const wchar_t* pDevicePath) {
-	wchar_t pszFilename[MAX_PATH + 1];
+bool TranslateDevicePath(const wchar_t* pDevicePath, wchar_t *pTranslatedPath) {
+	//wchar_t pszFilename[MAX_PATH + 1];
 	wchar_t szTemp[MAX_PATH + 1];
+	bool bTranslated = false;
 	szTemp[0] = '\0';
 
 	if (GetLogicalDriveStringsW(MAX_PATH, szTemp))
@@ -210,50 +210,38 @@ bool TranslateDevicePath(const wchar_t* pDevicePath) {
 			// Look up each device name
 			if (QueryDosDeviceW(szDrive, szName, MAX_PATH))
 			{
-				printf("QueryDosDeviceW device name: %ws, target path: %ws\r\n", szDrive, szName);
+				//printf("QueryDosDeviceW device name: %ws, target path: %ws\r\n", szDrive, szName);
 				if (_wcsnicmp(pDevicePath, szName, wcslen(szName)) == 0) {
-					printf("Match device name: %ws, target path: %ws\r\n", szDrive, szName);
-				}
-				size_t uNameLen = wcslen(szName);
-
-				if (uNameLen < MAX_PATH)
-				{
-					bFound = _wcsnicmp(pszFilename, szName, uNameLen) == 0
-						&& pszFilename[uNameLen] == '\\';
-
-					if (bFound)
-					{
-						//printf("");
-						// Reconstruct pszFilename using szTempFile
-						// Replace device path with DOS path
-						wchar_t szTempFile[MAX_PATH];
-						StringCchPrintfW(szTempFile,
-							MAX_PATH,
-							L"%s%s",
-							szDrive,
-							pszFilename + uNameLen);
-						StringCchCopyNW(pszFilename, MAX_PATH + 1, szTempFile, wcslen(szTempFile));
-					}
+					//printf("Match device name: %ws, target path: %ws\r\n", szDrive, szName);
+					wcscpy_s(pTranslatedPath, MAX_PATH + 1, szDrive);
+					wcscat_s(pTranslatedPath, MAX_PATH + 1, L"\\");
+					wcscat_s(pTranslatedPath, MAX_PATH + 1, pDevicePath + wcslen(szName));
+					bTranslated = true;
 				}
 			}
 
+			p++;
+
 			// Go to the next NULL character.
-			while (*p++);
-		} while (!bFound && *p); // end of string
+			//while (*p++);
+		} while (!bTranslated && *p); // end of string
 	}
 
-	printf("* Converted %ws to %ws\r\n", pDevicePath, pszFilename);
+	//printf("* Converted %ws to %ws\r\n", pDevicePath, pTranslatedPath);
+	return bTranslated;
 }
 
-
+HANDLE Process::GetHandle() {
+	return this->Handle;
+}
 Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	//
 	// Initialize a new entity for each allocation base and add it to this process address space map
 	//
 	
-	HANDLE hProcess = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
+	this->Handle = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
 	
-	if (hProcess != nullptr) {
+	if (this->Handle != nullptr) {
 		uint64_t qwRegionSize = 0;
 		vector<MemoryBlock *> SBlocks;
 		vector<MemoryBlock*>::iterator ABlock;
@@ -264,7 +252,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += qwRegionSize) {
 			MEMORY_BASIC_INFORMATION64* pBasicInfo = new MEMORY_BASIC_INFORMATION64;
 
-			if (VirtualQueryEx(hProcess, pBaseAddr, (MEMORY_BASIC_INFORMATION*)pBasicInfo, sizeof(MEMORY_BASIC_INFORMATION64)) == sizeof(MEMORY_BASIC_INFORMATION64)) {
+			if (VirtualQueryEx(this->Handle, pBaseAddr, (MEMORY_BASIC_INFORMATION*)pBasicInfo, sizeof(MEMORY_BASIC_INFORMATION64)) == sizeof(MEMORY_BASIC_INFORMATION64)) {
 				qwRegionSize = pBasicInfo->RegionSize;
 
 				if (!SBlocks.empty()) { // If the sblock list is empty then there is no ablock for comparison
@@ -290,18 +278,23 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 					ABlock = SBlocks.begin();
 					if (pBasicInfo->Type == MEM_IMAGE) {
 						//printf("img\r\n");
-						wchar_t ModFileName[MAX_PATH + 1] = { 0 };
+						wchar_t DevFilePath[MAX_PATH + 1] = { 0 };
 						//if (GetModuleFileNameExW(hProcess, (HMODULE)pBasicInfo->AllocationBase, ModFileName, MAX_PATH)) { // GetModuleFileNameW parses the PEB and thus is useless for mapped section views which were not properly loaded with LoadLibrary. GetMappedFileNameW loads the low level FILE_OBJECT link.
-						if (GetMappedFileNameW(hProcess, (HMODULE)pBasicInfo->AllocationBase, ModFileName, MAX_PATH)) {
+						if (GetMappedFileNameW(this->Handle, (HMODULE)pBasicInfo->AllocationBase, DevFilePath, MAX_PATH)) {
 							//printf("%ws\r\n", ModFileName);
+							wchar_t ModFilePath[MAX_PATH + 1] = { 0 };
+							if (TranslateDevicePath(DevFilePath, ModFilePath)) {
+								CurrentEntity = new Moneta::PE();
+								((Moneta::PE*)CurrentEntity)->SetFile(ModFilePath);
+							}
+							else {
+								printf("! Failed to translate device path: %ws\r\n", DevFilePath);
+							}
 						}
 						else {
 							printf("- Failed to retrieve module file name\r\n");
 						}
 
-						TranslateDevicePath(ModFileName);
-						CurrentEntity = new Moneta::PE();
-						((Moneta::PE*)CurrentEntity)->SetFile(ModFileName);
 						//printf("1\r\n");
 					}
 					else if (pBasicInfo->Type == MEM_MAPPED) {
@@ -309,7 +302,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 						wchar_t ModFileName[MAX_PATH + 1] = { 0 };
 						CurrentEntity = new MappedFile();
 
-						if (GetMappedFileNameW(hProcess, (HMODULE)pBasicInfo->AllocationBase, ModFileName, MAX_PATH)) {
+						if (GetMappedFileNameW(this->Handle, (HMODULE)pBasicInfo->AllocationBase, ModFileName, MAX_PATH)) {
 							//printf("%ws\r\n", ModFileName);
 						}
 						else {
@@ -335,7 +328,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		}
 
 		//this->PermissionRecords = new MemoryPermissionRecord(this->Blocks); // Initialize 
-		CloseHandle(hProcess);
+		//CloseHandle(hProcess);
 	}
 }
 
@@ -399,7 +392,7 @@ const char* PermissionSymbol(uint32_t dwProtection) {
 	}
 }
 
-void AddressSpace::Enumerate() {
+void Process::Enumerate() {
 	//
 	// Walk ablocks (entities) and list the corresponding sblocks of each.
 	//
@@ -421,7 +414,9 @@ void AddressSpace::Enumerate() {
 
 				for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
 					//printf("  0x%p\r\n", (*SBlockItr)->GetBasic()->BaseAddress);
-					printf("  0x%p:0x%08x | %s | %s\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, PermissionSymbol((*SBlockItr)->GetBasic()->Protect), (*SectItr)->GetHeader()->Name);
+					printf("  0x%p:0x%08x | %s | %s | %d\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, PermissionSymbol((*SBlockItr)->GetBasic()->Protect), (*SectItr)->GetHeader()->Name, 
+						Moneta::GetPrivateSize(this->GetHandle(), (uint8_t *)(*SBlockItr)->GetBasic()->BaseAddress, (uint32_t)(*SBlockItr)->GetBasic()->RegionSize)
+					);
 				}
 			}
 		}
@@ -572,14 +567,14 @@ void AddressSpace::Enumerate() {
 	}*/
 }
 
-uint32_t GetPrivateSize(uint8_t* pBaseAddress, uint32_t dwSize) {
+uint32_t Moneta::GetPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t dwSize) {
 	PSAPI_WORKING_SET_EX_INFORMATION* pWorkingSets = new PSAPI_WORKING_SET_EX_INFORMATION;
 	uint32_t dwWorkingSetsSize = sizeof(PSAPI_WORKING_SET_EX_INFORMATION);
 	uint32_t dwPrivateSize = 0;
 
 	for (uint32_t dwPageOffset = 0; dwPageOffset < dwSize; dwPageOffset += 0x1000) {
 		pWorkingSets->VirtualAddress = (pBaseAddress + dwPageOffset);
-		if (K32QueryWorkingSetEx(GetCurrentProcess(), pWorkingSets, dwWorkingSetsSize)) {
+		if (K32QueryWorkingSetEx(hProcess, pWorkingSets, dwWorkingSetsSize)) {
 			//printf("+ Successfully queried working set at 0x%p\r\n", pWorkingSets->VirtualAddress);
 
 			if (!pWorkingSets->VirtualAttributes.Shared) {

@@ -38,15 +38,18 @@ namespace Moneta {
 	protected:
 		std::map<uint8_t*, Entity *> Entities; // An ablock can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
 	public:
-		void Enumerate();
+		//void Enumerate();
 	};
 
 	class Process : public AddressSpace {
 	protected:
 		uint32_t Pid;
+		HANDLE Handle;
 	public:
+		HANDLE GetHandle();
 		uint32_t GetPid();
 		Process(uint32_t);
+		void Enumerate();
 	};
 
 	class Section : public Entity {
@@ -95,5 +98,5 @@ namespace Moneta {
 		EntityType Type() { return EntityType::UNKNOWN; }
 	};
 
-	uint32_t GetPrivateSize(uint8_t* pBaseAddress, uint32_t dwSize);
+	uint32_t GetPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t dwSize);
 }
