@@ -28,6 +28,8 @@ namespace Moneta {
 		uint8_t* StartVa, * EndVa;
 	public:
 		std::vector<MemoryBlock*> GetSBlocks();
+		uint8_t* GetStartVa();
+		uint8_t* GetEndVa();
 		virtual void SetSBlocks(std::vector<MemoryBlock*>) = 0; // In addition to initializing the sblocks list, derivations of this class are expected to implement this method so as to process the sblocks as input, analyze them and generate additional child entities (if applicable)
 		virtual EntityType Type() = 0;
 	};
@@ -49,12 +51,15 @@ namespace Moneta {
 
 	class Section : public Entity {
 	public:
-		Section(IMAGE_SECTION_HEADER* pHdr);
+		Section(IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase);
 		void SetSBlocks(std::vector<MemoryBlock*>);
 		IMAGE_SECTION_HEADER* GetHeader();
 		EntityType Type() { return EntityType::PE_SECTION; }
 	protected:
 		IMAGE_SECTION_HEADER Hdr;
+		uint8_t* PeBase;
+		uint32_t Size;
+
 	};
 
 	class MappedFile : public Entity {
@@ -72,12 +77,14 @@ namespace Moneta {
 	public:
 		EntityType Type() { return EntityType::PE_FILE; }
 		void SetSBlocks(std::vector<MemoryBlock*>);
+		uint8_t* GetPeBase();
 		PeFile::PeBase* GetPe();
 		PE();
 		std::vector<Section*> GetSections();
 	protected:
 		std::vector<Section *> Sections;
 		PeFile::PeBase* Pe;
+		uint8_t* PeBase;
 	};
 
 	class Unknown : public Entity {

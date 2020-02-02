@@ -58,6 +58,8 @@ MEMORY_REGION_INFORMATION* MemoryBlock::GetRegion() {
 
 void MappedFile::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
+	this->StartVa = (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress;
+	this->EndVa = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize);
 }
 
 void Section::SetSBlocks(vector<MemoryBlock*> SBlocks) {
@@ -76,57 +78,57 @@ std::vector<Section*> Moneta::PE::GetSections() {
 
 MappedFile::MappedFile() {}
 
-Section::Section(IMAGE_SECTION_HEADER *pHdr) {
+Section::Section(IMAGE_SECTION_HEADER *pHdr, uint8_t *pPeBase) : PeBase(pPeBase) {
 	memcpy(&this->Hdr, pHdr, sizeof(IMAGE_SECTION_HEADER));
+	this->Size = this->Hdr.SizeOfRawData == 0 ? this->Hdr.Misc.VirtualSize : this->Hdr.SizeOfRawData;
+	this->StartVa = this->PeBase + this->Hdr.VirtualAddress;
+	this->EndVa = this->PeBase + this->Hdr.VirtualAddress + this->Size;
 }
 
 IMAGE_SECTION_HEADER *Section::GetHeader() {
 	return &this->Hdr;
 }
 
-/*
-[ Image
-[ 0x00040000:761383 | program.exe <- Size here does not correspond to sblock, it corresponds to entire total size in region sharing ablock
-  0x00040000:4096   | R   | PE headers
-  0xb2345678:4096   | RX  | .test
-  0xc2345678:4096   | RWX |
-  0xd2345678:8192   | RX  |
-  0xe2345678 | RW  | .data
-  0xf2345678 | R   | .rdata
-  0xf2345678 | R   | .rsrc
+uint8_t* Entity::GetStartVa() {
+	return this->StartVa;
+}
 
-[ Image
-[ 0x00040000 | kernel32.dll
-  0xa2345678 | R   | PE headers
-  0xb2345678 | RX  | .test
-  0xc2345678 | RWX |
-  0xd2345678 | RX  |
-  0xe2345678 | RW  | .data
-  0xf2345678 | R   | .rdata
-  0xf2345678 | R   | .rsrc
-
-[ Mapped
-[ 0x71627:4096 | c:\abc.nls
-  0x71627:4096 | R
-
-*/
+uint8_t* Entity::GetEndVa() {
+	return this->EndVa;
+}
 
 void Moneta::PE::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
-	this->StartVa = (uint8_t *)(SBlocks.front())->GetBasic()->BaseAddress;
+	this->PeBase = (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress;
+	this->StartVa = this->PeBase;
 	this->EndVa = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize);
+	printf("* Runtime image base: 0x%p for %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, this->File->GetPath().c_str());
 	this->Pe = PeBase::Load(this->File->GetData(), this->File->GetSize());
-	//printf("* Runtime image base: 0x%p\r\n", SBlocks.front()->GetBasic()->AllocationBase);
-	// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
-	for (int32_t nX = 0; nX < this->Pe->GetFileHdr()->NumberOfSections; nX++) {
-		//
-		// Generate an image section header entity to and add it to the section vector for the PE entity
-		//
 
-		Section* Sect = new Section((this->Pe->GetSectHdrs() + nX));
-		uint32_t dwSectionSize = ((this->Pe->GetSectHdrs() + nX)->SizeOfRawData == 0 ? (this->Pe->GetSectHdrs() + nX)->Misc.VirtualSize : (this->Pe->GetSectHdrs() + nX)->SizeOfRawData);
-		uint8_t* pSectStartVa = (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase + (this->Pe->GetSectHdrs() + nX)->VirtualAddress;
-		uint8_t* pSectEndVa = (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase + (this->Pe->GetSectHdrs() + nX)->VirtualAddress + dwSectionSize;
+	//
+	// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
+	//
+
+	for (int32_t nX = -1; nX < this->Pe->GetFileHdr()->NumberOfSections; nX++) {
+		Section* Sect = nullptr;
+
+		if (nX == -1) {
+			IMAGE_SECTION_HEADER ArtificialPeHdr = { 0 };
+			strcpy_s((char*)ArtificialPeHdr.Name, sizeof(ArtificialPeHdr.Name), "Headers");
+			ArtificialPeHdr.SizeOfRawData = this->Pe->GetSectHdrs()->VirtualAddress; // Consider the size of the PE headers to be all data leading up to the start of the first real section.
+			Sect = new Section(&ArtificialPeHdr, this->PeBase);
+		}
+		else {
+			//
+			// Generate an image section header entity to and add it to the section vector for the PE entity
+			//
+
+			Sect = new Section((this->Pe->GetSectHdrs() + nX), this->PeBase);
+		}
+
+		//uint32_t dwSectionSize = ((this->Pe->GetSectHdrs() + nX)->SizeOfRawData == 0 ? (this->Pe->GetSectHdrs() + nX)->Misc.VirtualSize : (this->Pe->GetSectHdrs() + nX)->SizeOfRawData);
+		//uint8_t* pSectStartVa = (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase + (this->Pe->GetSectHdrs() + nX)->VirtualAddress;
+		//uint8_t* pSectEndVa = (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase + (this->Pe->GetSectHdrs() + nX)->VirtualAddress + dwSectionSize;
 
 		//printf("%s [0x%p:0x%p]\r\n", (this->Pe->GetSectHdrs() + nX)->Name, pSectStartVa, pSectEndVa);
 		//printf("%s [0x%p:0x%p]\r\n", (this->Pe->GetSectHdrs() + nX)->Name, pSectStartVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase, pSectEndVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase);
@@ -140,8 +142,8 @@ void Moneta::PE::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 			uint8_t* pSBlockStartVa = (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress;
 			uint8_t* pSBlockEndVa = (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress + (*SBlockItr)->GetBasic()->RegionSize;
 
-			if ((pSBlockStartVa >= pSectStartVa && pSBlockStartVa < pSectEndVa) || (pSBlockEndVa > pSectStartVa && pSBlockEndVa <= pSectEndVa) || (pSBlockStartVa < pSectStartVa && pSBlockEndVa > pSectEndVa)) {
-				printf("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", (this->Pe->GetSectHdrs() + nX)->Name, pSectStartVa, pSectEndVa, pSBlockStartVa, pSBlockEndVa);
+			if ((pSBlockStartVa >= Sect->GetStartVa() && pSBlockStartVa < Sect->GetEndVa()) || (pSBlockEndVa > Sect->GetStartVa()&& pSBlockEndVa <= Sect->GetEndVa()) || (pSBlockStartVa < Sect->GetStartVa() && pSBlockEndVa > Sect->GetEndVa())) {
+				//printf("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, Sect->GetStartVa(), Sect->GetEndVa(), pSBlockStartVa, pSBlockEndVa);
 				OverlapSBlock.push_back(*SBlockItr);
 			}
 
@@ -150,10 +152,17 @@ void Moneta::PE::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 
 		this->Sections.push_back(Sect);
 	}
+	printf("done\r\n");
+}
+
+uint8_t* Moneta::PE::GetPeBase() {
+	return this->PeBase;
 }
 
 void Unknown::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
+	this->StartVa = (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress;
+	this->EndVa = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize);
 }
 
 //Unknown::Unknown() {}
@@ -180,6 +189,62 @@ void MappedFile::SetFile(const wchar_t* pFilePath) {
 wstring MappedFile::GetFilePath() {
 	return this->File == nullptr ? L"?" : this->File->GetPath();
 }
+
+bool TranslateDevicePath(const wchar_t* pDevicePath) {
+	wchar_t pszFilename[MAX_PATH + 1];
+	wchar_t szTemp[MAX_PATH + 1];
+	szTemp[0] = '\0';
+
+	if (GetLogicalDriveStringsW(MAX_PATH, szTemp))
+	{
+		wchar_t szName[MAX_PATH];
+		wchar_t szDrive[3] = L" :";
+		BOOL bFound = FALSE;
+		wchar_t* p = szTemp;
+
+		do
+		{
+			// Copy the drive letter to the template string
+			*szDrive = *p;
+
+			// Look up each device name
+			if (QueryDosDeviceW(szDrive, szName, MAX_PATH))
+			{
+				printf("QueryDosDeviceW device name: %ws, target path: %ws\r\n", szDrive, szName);
+				if (_wcsnicmp(pDevicePath, szName, wcslen(szName)) == 0) {
+					printf("Match device name: %ws, target path: %ws\r\n", szDrive, szName);
+				}
+				size_t uNameLen = wcslen(szName);
+
+				if (uNameLen < MAX_PATH)
+				{
+					bFound = _wcsnicmp(pszFilename, szName, uNameLen) == 0
+						&& pszFilename[uNameLen] == '\\';
+
+					if (bFound)
+					{
+						//printf("");
+						// Reconstruct pszFilename using szTempFile
+						// Replace device path with DOS path
+						wchar_t szTempFile[MAX_PATH];
+						StringCchPrintfW(szTempFile,
+							MAX_PATH,
+							L"%s%s",
+							szDrive,
+							pszFilename + uNameLen);
+						StringCchCopyNW(pszFilename, MAX_PATH + 1, szTempFile, wcslen(szTempFile));
+					}
+				}
+			}
+
+			// Go to the next NULL character.
+			while (*p++);
+		} while (!bFound && *p); // end of string
+	}
+
+	printf("* Converted %ws to %ws\r\n", pDevicePath, pszFilename);
+}
+
 
 Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	//
@@ -226,10 +291,15 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 					if (pBasicInfo->Type == MEM_IMAGE) {
 						//printf("img\r\n");
 						wchar_t ModFileName[MAX_PATH + 1] = { 0 };
-						if (GetModuleFileNameExW(hProcess, (HMODULE)pBasicInfo->AllocationBase, ModFileName, MAX_PATH)) {
-							printf("%ws\r\n", ModFileName);
+						//if (GetModuleFileNameExW(hProcess, (HMODULE)pBasicInfo->AllocationBase, ModFileName, MAX_PATH)) { // GetModuleFileNameW parses the PEB and thus is useless for mapped section views which were not properly loaded with LoadLibrary. GetMappedFileNameW loads the low level FILE_OBJECT link.
+						if (GetMappedFileNameW(hProcess, (HMODULE)pBasicInfo->AllocationBase, ModFileName, MAX_PATH)) {
+							//printf("%ws\r\n", ModFileName);
+						}
+						else {
+							printf("- Failed to retrieve module file name\r\n");
 						}
 
+						TranslateDevicePath(ModFileName);
 						CurrentEntity = new Moneta::PE();
 						((Moneta::PE*)CurrentEntity)->SetFile(ModFileName);
 						//printf("1\r\n");
@@ -240,7 +310,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 						CurrentEntity = new MappedFile();
 
 						if (GetMappedFileNameW(hProcess, (HMODULE)pBasicInfo->AllocationBase, ModFileName, MAX_PATH)) {
-							printf("%ws\r\n", ModFileName);
+							//printf("%ws\r\n", ModFileName);
 						}
 						else {
 							wcscpy_s(ModFileName, MAX_PATH + 1, L"Page File");
@@ -273,47 +343,120 @@ vector<MemoryBlock*> Entity::GetSBlocks() {
 	return this->SBlocks;
 }
 
+/*
+[ Image
+[ 0x00007FFAFF290000:761383 | program.exe <- Size here does not correspond to sblock, it corresponds to entire total size in region sharing ablock
+  0x00040000:4096   | R   | PE headers
+  0xb2345678:4096   | RX  | .test
+  0xc2345678:4096   | RWX |
+  0xd2345678:8192   | RX  |
+  0xe2345678 | RW  | .data
+  0xf2345678 | R   | .rdata
+  0xf2345678 | R   | .rsrc
+
+[ Image
+[ 0x00040000 | kernel32.dll
+  0xa2345678 | R   | PE headers
+  0xb2345678 | RX  | .test
+  0xc2345678 | RWX |
+  0xd2345678 | RX  |
+  0xe2345678 | RW  | .data
+  0xf2345678 | R   | .rdata
+  0xf2345678 | R   | .rsrc
+
+[ Mapped
+[ 0x71627:4096 | c:\abc.nls
+  0x71627:4096 | R
+
+*/
+
+const char* PermissionSymbol(uint32_t dwProtection) {
+	switch (dwProtection) {
+	case PAGE_READONLY:
+		return "R   ";
+	case PAGE_READWRITE:
+		return "RW  ";
+	case PAGE_EXECUTE_READ:
+		return "RX  ";
+	case PAGE_EXECUTE_READWRITE:
+		return "RWX ";
+	case PAGE_EXECUTE_WRITECOPY:
+		return "RWXC";
+	case PAGE_EXECUTE:
+		return "X   ";
+	case PAGE_WRITECOPY:
+		return "WC  ";
+	case PAGE_NOACCESS:
+		return "NA  ";
+	case PAGE_WRITECOMBINE:
+		return "WCB ";
+	case PAGE_GUARD:
+		return "PG  ";
+	case PAGE_NOCACHE:
+		return "NC  ";
+	default:
+		return "?   ";
+	}
+}
+
 void AddressSpace::Enumerate() {
 	//
 	// Walk ablocks (entities) and list the corresponding sblocks of each.
 	//
 
 	for (map<uint8_t *, Entity *>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-		printf("A-Block 0x%p\r\n", Itr->first);
+		//printf("A-Block 0x%p\r\n", Itr->first);
 		
 		if (Itr->second->Type() == EntityType::PE_FILE) {
-			printf("Entity type: PE\r\n");
-			printf("File path: %ws (%ws)\r\n", ((Moneta::PE *)Itr->second)->GetFilePath().c_str(), ((Moneta::PE*)Itr->second)->GetPe()->GetPeMagic() == IMAGE_NT_OPTIONAL_HDR64_MAGIC ? L"64-bit" : L"32-bit");
+			//printf("Entity type: PE\r\n");
+			//printf("[ Image\r\n");
+			printf("[ 0x%016x:0x%08x | Image | %ws\r\n", ((Moneta::PE*)Itr->second)->GetPeBase(), ((Moneta::PE*)Itr->second)->GetPe()->GetImageSize(), ((Moneta::PE*)Itr->second)->GetFilePath().c_str());
+			//printf("File path: %ws (%ws)\r\n", ((Moneta::PE *)Itr->second)->GetFilePath().c_str(), ((Moneta::PE*)Itr->second)->GetPe()->GetPeMagic() == IMAGE_NT_OPTIONAL_HDR64_MAGIC ? L"64-bit" : L"32-bit");
 
 			vector<Section*> Sections = ((Moneta::PE*)Itr->second)->GetSections();
 			for (vector<Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
-				printf("  %s\r\n", (*SectItr)->GetHeader()->Name);
-				printf("  S-Blocks:\r\n");
+				//printf("  %s\r\n", (*SectItr)->GetHeader()->Name);
+				//printf("  S-Blocks:\r\n");
 				vector<MemoryBlock*> SBlocks = (*SectItr)->GetSBlocks();
 
 				for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
-					printf("  0x%p\r\n", (*SBlockItr)->GetBasic()->BaseAddress);
+					//printf("  0x%p\r\n", (*SBlockItr)->GetBasic()->BaseAddress);
+					printf("  0x%p:0x%08x | %s | %s\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, PermissionSymbol((*SBlockItr)->GetBasic()->Protect), (*SectItr)->GetHeader()->Name);
 				}
 			}
 		}
 		else if (Itr->second->Type() == EntityType::MAPPED_FILE) {
-			printf("Entity type: Mapped file\r\n");
-			printf("File path: %ws\r\n", ((MappedFile*)Itr->second)->GetFilePath().c_str());
+			//printf("Entity type: Mapped file\r\n");
+			//printf("File path: %ws\r\n", ((MappedFile*)Itr->second)->GetFilePath().c_str());
+			vector<MemoryBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
+
+			//printf("[ Mapped\r\n");
+			printf("[ 0x%016x:0x%08x | Mapped | %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, SBlocks.front()->GetBasic()->RegionSize, ((MappedFile*)Itr->second)->GetFilePath().c_str());
+			//printf("S-Blocks:\r\n");
+
+			for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
+				//printf("  0x%p\r\n", (*SBlockItr)->GetBasic()->BaseAddress);
+				printf("  0x%p:0x%08x | %s\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, PermissionSymbol((*SBlockItr)->GetBasic()->Protect));
+			}
 		}
 		else {
-			printf("Entity type: Unknown\r\n");
+			//printf("Entity type: Unknown\r\n");
+			//printf("S-Blocks:\r\n");
+
+			vector<MemoryBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
+
+			if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
+				printf("[ 0x%016x:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->AllocationBase, SBlocks.front()->GetBasic()->RegionSize);
+				for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
+					printf("  0x%p:0x%08x | %s\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, PermissionSymbol((*SBlockItr)->GetBasic()->Protect));
+				}
+			}
+			else {
+				printf("! Unknown memory type at 0x%p\r\n", Itr->first);
+			}
 		}
 
-		printf("S-Blocks:\r\n");
-
-		vector<MemoryBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
-		if (SBlocks.empty()) {
-			printf("Empty SBlock list");
-		}
-
-		for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
-			printf("  0x%p\r\n", (*SBlockItr)->GetBasic()->BaseAddress);
-		}
+		printf("\r\n");
 	}
 	/*
 	bool bFileRange = false, bImageRange = false;
