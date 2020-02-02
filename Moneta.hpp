@@ -30,6 +30,7 @@ namespace Moneta {
 		std::vector<MemoryBlock*> GetSBlocks();
 		uint8_t* GetStartVa();
 		uint8_t* GetEndVa();
+		~Entity();
 		virtual void SetSBlocks(std::vector<MemoryBlock*>) = 0; // In addition to initializing the sblocks list, derivations of this class are expected to implement this method so as to process the sblocks as input, analyze them and generate additional child entities (if applicable)
 		virtual EntityType Type() = 0;
 	};
@@ -38,6 +39,7 @@ namespace Moneta {
 	protected:
 		std::map<uint8_t*, Entity *> Entities; // An ablock can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
 	public:
+		~AddressSpace();
 		//void Enumerate();
 	};
 
@@ -50,6 +52,7 @@ namespace Moneta {
 		uint32_t GetPid();
 		Process(uint32_t);
 		void Enumerate();
+		~Process();
 	};
 
 	class Section : public Entity {
@@ -68,6 +71,7 @@ namespace Moneta {
 	class MappedFile : public Entity {
 	public:
 		MappedFile();
+		~MappedFile();
 		void SetSBlocks(std::vector<MemoryBlock*>);
 		void SetFile(const wchar_t* pFilePath);
 		std::wstring GetFilePath();
@@ -83,6 +87,7 @@ namespace Moneta {
 		uint8_t* GetPeBase();
 		PeFile::PeBase* GetPe();
 		PE();
+		~PE();
 		std::vector<Section*> GetSections();
 	protected:
 		std::vector<Section *> Sections;

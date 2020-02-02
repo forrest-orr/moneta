@@ -18,6 +18,10 @@ PeBase::PeBase(
 	this->FileHdr = (IMAGE_FILE_HEADER*)((uint8_t*)this->DosHdr + this->DosHdr->e_lfanew + sizeof(LONG));
 }
 
+PeBase::~PeBase() {
+	delete this->Base;
+}
+
 PeBase* PeBase::Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) // Factory method for derived 32/64-bit classes
 {
 	assert(pPeFileBuf != nullptr);

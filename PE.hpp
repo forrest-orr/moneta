@@ -10,7 +10,6 @@ namespace PeFile
 		uint32_t Size;
 		uint16_t PeMagic;
 		uint16_t PeArch;
-
 		PeBase(
 			uint8_t* pPeFileBuf,
 			uint32_t dwPeFileSize);
@@ -35,6 +34,7 @@ namespace PeFile
 		PIMAGE_DOS_HEADER GetDosHdr();
 		IMAGE_FILE_HEADER* GetFileHdr();
 		IMAGE_SECTION_HEADER* GetSectHdrs();
+		~PeBase();
 
 		static PeBase* Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize); // Factory method for derived 32/64-bit classes
 	};

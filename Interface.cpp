@@ -104,7 +104,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				//MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(TargetProc.GetBlocks());
 				//MemPermRec->ShowRecords();
 			}
-		}/*
+		}
 		else {
 			PROCESSENTRY32W ProcEntry = { 0 };
 			HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -116,9 +116,20 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				if (Process32FirstW(hSnapshot, &ProcEntry)) {
 					do
 					{
-						if (OutputType == SelectedOutputType::Raw) {
-							EnumProcessMem(ProcEntry.th32ProcessID);
+						//Process* TargetProc;
+
+						try {
+							//TargetProc = new Process(ProcEntry.th32ProcessID);
+							Process TargetProc(ProcEntry.th32ProcessID);
+							if (OutputType == SelectedOutputType::Raw) {
+								TargetProc.Enumerate();
+							}
+
 						}
+						catch (...) {
+							continue;
+						}
+						/*
 						else if (OutputType == SelectedOutputType::Statistics) {
 							list<MemoryBlock*> ProcessMem = QueryProcessMem(ProcEntry.th32ProcessID);
 							if (MemPermRec == nullptr) {
@@ -127,7 +138,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 							else {
 								MemPermRec->UpdateMap(ProcessMem);
 							}
-						}
+						}*/
 					} while (Process32NextW(hSnapshot, &ProcEntry));
 				}
 
@@ -141,6 +152,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			if (MemPermRec != nullptr) {
 				MemPermRec->ShowRecords();
 			}
-		}*/
+		}
 	}
 }

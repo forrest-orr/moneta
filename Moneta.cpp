@@ -38,7 +38,6 @@ using namespace Moneta;
 MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION64* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo) : Basic(pMemBasicInfo), Region(pMemRegionInfo) {}
 
 MemoryBlock::~MemoryBlock() {
-	printf("! Memory block destructor\r\n");
 	if (Basic != nullptr) {
 		delete Basic;
 	}
@@ -46,6 +45,46 @@ MemoryBlock::~MemoryBlock() {
 	if (Region != nullptr) {
 		delete Basic;
 	}
+}
+
+Entity::~Entity() {
+	printf("Entity destructor\r\n");
+	for (vector<MemoryBlock*>::const_iterator Itr = this->SBlocks.begin(); Itr != this->SBlocks.end(); ++Itr) {
+		delete * Itr;
+	}
+}
+
+Moneta::PE::~PE() {
+	printf("PE destructor\r\n");
+	for (vector<Section*>::const_iterator Itr = this->Sections.begin(); Itr != this->Sections.end(); ++Itr) {
+		delete* Itr;
+	}
+	delete this->Pe;
+}
+
+MappedFile::~MappedFile() {
+	printf("Mapped file destructor\r\n");
+	delete this->File;
+}
+
+AddressSpace::~AddressSpace() {
+	printf("AddressSpace destructor\r\n");
+	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
+		if (Itr->second->Type() == EntityType::PE_FILE) {
+			delete (PE*)Itr->second; // This will call the destructors for PE, mapped file and entity all to be called in inheritted order.
+		}
+		else if (Itr->second->Type() == EntityType::MAPPED_FILE) {
+			delete (MappedFile*)Itr->second;
+		}
+		else {
+			delete (Unknown *)Itr->second;
+		}
+	}
+}
+
+Process::~Process() {
+	CloseHandle(this->Handle);
+	printf("Process destructor\r\n");
 }
 
 MEMORY_BASIC_INFORMATION64* MemoryBlock::GetBasic() {
@@ -239,6 +278,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	// Initialize a new entity for each allocation base and add it to this process address space map
 	//
 	
+	printf("* Mapping address space of PID %d\r\n", this->Pid);
 	this->Handle = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
 	
 	if (this->Handle != nullptr) {
@@ -248,6 +288,8 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		Entity* CurrentEntity = nullptr;
 
 		//Loop memory, building list of SBlocks. Once a block is found which does not match the "current" allocation base, create a new entity containing the corresponding sblock list, and insert it into the address space entities map using the ablock as the key.
+
+		if (this->Pid == 3272) system("pause");
 
 		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += qwRegionSize) {
 			MEMORY_BASIC_INFORMATION64* pBasicInfo = new MEMORY_BASIC_INFORMATION64;
@@ -283,7 +325,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 						if (GetMappedFileNameW(this->Handle, (HMODULE)pBasicInfo->AllocationBase, DevFilePath, MAX_PATH)) {
 							//printf("%ws\r\n", ModFileName);
 							wchar_t ModFilePath[MAX_PATH + 1] = { 0 };
-							if (TranslateDevicePath(DevFilePath, ModFilePath)) {
+							if (TranslateDevicePath(DevFilePath, ModFilePath)) { // GetMappedFileName queries the path associated with the kernelmode FILE_OBJECT, therefore it is returning a kernelmode device path rather than the typical usermode drive letter path format.
 								CurrentEntity = new Moneta::PE();
 								((Moneta::PE*)CurrentEntity)->SetFile(ModFilePath);
 							}
@@ -299,17 +341,23 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 					}
 					else if (pBasicInfo->Type == MEM_MAPPED) {
 						//printf("map\r\n");
-						wchar_t ModFileName[MAX_PATH + 1] = { 0 };
+						wchar_t DevFilePath[MAX_PATH + 1] = { 0 };
+						wchar_t MapFilePath[MAX_PATH + 1] = { 0 };
 						CurrentEntity = new MappedFile();
 
-						if (GetMappedFileNameW(this->Handle, (HMODULE)pBasicInfo->AllocationBase, ModFileName, MAX_PATH)) {
-							//printf("%ws\r\n", ModFileName);
+						if (GetMappedFileNameW(this->Handle, (HMODULE)pBasicInfo->AllocationBase, DevFilePath, MAX_PATH)) {
+							if (TranslateDevicePath(DevFilePath, MapFilePath)) {
+								//
+							}
+							else {
+								printf("! Failed to translate device path: %ws\r\n", DevFilePath);
+							}
 						}
 						else {
-							wcscpy_s(ModFileName, MAX_PATH + 1, L"Page File");
+							wcscpy_s(MapFilePath, MAX_PATH + 1, L"Page File");
 						}
 
-						((MappedFile*)CurrentEntity)->SetFile(ModFileName);
+						((MappedFile*)CurrentEntity)->SetFile(MapFilePath);
 					}
 					else {
 						CurrentEntity = new Unknown();
@@ -318,17 +366,23 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				}
 			}
 			else {
+				printf("VirtualQuery failed\r\n");
 				if (!SBlocks.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
 					CurrentEntity->SetSBlocks(SBlocks);
 					this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, CurrentEntity));
+					SBlocks.clear();
 				}
-
+				printf("done\r\n");
 				break;
 			}
 		}
 
 		//this->PermissionRecords = new MemoryPermissionRecord(this->Blocks); // Initialize 
 		//CloseHandle(hProcess);
+	}
+	else {
+		printf("- Failed to open handle to process\r\n");
+		throw 1; // Not throwing a specific value crashes it
 	}
 }
 
@@ -392,7 +446,12 @@ const char* PermissionSymbol(uint32_t dwProtection) {
 	}
 }
 
+uint32_t Process::GetPid() {
+	return this->Pid;
+}
+
 void Process::Enumerate() {
+	printf("[ PID: %d\r\n", this->GetPid());
 	//
 	// Walk ablocks (entities) and list the corresponding sblocks of each.
 	//
@@ -414,7 +473,7 @@ void Process::Enumerate() {
 
 				for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
 					//printf("  0x%p\r\n", (*SBlockItr)->GetBasic()->BaseAddress);
-					printf("  0x%p:0x%08x | %s | %s | %d\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, PermissionSymbol((*SBlockItr)->GetBasic()->Protect), (*SectItr)->GetHeader()->Name, 
+					printf("  0x%p:0x%08x | %s | %s | 0x%08x\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, PermissionSymbol((*SBlockItr)->GetBasic()->Protect), (*SectItr)->GetHeader()->Name, 
 						Moneta::GetPrivateSize(this->GetHandle(), (uint8_t *)(*SBlockItr)->GetBasic()->BaseAddress, (uint32_t)(*SBlockItr)->GetBasic()->RegionSize)
 					);
 				}
@@ -453,6 +512,8 @@ void Process::Enumerate() {
 
 		printf("\r\n");
 	}
+
+	printf("\r\n");
 	/*
 	bool bFileRange = false, bImageRange = false;
 
