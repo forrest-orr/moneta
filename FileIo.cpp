@@ -37,14 +37,17 @@ bool FileBase::ToDisk(bool bAppend) {
 	return bWritten;
 }
 
-FileBase::FileBase(wstring TargetPath, bool bForceOpen) : Path(TargetPath) {
+FileBase::FileBase(wstring TargetPath, bool bMemStore, bool bForceOpen) : Path(TargetPath) {
 	HANDLE hFile;
 
 	if ((hFile = CreateFileW(this->Path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE) {
-		uint32_t dwBytesRead;
-		this->Size = GetFileSize(hFile, NULL);
-		this->Data = new uint8_t[this->Size];
-		if (!ReadFile(hFile, this->Data, this->Size, (PDWORD)&dwBytesRead, 0)) throw 2;
+		if (bMemStore) {
+			uint32_t dwBytesRead;
+			this->Size = GetFileSize(hFile, NULL);
+			this->Data = new uint8_t[this->Size];
+			if (!ReadFile(hFile, this->Data, this->Size, (PDWORD)&dwBytesRead, 0)) throw 2;
+		}
+
 		CloseHandle(hFile);
 	}
 	else {

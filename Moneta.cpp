@@ -225,7 +225,7 @@ PE::PE(list<MemoryBlock*> SBlocks, const wchar_t *pFilePath) : FilePath(pFilePat
 
 void MappedFile::SetFile(const wchar_t* pFilePath) {
 	try {
-		this->File = new FileBase(pFilePath, false);
+		this->File = new FileBase(pFilePath, true, false);
 	}
 	catch (...) {
 		printf("- Failed to open %ws\r\n", pFilePath);
@@ -282,7 +282,7 @@ bool TranslateDevicePath(const wchar_t* pDevicePath, wchar_t *pTranslatedPath) {
 HANDLE Process::GetHandle() {
 	return this->Handle;
 }
-Process::Process(uint32_t dwPid) : Pid(dwPid) {
+Process::Process(uint32_t dwPid, const wchar_t* pProcessName) : Pid(dwPid), Name(pProcessName) {
 	//
 	// Initialize a new entity for each allocation base and add it to this process address space map
 	//
@@ -489,6 +489,11 @@ void Process::Enumerate() {
 					printf("  0x%p:0x%08x | %s | %s | 0x%08x\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, PermissionSymbol((*SBlockItr)->GetBasic()->Protect), (*SectItr)->GetHeader()->Name, 
 						Moneta::GetPrivateSize(this->GetHandle(), (uint8_t *)(*SBlockItr)->GetBasic()->BaseAddress, (uint32_t)(*SBlockItr)->GetBasic()->RegionSize)
 					);
+
+					if (((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress, (uint32_t)(*SBlockItr)->GetBasic()->RegionSize)) {
+						printf("! Section %s is executable and has private pages within %ws [%ws:%d]\r\n", (*SectItr)->GetHeader()->Name, ((Moneta::PE*)Itr->second)->GetFilePath().c_str(), this->Name.c_str(), this->Pid);
+						system("pause");
+					}
 				}
 			}
 		}

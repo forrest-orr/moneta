@@ -94,7 +94,9 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		}
 
 		if (ProcType == SelectedProcessType::SpecificPid || ProcType == SelectedProcessType::SelfPid) {
-			Process TargetProc(dwSelectedPid);
+			wchar_t SelfPath[MAX_PATH + 1] = { 0 };
+			GetModuleFileNameW(NULL, SelfPath, MAX_PATH + 1);
+			Process TargetProc(dwSelectedPid, SelfPath);
 			//list<MemoryBlock*> ProcessMem = QueryProcessMem(dwSelectedPid);
 
 			if (OutputType == SelectedOutputType::Raw) {
@@ -120,7 +122,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 
 						try {
 							//TargetProc = new Process(ProcEntry.th32ProcessID);
-							Process TargetProc(ProcEntry.th32ProcessID);
+							Process TargetProc(ProcEntry.th32ProcessID, ProcEntry.szExeFile);
 							if (OutputType == SelectedOutputType::Raw) {
 								TargetProc.Enumerate();
 							}

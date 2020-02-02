@@ -47,10 +47,11 @@ namespace Moneta {
 	protected:
 		uint32_t Pid;
 		HANDLE Handle;
+		std::wstring Name;
 	public:
 		HANDLE GetHandle();
 		uint32_t GetPid();
-		Process(uint32_t);
+		Process(uint32_t, const wchar_t*);
 		void Enumerate();
 		~Process();
 	};
