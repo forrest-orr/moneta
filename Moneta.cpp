@@ -111,40 +111,14 @@ IMAGE_SECTION_HEADER *Section::GetHeader() {
 
 */
 
-/*
-There are missing sblocks in section .pdata onward, probably because all sections following it share the same sblock (all +r) and there are NO sections sharing an sblock in output.
-
-File path: C:\Windows\System32\shcore.dll (64-bit)
-  .text
-  S-Blocks:
-  0x00007FFB02451000
-  .rdata
-  S-Blocks:
-  0x00007FFB024C2000
-  .data
-  S-Blocks:
-  0x00007FFB024E8000
-  .pdata
-  S-Blocks:
-  0x00007FFB024EA000
-  .didat
-  S-Blocks:
-  .rsrc
-  S-Blocks:
-  .reloc
-  S-Blocks:
-
-*/
 void Moneta::PE::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
 	this->StartVa = (uint8_t *)(SBlocks.front())->GetBasic()->BaseAddress;
 	this->EndVa = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize);
 	this->Pe = PeBase::Load(this->File->GetData(), this->File->GetSize());
-	printf("* Runtime image base: 0x%p\r\n", SBlocks.front()->GetBasic()->AllocationBase);
+	//printf("* Runtime image base: 0x%p\r\n", SBlocks.front()->GetBasic()->AllocationBase);
 	// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
 	for (int32_t nX = 0; nX < this->Pe->GetFileHdr()->NumberOfSections; nX++) {
-		//printf("%s\r\n", (this->Pe->GetSectHdrs() + nX)->Name);
-
 		//
 		// Generate an image section header entity to and add it to the section vector for the PE entity
 		//
@@ -154,6 +128,8 @@ void Moneta::PE::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 		uint8_t* pSectStartVa = (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase + (this->Pe->GetSectHdrs() + nX)->VirtualAddress;
 		uint8_t* pSectEndVa = (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase + (this->Pe->GetSectHdrs() + nX)->VirtualAddress + dwSectionSize;
 
+		//printf("%s [0x%p:0x%p]\r\n", (this->Pe->GetSectHdrs() + nX)->Name, pSectStartVa, pSectEndVa);
+		//printf("%s [0x%p:0x%p]\r\n", (this->Pe->GetSectHdrs() + nX)->Name, pSectStartVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase, pSectEndVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase);
 		//
 		// Calculate the sblocks overlapping between this PE entity and the current section.
 		//
@@ -178,8 +154,10 @@ void Moneta::PE::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 			//sblock end address matches section start address
 			uint8_t* pSBlockStartVa = (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress;
 			uint8_t* pSBlockEndVa = (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress + (*SBlockItr)->GetBasic()->RegionSize;
-
-			if ((pSBlockStartVa >= pSectStartVa && pSBlockStartVa < pSectEndVa) || (pSBlockEndVa > pSectStartVa && pSBlockEndVa <= pSectEndVa)) {
+			//printf("Current itr: 0x%p:0x%p\r\n", pSBlockStartVa, pSBlockEndVa);
+			//printf("Current itr: 0x%p:0x%p\r\n", pSBlockStartVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase, pSBlockEndVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase);
+			//case: sblock begins before the section and ends after it.
+			if ((pSBlockStartVa >= pSectStartVa && pSBlockStartVa < pSectEndVa) || (pSBlockEndVa > pSectStartVa && pSBlockEndVa <= pSectEndVa) || (pSBlockStartVa < pSectStartVa && pSBlockEndVa > pSectEndVa)) {
 				printf("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", (this->Pe->GetSectHdrs() + nX)->Name, pSectStartVa, pSectEndVa, pSBlockStartVa, pSBlockEndVa);
 				OverlapSBlock.push_back(*SBlockItr);
 			}
