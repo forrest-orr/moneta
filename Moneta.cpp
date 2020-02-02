@@ -110,12 +110,37 @@ IMAGE_SECTION_HEADER *Section::GetHeader() {
   0x71627:4096 | R
 
 */
+
+/*
+There are missing sblocks in section .pdata onward, probably because all sections following it share the same sblock (all +r) and there are NO sections sharing an sblock in output.
+
+File path: C:\Windows\System32\shcore.dll (64-bit)
+  .text
+  S-Blocks:
+  0x00007FFB02451000
+  .rdata
+  S-Blocks:
+  0x00007FFB024C2000
+  .data
+  S-Blocks:
+  0x00007FFB024E8000
+  .pdata
+  S-Blocks:
+  0x00007FFB024EA000
+  .didat
+  S-Blocks:
+  .rsrc
+  S-Blocks:
+  .reloc
+  S-Blocks:
+
+*/
 void Moneta::PE::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
 	this->StartVa = (uint8_t *)(SBlocks.front())->GetBasic()->BaseAddress;
 	this->EndVa = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize);
 	this->Pe = PeBase::Load(this->File->GetData(), this->File->GetSize());
-;
+	printf("* Runtime image base: 0x%p\r\n", SBlocks.front()->GetBasic()->AllocationBase);
 	// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
 	for (int32_t nX = 0; nX < this->Pe->GetFileHdr()->NumberOfSections; nX++) {
 		//printf("%s\r\n", (this->Pe->GetSectHdrs() + nX)->Name);
@@ -125,10 +150,42 @@ void Moneta::PE::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 		//
 
 		Section* Sect = new Section((this->Pe->GetSectHdrs() + nX));
+		uint32_t dwSectionSize = ((this->Pe->GetSectHdrs() + nX)->SizeOfRawData == 0 ? (this->Pe->GetSectHdrs() + nX)->Misc.VirtualSize : (this->Pe->GetSectHdrs() + nX)->SizeOfRawData);
+		uint8_t* pSectStartVa = (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase + (this->Pe->GetSectHdrs() + nX)->VirtualAddress;
+		uint8_t* pSectEndVa = (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase + (this->Pe->GetSectHdrs() + nX)->VirtualAddress + dwSectionSize;
 
 		//
 		// Calculate the sblocks overlapping between this PE entity and the current section.
 		//
+
+		vector<MemoryBlock*> OverlapSBlock;
+
+		for (vector<MemoryBlock*>::const_iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
+			//if ((uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress >= pSectStartVa && ((uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress + (*SBlockItr)->GetBasic()->RegionSize) < pSectEndVa) {
+			// sblock 0x2000 encompasses .rdata and .rsrc 0x1000 each.
+			//sblock within section? section within sblock?
+			// does the sblock start fall in the section bounds? does the end fall within the section bounds?
+			// check which is bigger, the section or the sblock. Whichever is bigger, check if the other's start falls within its range, or end falls within its range.
+			// 0x2000 is bigger than 0x1000. Is 0x0 >= 0x0? yes. Is 0x0+0x1000 (0x1000) < 0x2000? yes.
+
+
+			// Other scenario: .text is 0x8000 in size starting at 0x1000. It has 3 sblocks overlapping with it. One beginning at 0x0 with a size of 0x2000, the next with a size of 0x1000 at 0x2000, the last with a size of 0x9000 at 0x3000.
+			// First sblock: smaller than section. Does its start fall within the section? no. Does its end? yes.
+			// Second sblock: smaller than section. Start falls within section? yes.
+			// Third sblock: bigger than section. Does section start fall within sblock? no. Does section end fall within sblock? yes.
+			
+			//When finding overlap it does not matter which is bigger. Checking if the start or end of either a section or sblock falls within the start/end range of another is sufficient.
+			//sblock end address matches section start address
+			uint8_t* pSBlockStartVa = (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress;
+			uint8_t* pSBlockEndVa = (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress + (*SBlockItr)->GetBasic()->RegionSize;
+
+			if ((pSBlockStartVa >= pSectStartVa && pSBlockStartVa < pSectEndVa) || (pSBlockEndVa > pSectStartVa && pSBlockEndVa <= pSectEndVa)) {
+				printf("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", (this->Pe->GetSectHdrs() + nX)->Name, pSectStartVa, pSectEndVa, pSBlockStartVa, pSBlockEndVa);
+				OverlapSBlock.push_back(*SBlockItr);
+			}
+
+			Sect->SetSBlocks(OverlapSBlock);
+		}
 
 		this->Sections.push_back(Sect);
 	}
@@ -270,6 +327,12 @@ void AddressSpace::Enumerate() {
 			vector<Section*> Sections = ((Moneta::PE*)Itr->second)->GetSections();
 			for (vector<Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
 				printf("  %s\r\n", (*SectItr)->GetHeader()->Name);
+				printf("  S-Blocks:\r\n");
+				vector<MemoryBlock*> SBlocks = (*SectItr)->GetSBlocks();
+
+				for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
+					printf("  0x%p\r\n", (*SBlockItr)->GetBasic()->BaseAddress);
+				}
 			}
 		}
 		else if (Itr->second->Type() == EntityType::MAPPED_FILE) {
