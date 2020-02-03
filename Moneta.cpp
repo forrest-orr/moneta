@@ -223,9 +223,9 @@ PE::PE(list<MemoryBlock*> SBlocks, const wchar_t *pFilePath) : FilePath(pFilePat
 	this->SBlocks = SBlocks; // This must be done since it is inheritted from the abstract base class (it can't be auto-set like FilePath was)
 }*/
 
-void MappedFile::SetFile(const wchar_t* pFilePath) {
+void MappedFile::SetFile(const wchar_t* pFilePath, bool bMemStore) {
 	try {
-		this->File = new FileBase(pFilePath, true, false);
+		this->File = new FileBase(pFilePath, bMemStore, false);
 	}
 	catch (...) {
 		printf("- Failed to open %ws\r\n", pFilePath);
@@ -338,7 +338,7 @@ Process::Process(uint32_t dwPid, const wchar_t* pProcessName) : Pid(dwPid), Name
 							wchar_t ModFilePath[MAX_PATH + 1] = { 0 };
 							if (TranslateDevicePath(DevFilePath, ModFilePath)) { // GetMappedFileName queries the path associated with the kernelmode FILE_OBJECT, therefore it is returning a kernelmode device path rather than the typical usermode drive letter path format.
 								CurrentEntity = new Moneta::PE();
-								((Moneta::PE*)CurrentEntity)->SetFile(ModFilePath);
+								((Moneta::PE*)CurrentEntity)->SetFile(ModFilePath, true);
 							}
 							else {
 								printf("! Failed to translate device path: %ws\r\n", DevFilePath);

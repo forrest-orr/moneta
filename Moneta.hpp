@@ -74,7 +74,7 @@ namespace Moneta {
 		MappedFile();
 		~MappedFile();
 		void SetSBlocks(std::vector<MemoryBlock*>);
-		void SetFile(const wchar_t* pFilePath);
+		void SetFile(const wchar_t* pFilePath, bool bMemStore = false);
 		std::wstring GetFilePath();
 		EntityType Type() { return EntityType::MAPPED_FILE; }
 	protected:
