@@ -29,8 +29,7 @@ PeBase* PeBase::Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) // Factory meth
 
 	PeBase* NewPe = nullptr;
 
-	if (*(uint16_t*)&pPeFileBuf[0] == 'ZM')
-	{
+	if (*(uint16_t*)&pPeFileBuf[0] == 'ZM') {
 		PIMAGE_DOS_HEADER pDosHdr = (PIMAGE_DOS_HEADER)pPeFileBuf;
 		IMAGE_FILE_HEADER* pFileHdr = (IMAGE_FILE_HEADER*)(pPeFileBuf + pDosHdr->e_lfanew + sizeof(LONG));
 

@@ -1,12 +1,12 @@
 class MemoryBlock {
 protected:
-	MEMORY_BASIC_INFORMATION64* Basic = nullptr;
+	MEMORY_BASIC_INFORMATION* Basic = nullptr;
 	MEMORY_REGION_INFORMATION* Region = nullptr;
 
 public:
-	MemoryBlock(MEMORY_BASIC_INFORMATION64* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo);
+	MemoryBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo);
 	~MemoryBlock();
-	MEMORY_BASIC_INFORMATION64* GetBasic();
+	MEMORY_BASIC_INFORMATION* GetBasic();
 	MEMORY_REGION_INFORMATION* GetRegion();
 };
 
@@ -26,6 +26,7 @@ namespace Moneta {
 	protected:
 		std::vector<MemoryBlock*> SBlocks;
 		uint8_t* StartVa, * EndVa;
+		uint32_t Size;
 	public:
 		std::vector<MemoryBlock*> GetSBlocks();
 		uint8_t* GetStartVa();
@@ -48,25 +49,14 @@ namespace Moneta {
 		uint32_t Pid;
 		HANDLE Handle;
 		std::wstring Name;
+		bool Wow64;
 	public:
 		HANDLE GetHandle();
 		uint32_t GetPid();
+		bool IsWow64();
 		Process(uint32_t, const wchar_t*);
 		void Enumerate();
 		~Process();
-	};
-
-	class Section : public Entity {
-	public:
-		Section(IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase);
-		void SetSBlocks(std::vector<MemoryBlock*>);
-		IMAGE_SECTION_HEADER* GetHeader();
-		EntityType Type() { return EntityType::PE_SECTION; }
-	protected:
-		IMAGE_SECTION_HEADER Hdr;
-		uint8_t* PeBase;
-		uint32_t Size;
-
 	};
 
 	class MappedFile : public Entity {
@@ -81,20 +71,34 @@ namespace Moneta {
 		FileBase *File = nullptr;
 	};
 
-	class PE : public MappedFile {
-	public:
-		EntityType Type() { return EntityType::PE_FILE; }
-		void SetSBlocks(std::vector<MemoryBlock*>);
-		uint8_t* GetPeBase();
-		PeFile::PeBase* GetPe();
-		PE();
-		~PE();
-		std::vector<Section*> GetSections();
-	protected:
-		std::vector<Section *> Sections;
-		PeFile::PeBase* Pe;
-		uint8_t* PeBase;
-	};
+	namespace PE {
+		typedef class Section;
+		class PE : public MappedFile {
+		public:
+			EntityType Type() { return EntityType::PE_FILE; }
+			void SetSBlocks(std::vector<MemoryBlock*>);
+			uint8_t* GetPeBase();
+			PeFile::PeBase* GetPe();
+			std::vector<Section*> GetSections();
+			PE();
+			~PE();
+		protected:
+			uint8_t* PeBase;
+		private:
+			std::vector<Section*> Sections;
+			PeFile::PeBase* Pe;
+		};
+
+		class Section : public PE {
+		public:
+			Section(IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase);
+			void SetSBlocks(std::vector<MemoryBlock*>);
+			IMAGE_SECTION_HEADER* GetHeader();
+			EntityType Type() { return EntityType::PE_SECTION; }
+		protected:
+			IMAGE_SECTION_HEADER Hdr;
+		};
+	}
 
 	class Unknown : public Entity {
 	public:

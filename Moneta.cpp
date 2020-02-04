@@ -35,7 +35,7 @@ using namespace std;
 using namespace PeFile;
 using namespace Moneta;
 
-MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION64* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo) : Basic(pMemBasicInfo), Region(pMemRegionInfo) {}
+MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo) : Basic(pMemBasicInfo), Region(pMemRegionInfo) {}
 
 MemoryBlock::~MemoryBlock() {
 	//printf("mem destructor\r\n");
@@ -94,7 +94,7 @@ Process::~Process() {
 	//printf("Process destructor\r\n");
 }
 
-MEMORY_BASIC_INFORMATION64* MemoryBlock::GetBasic() {
+MEMORY_BASIC_INFORMATION* MemoryBlock::GetBasic() {
 	return Basic;
 }
 
@@ -124,8 +124,9 @@ std::vector<Section*> Moneta::PE::GetSections() {
 
 MappedFile::MappedFile() {}
 
-Section::Section(IMAGE_SECTION_HEADER *pHdr, uint8_t *pPeBase) : PeBase(pPeBase) {
+Section::Section(IMAGE_SECTION_HEADER *pHdr, uint8_t *pPeBase) {
 	memcpy(&this->Hdr, pHdr, sizeof(IMAGE_SECTION_HEADER));
+	this->PeBase = pPeBase;
 	this->Size = this->Hdr.SizeOfRawData == 0 ? this->Hdr.Misc.VirtualSize : this->Hdr.SizeOfRawData;
 	this->StartVa = this->PeBase + this->Hdr.VirtualAddress;
 	this->EndVa = this->PeBase + this->Hdr.VirtualAddress + this->Size;
@@ -150,6 +151,9 @@ void Moneta::PE::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 	this->EndVa = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize);
 	//printf("* Runtime image base: 0x%p for %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, this->File->GetPath().c_str());
 	this->Pe = PeBase::Load(this->File->GetData(), this->File->GetSize());
+	wstring FilePath(this->GetFilePath());
+	delete this->File; // Don't double-store the file content. 
+	this->SetFile(FilePath.c_str());
 
 	//
 	// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
@@ -190,8 +194,8 @@ void Moneta::PE::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 
 			if ((pSBlockStartVa >= Sect->GetStartVa() && pSBlockStartVa < Sect->GetEndVa()) || (pSBlockEndVa > Sect->GetStartVa()&& pSBlockEndVa <= Sect->GetEndVa()) || (pSBlockStartVa < Sect->GetStartVa() && pSBlockEndVa > Sect->GetEndVa())) {
 				//printf("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, Sect->GetStartVa(), Sect->GetEndVa(), pSBlockStartVa, pSBlockEndVa);
-				MEMORY_BASIC_INFORMATION64* pBasicInfo = new MEMORY_BASIC_INFORMATION64; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
-				memcpy(pBasicInfo, (*SBlockItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION64));
+				MEMORY_BASIC_INFORMATION* pBasicInfo = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
+				memcpy(pBasicInfo, (*SBlockItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
 				OverlapSBlock.push_back(new MemoryBlock(pBasicInfo, nullptr));
 			}
 
@@ -282,6 +286,13 @@ bool TranslateDevicePath(const wchar_t* pDevicePath, wchar_t *pTranslatedPath) {
 HANDLE Process::GetHandle() {
 	return this->Handle;
 }
+
+bool Process::IsWow64() {
+	return this->Wow64;
+}
+
+typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
+
 Process::Process(uint32_t dwPid, const wchar_t* pProcessName) : Pid(dwPid), Name(pProcessName) {
 	//
 	// Initialize a new entity for each allocation base and add it to this process address space map
@@ -291,6 +302,22 @@ Process::Process(uint32_t dwPid, const wchar_t* pProcessName) : Pid(dwPid), Name
 	this->Handle = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
 	
 	if (this->Handle != nullptr) {
+		static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
+
+		if (IsWow64Process != nullptr) {
+			if (IsWow64Process(this->Handle, (PBOOL)&this->Wow64)) {
+				if (this->IsWow64()) {
+					//CloseHandle(this->Handle);
+					printf("* PID %d is Wow64\r\n", this->Pid);
+					//system("pause");
+					//throw 2;
+				}
+				else {
+					//throw 2;
+				}
+			}
+		}
+
 		//system("pause");
 		uint64_t qwRegionSize = 0;
 		vector<MemoryBlock *> SBlocks;
@@ -300,11 +327,11 @@ Process::Process(uint32_t dwPid, const wchar_t* pProcessName) : Pid(dwPid), Name
 		//Loop memory, building list of SBlocks. Once a block is found which does not match the "current" allocation base, create a new entity containing the corresponding sblock list, and insert it into the address space entities map using the ablock as the key.
 
 		//if (this->Pid == 3272) system("pause");
-
+		
 		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += qwRegionSize) {
-			MEMORY_BASIC_INFORMATION64* pBasicInfo = new MEMORY_BASIC_INFORMATION64;
+			MEMORY_BASIC_INFORMATION* pBasicInfo = new MEMORY_BASIC_INFORMATION;
 
-			if (VirtualQueryEx(this->Handle, pBaseAddr, (MEMORY_BASIC_INFORMATION*)pBasicInfo, sizeof(MEMORY_BASIC_INFORMATION64)) == sizeof(MEMORY_BASIC_INFORMATION64)) {
+			if (VirtualQueryEx(this->Handle, pBaseAddr, (MEMORY_BASIC_INFORMATION*)pBasicInfo, sizeof(MEMORY_BASIC_INFORMATION)) == sizeof(MEMORY_BASIC_INFORMATION)) {
 				qwRegionSize = pBasicInfo->RegionSize;
 
 				if (!SBlocks.empty()) { // If the sblock list is empty then there is no ablock for comparison
@@ -321,7 +348,7 @@ Process::Process(uint32_t dwPid, const wchar_t* pProcessName) : Pid(dwPid), Name
 					//printf("done2\r\n");
 				}
 				//printf("Addomg mew sblock to list\r\n");
-				SBlocks.push_back(new MemoryBlock((MEMORY_BASIC_INFORMATION64*)pBasicInfo, nullptr));
+				SBlocks.push_back(new MemoryBlock((MEMORY_BASIC_INFORMATION*)pBasicInfo, nullptr));
 				ABlock = SBlocks.begin(); // This DOES fix a bug.
 				//
 				// Potentially initialize a new polymorphic entity class based upon the memory characteristics
@@ -464,7 +491,7 @@ uint32_t Process::GetPid() {
 }
 
 void Process::Enumerate() {
-	printf("[ PID: %d\r\n", this->GetPid());
+	printf("\r\n[ %ws : %d : %ws\r\n", this->Name.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
 	//
 	// Walk ablocks (entities) and list the corresponding sblocks of each.
 	//
