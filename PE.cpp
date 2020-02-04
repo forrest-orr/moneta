@@ -93,7 +93,9 @@ template<typename NtHdrType> NtHdrType* PeArch<NtHdrType>::GetNtHdrs() {
 	if (pNtHdr->Signature == 'EP') {
 		if (pNtHdr->FileHeader.Machine == GetPeArch()) {
 			if (pNtHdr->OptionalHeader.Magic == GetPeMagic()) {
-				this->SectHdrs = (IMAGE_SECTION_HEADER *)((uint8_t *)pNtHdr + sizeof(NtHdrType));
+				this->SectHdrs = reinterpret_cast<IMAGE_SECTION_HEADER *>(
+					reinterpret_cast<uint8_t *>(pNtHdr) + sizeof(NtHdrType)
+					);
 				return pNtHdr;
 			}
 		}
