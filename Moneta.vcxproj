@@ -123,9 +123,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AddressSpace.cpp" />
+    <ClCompile Include="Blocks.cpp" />
     <ClCompile Include="FileIo.cpp" />
     <ClCompile Include="Interface.cpp" />
-    <ClCompile Include="Moneta.cpp" />
+    <ClCompile Include="Entity.cpp" />
     <ClCompile Include="PE.cpp" />
   </ItemGroup>
   <ItemGroup>

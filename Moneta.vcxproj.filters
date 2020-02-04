@@ -19,19 +19,28 @@
     <Filter Include="Header Files\Classes">
       <UniqueIdentifier>{99d0197e-6354-4645-b4c2-edc2420d44ee}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Classes\Moneta">
+      <UniqueIdentifier>{12f263ff-349e-4eb0-87ba-8e1042e59bd1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Interface.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Moneta.cpp">
-      <Filter>Source Files\Classes</Filter>
     </ClCompile>
     <ClCompile Include="PE.cpp">
       <Filter>Source Files\Classes</Filter>
     </ClCompile>
     <ClCompile Include="FileIo.cpp">
       <Filter>Source Files\Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="AddressSpace.cpp">
+      <Filter>Source Files\Classes\Moneta</Filter>
+    </ClCompile>
+    <ClCompile Include="Blocks.cpp">
+      <Filter>Source Files\Classes\Moneta</Filter>
+    </ClCompile>
+    <ClCompile Include="Entity.cpp">
+      <Filter>Source Files\Classes\Moneta</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
