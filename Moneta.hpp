@@ -31,10 +31,20 @@ namespace Moneta {
 		std::vector<MemoryBlock*> GetSBlocks();
 		uint8_t* GetStartVa();
 		uint8_t* GetEndVa();
+		static Entity* Create(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks); // Factory method for derived PE images, mapped files, unknown memory ranges.
+		//Entity(vector<MemoryBlock*> SBlocks);
+		//void SetSBlocks(std::vector<MemoryBlock*>);
 		~Entity();
-		virtual void SetSBlocks(std::vector<MemoryBlock*>) = 0; // In addition to initializing the sblocks list, derivations of this class are expected to implement this method so as to process the sblocks as input, analyze them and generate additional child entities (if applicable)
+		//virtual void SetSBlocks(std::vector<MemoryBlock*>) = 0; // In addition to initializing the sblocks list, derivations of this class are expected to implement this method so as to process the sblocks as input, analyze them and generate additional child entities (if applicable)
 		virtual EntityType Type() = 0;
 	};
+
+	class Base : public Entity { // This is essential, since a parameterized constructor of the base entity class is impossible (since it is an abstract base class with a deferred method). new Entity() is impossible for this reason: only derived classes can be initialized.
+	public:
+		Base(std::vector<MemoryBlock*> SBlocks);
+		EntityType Type() { return EntityType::UNKNOWN; }
+	};
+
 
 	class AddressSpace {
 	protected:
@@ -59,11 +69,11 @@ namespace Moneta {
 		~Process();
 	};
 
-	class MappedFile : public Entity {
+	class MappedFile : virtual public Base { // Virtual inheritance from entity prevents classes derived from multiple classes derived from entity from having ambiguous/conflicting content.
 	public:
-		MappedFile();
+		MappedFile(std::vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore = false);
 		~MappedFile();
-		void SetSBlocks(std::vector<MemoryBlock*>);
+		//void SetSBlocks(std::vector<MemoryBlock*>);
 		void SetFile(const wchar_t* pFilePath, bool bMemStore = false);
 		std::wstring GetFilePath();
 		EntityType Type() { return EntityType::MAPPED_FILE; }
@@ -71,42 +81,40 @@ namespace Moneta {
 		FileBase *File = nullptr;
 	};
 
-	namespace PE {
+	namespace PeVm {
+		class Component : virtual public Base {
+		public:
+			uint8_t* GetPeBase();
+			Component(std::vector<MemoryBlock*> SBlocks, uint8_t* pPeBase);
+		protected:
+			uint8_t* PeBase;
+		};
+
 		typedef class Section;
-		class PE : public MappedFile {
+		class Body : public MappedFile, public Component {
 		public:
 			EntityType Type() { return EntityType::PE_FILE; }
-			void SetSBlocks(std::vector<MemoryBlock*>);
+			//void SetSBlocks(std::vector<MemoryBlock*>);
 			uint8_t* GetPeBase();
 			PeFile::PeBase* GetPe();
 			std::vector<Section*> GetSections();
-			PE();
-			~PE();
+			Body(std::vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath);
+			~Body();
 		protected:
-			uint8_t* PeBase;
-		private:
 			std::vector<Section*> Sections;
 			PeFile::PeBase* Pe;
 		};
 
-		class Section : public PE {
+		class Section : public Component {
 		public:
-			Section(IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase);
-			void SetSBlocks(std::vector<MemoryBlock*>);
+			Section(std::vector<MemoryBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase);
+			//void SetSBlocks(std::vector<MemoryBlock*>);
 			IMAGE_SECTION_HEADER* GetHeader();
 			EntityType Type() { return EntityType::PE_SECTION; }
 		protected:
 			IMAGE_SECTION_HEADER Hdr;
 		};
 	}
-
-	class Unknown : public Entity {
-	public:
-		//Unknown(std::list<MemoryBlock*> SBlocks);
-		void SetSBlocks(std::vector<MemoryBlock*>);
-		//Unknown();
-		EntityType Type() { return EntityType::UNKNOWN; }
-	};
 
 	uint32_t GetPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t dwSize);
 }
