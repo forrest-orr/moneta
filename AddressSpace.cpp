@@ -130,6 +130,9 @@ uint32_t Process::GetPid() {
 	return this->Pid;
 }
 
+bool PageExecutable(uint32_t dwProtect) {
+	return (dwProtect == PAGE_EXECUTE || dwProtect == PAGE_EXECUTE_READ || dwProtect == PAGE_EXECUTE_READWRITE);
+}
 void Process::Enumerate() {
 	printf("\r\n[ %ws : %d : %ws\r\n", this->Name.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
 	//
@@ -160,6 +163,16 @@ void Process::Enumerate() {
 
 					if (((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress, (uint32_t)(*SBlockItr)->GetBasic()->RegionSize)) {
 						printf("! Section %s is executable and has private pages within %ws [%ws:%d]\r\n", (*SectItr)->GetHeader()->Name, dynamic_cast<PeVm::Body*>(Itr->second)->GetFilePath().c_str(), this->Name.c_str(), this->Pid);
+						//system("pause");
+					}
+
+					if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Headers") == 0 && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress, (uint32_t)(*SBlockItr)->GetBasic()->RegionSize)) {
+						printf("! PE headers have private pages within %ws [%ws:%d]\r\n", dynamic_cast<PeVm::Body*>(Itr->second)->GetFilePath().c_str(), this->Name.c_str(), this->Pid);
+						//system("pause");
+					}
+
+					if (PageExecutable((*SBlockItr)->GetBasic()->Protect) && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress, (uint32_t)(*SBlockItr)->GetBasic()->RegionSize)) {
+						printf("! Sblock in section %s is executable and has private pages within %ws [%ws:%d]\r\n", (*SectItr)->GetHeader()->Name, dynamic_cast<PeVm::Body*>(Itr->second)->GetFilePath().c_str(), this->Name.c_str(), this->Pid);
 						system("pause");
 					}
 				}
@@ -177,6 +190,10 @@ void Process::Enumerate() {
 			for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
 				//printf("  0x%p\r\n", (*SBlockItr)->GetBasic()->BaseAddress);
 				printf("  0x%p:0x%08x | %s\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SBlockItr)->GetBasic()->Protect));
+				if (PageExecutable((*SBlockItr)->GetBasic()->Protect)) {
+					printf("! Mapped memory at sblock 0x%p is executable\r\n", (*SBlockItr)->GetBasic()->BaseAddress);
+					system("pause");
+				}
 			}
 		}
 		else {
@@ -186,9 +203,14 @@ void Process::Enumerate() {
 			vector<MemoryBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 
 			if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
-				printf("[ 0x%016x:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->AllocationBase, SBlocks.front()->GetBasic()->RegionSize);
+				printf("[ 0x%016x:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->AllocationBase, (uint32_t)((uint8_t *)SBlocks.back()->GetBasic()->BaseAddress - SBlocks.back()->GetBasic()->AllocationBase) + SBlocks.back()->GetBasic()->RegionSize);
 				for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
 					printf("  0x%p:0x%08x | %s\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SBlockItr)->GetBasic()->Protect));
+
+					if (PageExecutable((*SBlockItr)->GetBasic()->Protect)) {
+						printf("! Private memory at sblock 0x%p is executable\r\n", (*SBlockItr)->GetBasic()->BaseAddress);
+						system("pause");
+					}
 				}
 			}
 			else {
