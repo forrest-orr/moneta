@@ -30,14 +30,16 @@ AddressSpace::~AddressSpace() {
 }
 
 Process::~Process() {
-	CloseHandle(this->Handle);
+	if (this->Handle != nullptr) {
+		CloseHandle(this->Handle);
+	}
 }
 
 HANDLE Process::GetHandle() {
 	return this->Handle;
 }
 
-bool Process::IsWow64() {
+BOOL Process::IsWow64() {
 	return this->Wow64;
 }
 
@@ -55,21 +57,29 @@ Process::Process(uint32_t dwPid, const wchar_t* pProcessName) : Pid(dwPid), Name
 		static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
 
 		if (IsWow64Process != nullptr) {
-			if (IsWow64Process(this->Handle, (PBOOL)&this->Wow64)) {
-				if (this->IsWow64()) {
-					//CloseHandle(this->Handle);
-					Interface::Log(4, "* PID %d is Wow64\r\n", this->Pid);
-					//system("pause");
-					//throw 2;
-				}
-				else {
-					//throw 2;
+			BOOL bSelfWow64 = FALSE;
+
+			if (IsWow64Process(GetCurrentProcess(), (PBOOL)&bSelfWow64)) {
+				if (IsWow64Process(this->Handle, (PBOOL)&this->Wow64)) {
+					if (this->IsWow64()) {
+						//CloseHandle(this->Handle);
+						Interface::Log(4, "* PID %d is Wow64\r\n", this->Pid);
+						//system("pause");
+						//throw 2;
+					}
+					else {
+						if (bSelfWow64) {
+							Interface::Log(4, "* Cannot scan non-Wow64 process from Wow64 Moneta instance\r\n");
+							throw 2;
+						}
+					}
 				}
 			}
 		}
 
+		Interface::Log(4, "* Scanning sblocks...\r\n");
 		//system("pause");
-		uint64_t qwRegionSize = 0;
+		SIZE_T cbRegionSize = 0;
 		vector<MemoryBlock*> SBlocks;
 		vector<MemoryBlock*>::iterator ABlock;
 		//Entity* CurrentEntity = nullptr;
@@ -78,44 +88,38 @@ Process::Process(uint32_t dwPid, const wchar_t* pProcessName) : Pid(dwPid), Name
 
 		//if (this->Pid == 3272) system("pause");
 
-		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += qwRegionSize) {
+		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += cbRegionSize) {
 			MEMORY_BASIC_INFORMATION* pBasicInfo = new MEMORY_BASIC_INFORMATION;
 
 			if (VirtualQueryEx(this->Handle, pBaseAddr, (MEMORY_BASIC_INFORMATION*)pBasicInfo, sizeof(MEMORY_BASIC_INFORMATION)) == sizeof(MEMORY_BASIC_INFORMATION)) {
-				qwRegionSize = pBasicInfo->RegionSize;
-
+				cbRegionSize = pBasicInfo->RegionSize;
+				
 				if (!SBlocks.empty()) { // If the sblock list is empty then there is no ablock for comparison
 					//
 					// In the event that this is a new ablock, create a map pair and insert it into the entities map
 					//
-					//Interface::Log("Sblock list not empty\r\n");
+					
+					Interface::Log(5, "Sblock list not empty\r\n");
+					
 					if (pBasicInfo->AllocationBase != (*ABlock)->GetBasic()->AllocationBase) {
-						//Interface::Log("Found a new ablock. Saving sblock list to new entity entry.");
+						Interface::Log(5, "Found a new ablock. Saving sblock list to new entity entry.");
 						//CurrentEntity->SetSBlocks(SBlocks);
 						this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, Entity::Create(this->Handle, SBlocks)));
 						SBlocks.clear();
 					}
 					//Interface::Log("done2\r\n");
 				}
-				//Interface::Log("Addomg mew sblock to list\r\n");
+				
+				Interface::Log(5, "Adding mew sblock to list\r\n");
 				SBlocks.push_back(new MemoryBlock((MEMORY_BASIC_INFORMATION*)pBasicInfo, nullptr));
 				ABlock = SBlocks.begin(); // This DOES fix a bug.
-				//
-				// Potentially initialize a new polymorphic entity class based upon the memory characteristics
-				//
-
-				if (SBlocks.size() == 1) {
-					ABlock = SBlocks.begin();
-					//Interface::Log("Set current ABlock to 0x%p due to sblock list size of 1 after insert\n", (*ABlock)->GetBasic()->AllocationBase);
-				}
 			}
 			else {
-				//Interface::Log("VirtualQuery failed\r\n");
+				Interface::Log(5, "VirtualQuery failed\r\n");
 				//system("pause");
 				delete pBasicInfo;
 				if (!SBlocks.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
 					this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, Entity::Create(this->Handle, SBlocks)));
-					//SBlocks.clear();
 				}
 				//Interface::Log("done\r\n");
 				break;

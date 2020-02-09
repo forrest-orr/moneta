@@ -55,11 +55,11 @@ namespace Moneta {
 		uint32_t Pid;
 		HANDLE Handle;
 		std::wstring Name;
-		bool Wow64;
+		BOOL Wow64; // bool and BOOL translate to different sizes, IsWow64Process pointed at a bool will corrupt memory.
 	public:
 		HANDLE GetHandle();
 		uint32_t GetPid();
-		bool IsWow64();
+		BOOL IsWow64();
 		Process(uint32_t, const wchar_t*);
 		void Enumerate();
 		~Process();

@@ -60,7 +60,7 @@ MappedFile::~MappedFile() {
 }
 
 uint8_t* PeVm::Component::GetPeBase() {
-	this->PeBase;
+	return this->PeBase;
 }
 PeBase* PeVm::Body::GetPe() {
 	return this->Pe;
