@@ -30,22 +30,23 @@ ________________________________________________________________________________
 #include "FileIo.hpp"
 #include "PE.hpp"
 #include "Moneta.hpp"
+#include "Interface.hpp"
 
 using namespace std;
 using namespace PeFile;
 using namespace Moneta;
 
 Entity::~Entity() {
-	//printf("Entity destructor\r\n");
+	//Interface::Log("Entity destructor\r\n");
 	for (vector<MemoryBlock*>::const_iterator Itr = this->SBlocks.begin(); Itr != this->SBlocks.end(); ++Itr) {
-		//if(!(*Itr)) printf("null itr\r\n");
+		//if(!(*Itr)) Interface::Log("null itr\r\n");
 		delete * Itr;
 	}
-	//printf("Entity destructor2\r\n");
+	//Interface::Log("Entity destructor2\r\n");
 }
 
 PeVm::Body::~Body() {
-	//printf("PE destructor\r\n");
+	//Interface::Log("PE destructor\r\n");
 	for (vector<Section*>::const_iterator Itr = this->Sections.begin(); Itr != this->Sections.end(); ++Itr) {
 		delete* Itr;
 	}
@@ -53,9 +54,9 @@ PeVm::Body::~Body() {
 }
 
 MappedFile::~MappedFile() {
-	//printf("Mapped file destructor\r\n");
+	//Interface::Log("Mapped file destructor\r\n");
 	delete this->File;
-	//printf("Mapped file destructor2\r\n");
+	//Interface::Log("Mapped file destructor2\r\n");
 }
 
 uint8_t* PeVm::Component::GetPeBase() {
@@ -90,7 +91,7 @@ void MappedFile::SetFile(const wchar_t* pFilePath, bool bMemStore) {
 		this->File = new FileBase(pFilePath, bMemStore, false);
 	}
 	catch (...) {
-		printf("- Failed to open %ws\r\n", pFilePath);
+		Interface::Log("- Failed to open %ws\r\n", pFilePath);
 		this->File = nullptr;
 	}
 }
@@ -152,7 +153,7 @@ MappedFile::MappedFile(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath, b
 }
 
 PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : Base(SBlocks), PeVm::Component(SBlocks, (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress), MappedFile(SBlocks, pFilePath, true) {
-	//printf("* Runtime image base: 0x%p for %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, this->File->GetPath().c_str());
+	//Interface::Log("* Runtime image base: 0x%p for %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, this->File->GetPath().c_str());
 	if ((this->Pe = PeBase::Load(this->File->GetData(), this->File->GetSize())) != nullptr) {
 		wstring FilePath(this->GetFilePath());
 		delete this->File; // Don't double-store the file content. 
@@ -177,8 +178,8 @@ PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : Base(
 			uint8_t* pSectStartVa = this->PeBase + ArtificialPeHdr.VirtualAddress;
 			uint8_t* pSectEndVa = this->PeBase + ArtificialPeHdr.VirtualAddress + dwSectionSize;
 
-			//printf("%s [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa, pSectEndVa);
-			//printf("%s [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase, pSectEndVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase);
+			//Interface::Log("%s [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa, pSectEndVa);
+			//Interface::Log("%s [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase, pSectEndVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase);
 			//
 			// Calculate the sblocks overlapping between this PE entity and the current section.
 			//
@@ -190,7 +191,7 @@ PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : Base(
 				uint8_t* pSBlockEndVa = (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress + (*SBlockItr)->GetBasic()->RegionSize;
 
 				if ((pSBlockStartVa >= pSectStartVa && pSBlockStartVa < pSectEndVa) || (pSBlockEndVa > pSectStartVa&& pSBlockEndVa <= pSectEndVa) || (pSBlockStartVa < pSectStartVa && pSBlockEndVa > pSectEndVa)) {
-					//printf("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, pSectStartVa, pSectEndVa, pSBlockStartVa, pSBlockEndVa);
+					//Interface::Log("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, pSectStartVa, pSectEndVa, pSBlockStartVa, pSBlockEndVa);
 					MEMORY_BASIC_INFORMATION* pBasicInfo = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
 					memcpy(pBasicInfo, (*SBlockItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
 					OverlapSBlock.push_back(new MemoryBlock(pBasicInfo, nullptr));
@@ -203,9 +204,9 @@ PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : Base(
 		}
 	}
 	else {
-		printf("- Failed to load PE file using factory method in PE body constructor\r\n");
+		Interface::Log("- Failed to load PE file using factory method in PE body constructor\r\n");
 	}
-	//printf("PE body sblocks done\r\n");
+	//Interface::Log("PE body sblocks done\r\n");
 }
 
 /*
@@ -224,7 +225,7 @@ Entity* Entity::Create(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks) {
 
 		if (GetMappedFileNameW(hProcess, (HMODULE)SBlocks.front()->GetBasic()->AllocationBase, DevFilePath, MAX_PATH)) {
 			if (!TranslateDevicePath(DevFilePath, MapFilePath)) {
-				printf("! Failed to translate device path: %ws\r\n", DevFilePath);
+				Interface::Log("! Failed to translate device path: %ws\r\n", DevFilePath);
 				wcscpy_s(MapFilePath, MAX_PATH + 1, L"?");
 			}
 		}

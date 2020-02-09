@@ -2,6 +2,7 @@
 #include "FileIo.hpp"
 #include "PE.hpp"
 #include "Moneta.hpp"
+#include "Interface.hpp"
 
 using namespace std;
 using namespace PeFile;
@@ -10,7 +11,7 @@ using namespace Moneta;
 MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo) : Basic(pMemBasicInfo), Region(pMemRegionInfo) {}
 
 MemoryBlock::~MemoryBlock() {
-	//printf("mem destructor\r\n");
+	//Interface::Log("mem destructor\r\n");
 	if (this->Basic != nullptr) {
 		delete Basic;
 	}
@@ -18,7 +19,7 @@ MemoryBlock::~MemoryBlock() {
 	if (this->Region != nullptr) {
 		delete Region;
 	}
-	//printf("mem destructor2\r\n");
+	//Interface::Log("mem destructor2\r\n");
 }
 
 MEMORY_BASIC_INFORMATION* MemoryBlock::GetBasic() {
@@ -66,15 +67,15 @@ uint32_t Moneta::GetPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t
 	for (uint32_t dwPageOffset = 0; dwPageOffset < dwSize; dwPageOffset += 0x1000) {
 		pWorkingSets->VirtualAddress = (pBaseAddress + dwPageOffset);
 		if (K32QueryWorkingSetEx(hProcess, pWorkingSets, dwWorkingSetsSize)) {
-			//printf("+ Successfully queried working set at 0x%p\r\n", pWorkingSets->VirtualAddress);
+			//Interface::Log("+ Successfully queried working set at 0x%p\r\n", pWorkingSets->VirtualAddress);
 
 			if (!pWorkingSets->VirtualAttributes.Shared) {
-				//printf("* Page at 0x%p is shared\r\n", pWorkingSets->VirtualAddress);
+				//Interface::Log("* Page at 0x%p is shared\r\n", pWorkingSets->VirtualAddress);
 				dwPrivateSize += 0x1000;
 			}
 		}
 		else {
-			printf("- Failed to query working set at 0x%p\r\n", pWorkingSets->VirtualAddress);
+			Interface::Log("- Failed to query working set at 0x%p\r\n", pWorkingSets->VirtualAddress);
 		}
 	}
 
@@ -109,16 +110,16 @@ void MemoryPermissionRecord::ShowRecords() {
 	for (map<uint32_t, map<uint32_t, uint32_t>>::const_iterator Itr = MemPermMap->begin(); Itr != MemPermMap->end(); ++Itr) {
 		switch (Itr->first) {
 		case MEM_IMAGE:
-			printf("~ Image memory:\r\n");
+			Interface::Log("~ Image memory:\r\n");
 			break;
 		case MEM_MAPPED:
-			printf("~ Mapped memory:\r\n");
+			Interface::Log("~ Mapped memory:\r\n");
 			break;
 		case MEM_PRIVATE:
-			printf("~ Private memory:\r\n");
+			Interface::Log("~ Private memory:\r\n");
 			break;
 		default:
-			printf("~ Unknown memory (type 0x%08x):\r\n", Itr->first);
+			Interface::Log("~ Unknown memory (type 0x%08x):\r\n", Itr->first);
 			break;
 		}
 
@@ -128,36 +129,36 @@ void MemoryPermissionRecord::ShowRecords() {
 			nTotalRegions += Itr2->second;
 		}
 
-		printf("  Total: %d\r\n", nTotalRegions);
+		Interface::Log("  Total: %d\r\n", nTotalRegions);
 
 		for (map<uint32_t, uint32_t>::const_iterator Itr2 = Itr->second.begin(); Itr2 != Itr->second.end(); ++Itr2) {
 			switch (Itr2->first) {
 			case PAGE_READONLY:
-				printf("  PAGE_READONLY: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("  PAGE_READONLY: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
 				break;
 			case PAGE_READWRITE:
-				printf("  PAGE_READWRITE: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("  PAGE_READWRITE: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
 				break;
 			case PAGE_EXECUTE_READ:
-				printf("  PAGE_EXECUTE_READ: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("  PAGE_EXECUTE_READ: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
 				break;
 			case PAGE_EXECUTE_READWRITE:
-				printf("  PAGE_EXECUTE_READWRITE: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("  PAGE_EXECUTE_READWRITE: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
 				break;
 			case PAGE_EXECUTE_WRITECOPY:
-				printf("  PAGE_EXECUTE_WRITECOPY: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("  PAGE_EXECUTE_WRITECOPY: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
 				break;
 			case PAGE_WRITECOPY:
-				printf("  PAGE_WRITECOPY: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("  PAGE_WRITECOPY: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
 				break;
 			case PAGE_EXECUTE:
-				printf("  PAGE_EXECUTE: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("  PAGE_EXECUTE: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
 				break;
 			case PAGE_NOACCESS:
-				printf("  PAGE_NOACCESS: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("  PAGE_NOACCESS: %d (%f%%)\r\n", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
 				break;
 			default:
-				printf("  0x%08x: %d (%f%%)\r\n", Itr2->first, Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("  0x%08x: %d (%f%%)\r\n", Itr2->first, Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
 				break;
 			}
 		}

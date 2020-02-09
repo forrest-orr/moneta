@@ -42,10 +42,10 @@ PeBase* PeBase::Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) // Factory meth
 
 		if (NewPe != nullptr) {
 			if (NewPe->Validate()) { // Validate method is needed to call template-specific derived methods not present in the base class, such as GetNtHdrs (which in turn also cannot be called from the constructor since it relies on virtual methods which will not exist until the class is initialized post-constructor)
-				//printf("[+] Successfully initialized/validated %s PE derived class.\r\n", NewPe->GetPeArch() == IMAGE_FILE_MACHINE_I386 ? "32-bit" : "64-bit");
+				//Interface::Log("[+] Successfully initialized/validated %s PE derived class.\r\n", NewPe->GetPeArch() == IMAGE_FILE_MACHINE_I386 ? "32-bit" : "64-bit");
 			}
 			else {
-				//printf("[-] Failed to initialize/validate %s derived PE class.\r\n", NewPe->GetPeArch() == IMAGE_FILE_MACHINE_I386 ? "32-bit" : "64-bit");
+				//Interface::Log("[-] Failed to initialize/validate %s derived PE class.\r\n", NewPe->GetPeArch() == IMAGE_FILE_MACHINE_I386 ? "32-bit" : "64-bit");
 				delete NewPe;
 				NewPe = nullptr;
 			}

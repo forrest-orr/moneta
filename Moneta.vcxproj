@@ -126,12 +126,14 @@
     <ClCompile Include="AddressSpace.cpp" />
     <ClCompile Include="Blocks.cpp" />
     <ClCompile Include="FileIo.cpp" />
-    <ClCompile Include="Interface.cpp" />
+    <ClCompile Include="Console.cpp" />
     <ClCompile Include="Entity.cpp" />
+    <ClCompile Include="Interface.cpp" />
     <ClCompile Include="PE.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FileIo.hpp" />
+    <ClInclude Include="Interface.hpp" />
     <ClInclude Include="Moneta.hpp" />
     <ClInclude Include="NtMem.h" />
     <ClInclude Include="PE.hpp" />
