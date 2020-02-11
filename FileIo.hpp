@@ -3,6 +3,7 @@ protected:
 	std::wstring Path;
 	uint8_t* Data = nullptr;
 	uint32_t Size = 0;
+	bool Phantom;
 
 public:
 	~FileBase();
@@ -12,4 +13,5 @@ public:
 	uint32_t GetSize();
 	bool ToDisk(bool bAppend = false);
 	std::wstring GetPath();
+	bool IsPhantom();
 };

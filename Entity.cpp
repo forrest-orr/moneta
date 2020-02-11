@@ -82,6 +82,10 @@ uint8_t* Entity::GetEndVa() {
 	return this->EndVa;
 }
 
+uint32_t Entity::GetSize() {
+	return this->Size;
+}
+
 uint8_t* PeVm::Body::GetPeBase() {
 	return this->PeBase;
 }
@@ -98,6 +102,10 @@ void MappedFile::SetFile(const wchar_t* pFilePath, bool bMemStore) {
 
 wstring MappedFile::GetFilePath() {
 	return this->File == nullptr ? L"?" : this->File->GetPath();
+}
+
+bool MappedFile::IsPhantom() {
+	return this->File == nullptr ? false : this->File->IsPhantom();
 }
 
 bool TranslateDevicePath(const wchar_t* pDevicePath, wchar_t *pTranslatedPath) {
@@ -149,62 +157,66 @@ PeVm::Section::Section(vector<MemoryBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr,
 }
 
 MappedFile::MappedFile(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore) : Base(SBlocks) {
+	Interface::Log("* Setting file for mapped entity object %ws (store memory: %d)\r\n", pFilePath, bMemStore);
 	this->SetFile(pFilePath, bMemStore);
 }
 
 PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : Base(SBlocks), PeVm::Component(SBlocks, (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress), MappedFile(SBlocks, pFilePath, true) {
 	//Interface::Log("* Runtime image base: 0x%p for %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, this->File->GetPath().c_str());
-	if ((this->Pe = PeBase::Load(this->File->GetData(), this->File->GetSize())) != nullptr) {
-		wstring FilePath(this->GetFilePath());
-		delete this->File; // Don't double-store the file content. 
-		this->SetFile(FilePath.c_str());
 
-		//
-		// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
-		//
+	if (!this->File->IsPhantom()) {
+		if ((this->Pe = PeBase::Load(this->File->GetData(), this->File->GetSize())) != nullptr) {
+			wstring FilePath(this->GetFilePath());
+			delete this->File; // Don't double-store the file content. 
+			this->SetFile(FilePath.c_str());
 
-		for (int32_t nX = -1; nX < this->Pe->GetFileHdr()->NumberOfSections; nX++) {
-			IMAGE_SECTION_HEADER ArtificialPeHdr = { 0 }; // This will initialize other relevant fields such as VirtualAddress to 0 for the PE header edge case.
-
-			if (nX == -1) {
-				strcpy_s((char*)ArtificialPeHdr.Name, sizeof(ArtificialPeHdr.Name), "Headers");
-				ArtificialPeHdr.SizeOfRawData = this->Pe->GetSectHdrs()->VirtualAddress; // Consider the size of the PE headers to be all data leading up to the start of the first real section.
-			}
-			else {
-				memcpy(&ArtificialPeHdr, (this->Pe->GetSectHdrs() + nX), sizeof(IMAGE_SECTION_HEADER));
-			}
-
-			uint32_t dwSectionSize = (ArtificialPeHdr.SizeOfRawData == 0 ? ArtificialPeHdr.Misc.VirtualSize : ArtificialPeHdr.SizeOfRawData);
-			uint8_t* pSectStartVa = this->PeBase + ArtificialPeHdr.VirtualAddress;
-			uint8_t* pSectEndVa = this->PeBase + ArtificialPeHdr.VirtualAddress + dwSectionSize;
-
-			//Interface::Log("%s [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa, pSectEndVa);
-			//Interface::Log("%s [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase, pSectEndVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase);
 			//
-			// Calculate the sblocks overlapping between this PE entity and the current section.
+			// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
 			//
 
-			vector<MemoryBlock*> OverlapSBlock;
+			for (int32_t nX = -1; nX < this->Pe->GetFileHdr()->NumberOfSections; nX++) {
+				IMAGE_SECTION_HEADER ArtificialPeHdr = { 0 }; // This will initialize other relevant fields such as VirtualAddress to 0 for the PE header edge case.
 
-			for (vector<MemoryBlock*>::const_iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
-				uint8_t* pSBlockStartVa = (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress;
-				uint8_t* pSBlockEndVa = (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress + (*SBlockItr)->GetBasic()->RegionSize;
-
-				if ((pSBlockStartVa >= pSectStartVa && pSBlockStartVa < pSectEndVa) || (pSBlockEndVa > pSectStartVa&& pSBlockEndVa <= pSectEndVa) || (pSBlockStartVa < pSectStartVa && pSBlockEndVa > pSectEndVa)) {
-					//Interface::Log("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, pSectStartVa, pSectEndVa, pSBlockStartVa, pSBlockEndVa);
-					MEMORY_BASIC_INFORMATION* pBasicInfo = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
-					memcpy(pBasicInfo, (*SBlockItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
-					OverlapSBlock.push_back(new MemoryBlock(pBasicInfo, nullptr));
+				if (nX == -1) {
+					strcpy_s((char*)ArtificialPeHdr.Name, sizeof(ArtificialPeHdr.Name), "Headers");
+					ArtificialPeHdr.SizeOfRawData = this->Pe->GetSectHdrs()->VirtualAddress; // Consider the size of the PE headers to be all data leading up to the start of the first real section.
+				}
+				else {
+					memcpy(&ArtificialPeHdr, (this->Pe->GetSectHdrs() + nX), sizeof(IMAGE_SECTION_HEADER));
 				}
 
-				//Sect->SetSBlocks(OverlapSBlock);
-			}
+				uint32_t dwSectionSize = (ArtificialPeHdr.SizeOfRawData == 0 ? ArtificialPeHdr.Misc.VirtualSize : ArtificialPeHdr.SizeOfRawData);
+				uint8_t* pSectStartVa = this->PeBase + ArtificialPeHdr.VirtualAddress;
+				uint8_t* pSectEndVa = this->PeBase + ArtificialPeHdr.VirtualAddress + dwSectionSize;
 
-			this->Sections.push_back(new Section(OverlapSBlock, &ArtificialPeHdr, this->PeBase));
+				//Interface::Log("%s [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa, pSectEndVa);
+				//Interface::Log("%s [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase, pSectEndVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase);
+				//
+				// Calculate the sblocks overlapping between this PE entity and the current section.
+				//
+
+				vector<MemoryBlock*> OverlapSBlock;
+
+				for (vector<MemoryBlock*>::const_iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
+					uint8_t* pSBlockStartVa = (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress;
+					uint8_t* pSBlockEndVa = (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress + (*SBlockItr)->GetBasic()->RegionSize;
+
+					if ((pSBlockStartVa >= pSectStartVa && pSBlockStartVa < pSectEndVa) || (pSBlockEndVa > pSectStartVa&& pSBlockEndVa <= pSectEndVa) || (pSBlockStartVa < pSectStartVa && pSBlockEndVa > pSectEndVa)) {
+						//Interface::Log("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, pSectStartVa, pSectEndVa, pSBlockStartVa, pSBlockEndVa);
+						MEMORY_BASIC_INFORMATION* pBasicInfo = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
+						memcpy(pBasicInfo, (*SBlockItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
+						OverlapSBlock.push_back(new MemoryBlock(pBasicInfo, nullptr));
+					}
+
+					//Sect->SetSBlocks(OverlapSBlock);
+				}
+
+				this->Sections.push_back(new Section(OverlapSBlock, &ArtificialPeHdr, this->PeBase));
+			}
 		}
-	}
-	else {
-		Interface::Log("- Failed to load PE file using factory method in PE body constructor\r\n");
+		else {
+			Interface::Log("- Failed to load PE file using factory method in PE body constructor\r\n");
+		}
 	}
 	//Interface::Log("PE body sblocks done\r\n");
 }

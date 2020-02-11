@@ -37,7 +37,7 @@ bool FileBase::ToDisk(bool bAppend) {
 	return bWritten;
 }
 
-FileBase::FileBase(wstring TargetPath, bool bMemStore, bool bForceOpen) : Path(TargetPath) {
+FileBase::FileBase(wstring TargetPath, bool bMemStore, bool bForceOpen) : Path(TargetPath), Phantom(false) {
 	HANDLE hFile;
 
 	if ((hFile = CreateFileW(this->Path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE) {
@@ -51,6 +51,8 @@ FileBase::FileBase(wstring TargetPath, bool bMemStore, bool bForceOpen) : Path(T
 		CloseHandle(hFile);
 	}
 	else {
+		this->Phantom = true;
+
 		if (bForceOpen) {
 			throw 1;
 		}
@@ -65,4 +67,8 @@ FileBase::~FileBase() {
 	if (this->Data != nullptr) {
 		delete this->Data;
 	}
+}
+
+bool FileBase::IsPhantom() {
+	return this->Phantom;
 }

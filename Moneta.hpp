@@ -31,6 +31,7 @@ namespace Moneta {
 		std::vector<MemoryBlock*> GetSBlocks();
 		uint8_t* GetStartVa();
 		uint8_t* GetEndVa();
+		uint32_t GetSize();
 		static Entity* Create(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks); // Factory method for derived PE images, mapped files, unknown memory ranges.
 		void SetSBlocks(std::vector<MemoryBlock*>);
 		~Entity();
@@ -71,6 +72,7 @@ namespace Moneta {
 		~MappedFile();
 		void SetFile(const wchar_t* pFilePath, bool bMemStore = false);
 		std::wstring GetFilePath();
+		bool IsPhantom();
 		EntityType Type() { return EntityType::MAPPED_FILE; }
 	protected:
 		FileBase *File = nullptr;
