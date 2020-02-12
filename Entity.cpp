@@ -157,7 +157,7 @@ PeVm::Section::Section(vector<MemoryBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr,
 }
 
 MappedFile::MappedFile(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore) : Base(SBlocks) {
-	Interface::Log("* Setting file for mapped entity object %ws (store memory: %d)\r\n", pFilePath, bMemStore);
+	Interface::Log(5, "* Setting file for mapped entity object %ws (store memory: %d)\r\n", pFilePath, bMemStore);
 	this->SetFile(pFilePath, bMemStore);
 }
 

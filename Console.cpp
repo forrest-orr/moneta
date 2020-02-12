@@ -51,6 +51,22 @@ enum class SelectedOutputType {
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	vector<wstring> Args(&pArgv[0], &pArgv[0 + nArgc]);
 	Interface::Initialize(Args);
+	SYSTEM_INFO SystemInfo = { 0 };
+	typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
+	static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
+
+	if (IsWow64Process != nullptr) {
+		BOOL bSelfWow64 = FALSE;
+
+		if (IsWow64Process(GetCurrentProcess(), (PBOOL)&bSelfWow64)) {
+			GetNativeSystemInfo(&SystemInfo); // Native version of this call works on both Wow64 and x64 as opposed to just x64 for GetSystemInfo. Works on XP+
+
+			if (SystemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 && bSelfWow64) {
+				Interface::Log("- Moneta 32-bit should not be used on a 64-bit OS. Use the x64 version of this tool.\r\n");
+				return 0;
+			}
+		}
+	}
 
 	if (nArgc < 5) {
 		Interface::Log("* Usage: %ws --target (PID) --output-type (see remarks)\r\n\r\n"
