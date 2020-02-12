@@ -48,6 +48,8 @@ enum class SelectedOutputType {
 	Statistics
 };
 
+#define DEBUG
+
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	vector<wstring> Args(&pArgv[0], &pArgv[0 + nArgc]);
 	Interface::Initialize(Args);
@@ -142,7 +144,11 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 					do
 					{
 						//Process* TargetProc;
-
+#ifdef DEBUG
+						if (ProcEntry.th32ProcessID == GetCurrentProcessId()) {
+							continue;
+						}
+#endif
 						try {
 							//TargetProc = new Process(ProcEntry.th32ProcessID);
 							Process TargetProc(ProcEntry.th32ProcessID, ProcEntry.szExeFile);

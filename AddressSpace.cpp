@@ -23,7 +23,7 @@ AddressSpace::~AddressSpace() {
 			delete dynamic_cast<MappedFile*>(Itr->second);
 		}
 		else {
-			delete dynamic_cast<Base*>(Itr->second);;
+			delete dynamic_cast<ABlock*>(Itr->second);;
 		}
 	}
 	//Interface::Log("AddressSpace destructor2\r\n");
@@ -142,6 +142,19 @@ uint32_t Process::GetPid() {
 bool PageExecutable(uint32_t dwProtect) {
 	return (dwProtect == PAGE_EXECUTE || dwProtect == PAGE_EXECUTE_READ || dwProtect == PAGE_EXECUTE_READWRITE);
 }
+
+void AlignSectionName(const char *pOriginalName, char *pAlignedName) {
+	if (strlen(pOriginalName)) {
+		strncpy_s(pAlignedName, 9, pOriginalName, 8);
+		for (int32_t nX = strlen(pAlignedName); nX < 8; nX++) {
+			strcat_s(pAlignedName, 9, " ");
+		}
+	}
+	else {
+		strcpy_s(pAlignedName, 9, "         ");
+	}
+}
+
 void Process::Enumerate() {
 	bool bShownProc = false;
 
@@ -165,7 +178,7 @@ void Process::Enumerate() {
 						// Headers with private pages
 						//
 
-						if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Headers") == 0 && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress, (uint32_t)(*SBlockItr)->GetBasic()->RegionSize)) {
+						if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress, (uint32_t)(*SBlockItr)->GetBasic()->RegionSize)) {
 							//Interface::Log("! PE headers have private pages within %ws [%ws:%d]\r\n", PeEntity->GetFilePath().c_str(), this->Name.c_str(), this->Pid);
 							//system("pause");
 							nSuspiciousObjCount++;
@@ -245,15 +258,18 @@ void Process::Enumerate() {
 				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
 				if (PeEntity->GetPe() != nullptr) {
-					Interface::Log("[ 0x%016x:0x%08x | Image | %ws\r\n", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetFilePath().c_str());
+					Interface::Log("[ 0x%016x:0x%08x | Image | %ws\r\n", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetPath().c_str());
 					//Interface::Log("File path: %ws (%ws)\r\n", ((Moneta::PE *)Itr->second)->GetFilePath().c_str(), dynamic_cast<PeVm::Body *>(Itr->second)->GetPe()->GetPeMagic() == IMAGE_NT_OPTIONAL_HDR64_MAGIC ? L"64-bit" : L"32-bit");
 
 					vector<PeVm::Section*> Sections = PeEntity->GetSections();
 					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
 						vector<MemoryBlock*> SBlocks = (*SectItr)->GetSBlocks();
+						char AlignedSectName[10] = { 0 };
+
+						AlignSectionName((const char *)(*SectItr)->GetHeader()->Name, AlignedSectName);
 
 						for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
-							Interface::Log("  0x%p:0x%08x | %s | %s | 0x%08x\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SBlockItr)->GetBasic()->Protect), (*SectItr)->GetHeader()->Name,
+							Interface::Log("  0x%p:0x%08x | %s | %s | 0x%08x\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SBlockItr)->GetBasic()->Protect), AlignedSectName,
 								Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SBlockItr)->GetBasic()->BaseAddress), (uint32_t)(*SBlockItr)->GetBasic()->RegionSize)
 							);
 
@@ -262,7 +278,7 @@ void Process::Enumerate() {
 							//
 
 							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Headers") == 0 && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress, (uint32_t)(*SBlockItr)->GetBasic()->RegionSize)) {
-								Interface::Log("! PE headers have private pages within %ws [%ws:%d]\r\n", PeEntity->GetFilePath().c_str(), this->Name.c_str(), this->Pid);
+								Interface::Log("! PE headers have private pages within %ws [%ws:%d]\r\n", PeEntity->GetPath().c_str(), this->Name.c_str(), this->Pid);
 								//system("pause");
 							}
 
@@ -272,7 +288,7 @@ void Process::Enumerate() {
 
 							if (PageExecutable((*SBlockItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
 								Interface::Log("! Sblock in section %s has executable permissions inconsistent with its file on disk at %ws [%ws:%d]\r\n",
-									(*SectItr)->GetHeader()->Name, PeEntity->GetFilePath().c_str(),
+									(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
 									this->Name.c_str(), this->Pid);
 								//system("pause");
 							}
@@ -283,7 +299,7 @@ void Process::Enumerate() {
 
 							if (PageExecutable((*SBlockItr)->GetBasic()->Protect) && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress, (uint32_t)(*SBlockItr)->GetBasic()->RegionSize)) {
 								Interface::Log("! Sblock in section %s is executable and has private pages within %ws - %ws PE on disk [%ws:%d]\r\n",
-									(*SectItr)->GetHeader()->Name, PeEntity->GetFilePath().c_str(),
+									(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
 									((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? L"matches" : L"does not match",
 									this->Name.c_str(), this->Pid);
 								//system("pause");
@@ -293,7 +309,7 @@ void Process::Enumerate() {
 				}
 				else {
 					vector<MemoryBlock*> SBlocks = PeEntity->GetSBlocks();
-					Interface::Log("[ 0x%016x:0x%08x | Image | %ws [Phantom]\r\n", PeEntity->GetStartVa(), PeEntity->GetSize(), PeEntity->GetFilePath().c_str());
+					Interface::Log("[ 0x%016x:0x%08x | Image | %ws [Phantom]\r\n", PeEntity->GetStartVa(), PeEntity->GetSize(), PeEntity->GetPath().c_str());
 
 					for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
 						Interface::Log("  0x%p:0x%08x | %s\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SBlockItr)->GetBasic()->Protect));
@@ -307,7 +323,7 @@ void Process::Enumerate() {
 			else if (Itr->second->Type() == EntityType::MAPPED_FILE) {
 				vector<MemoryBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 
-				Interface::Log("[ 0x%016x:0x%08x | Mapped | %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, SBlocks.front()->GetBasic()->RegionSize, dynamic_cast<MappedFile*>(Itr->second)->GetFilePath().c_str());
+				Interface::Log("[ 0x%016x:0x%08x | Mapped | %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, SBlocks.front()->GetBasic()->RegionSize, dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
 				//Interface::Log("S-Blocks:\r\n");
 
 				for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {

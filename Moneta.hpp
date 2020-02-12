@@ -38,9 +38,9 @@ namespace Moneta {
 		virtual EntityType Type() = 0;
 	};
 
-	class Base : public Entity { // This is essential, since a parameterized constructor of the base entity class is impossible (since it is an abstract base class with a deferred method). new Entity() is impossible for this reason: only derived classes can be initialized.
+	class ABlock : public Entity { // This is essential, since a parameterized constructor of the base entity class is impossible (since it is an abstract base class with a deferred method). new Entity() is impossible for this reason: only derived classes can be initialized.
 	public:
-		Base(std::vector<MemoryBlock*> SBlocks);
+		ABlock(std::vector<MemoryBlock*> SBlocks);
 		EntityType Type() { return EntityType::UNKNOWN; }
 	};
 
@@ -66,20 +66,20 @@ namespace Moneta {
 		~Process();
 	};
 
-	class MappedFile : virtual public Base { // Virtual inheritance from entity prevents classes derived from multiple classes derived from entity from having ambiguous/conflicting content.
+	class MappedFile : public FileBase, virtual public ABlock { // Virtual inheritance from entity prevents classes derived from multiple classes derived from entity from having ambiguous/conflicting content.
 	public:
 		MappedFile(std::vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore = false);
 		~MappedFile();
-		void SetFile(const wchar_t* pFilePath, bool bMemStore = false);
-		std::wstring GetFilePath();
-		bool IsPhantom();
+		//void SetFile(const wchar_t* pFilePath, bool bMemStore = false);
+		//std::wstring GetFilePath();
+		//bool IsPhantom();
 		EntityType Type() { return EntityType::MAPPED_FILE; }
 	protected:
-		FileBase *File = nullptr;
+		//FileBase *File = nullptr;
 	};
 
 	namespace PeVm {
-		class Component : virtual public Base {
+		class Component : virtual public ABlock {
 		public:
 			uint8_t* GetPeBase();
 			Component(std::vector<MemoryBlock*> SBlocks, uint8_t* pPeBase);

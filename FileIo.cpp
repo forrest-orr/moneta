@@ -7,11 +7,11 @@ FileBase::FileBase(wstring DesiredPath, uint8_t* pDataBuf, uint32_t dwSize) : Pa
 	memcpy(this->Data, pDataBuf, dwSize);
 }
 
-uint8_t* FileBase::GetData() {
+uint8_t* FileBase::FileData() {
 	return this->Data;
 }
 
-uint32_t FileBase::GetSize() {
+uint32_t FileBase::FileSize() {
 	return this->Size;
 }
 
@@ -27,7 +27,7 @@ bool FileBase::ToDisk(bool bAppend) {
 
 	if ((hFile = CreateFileW(this->Path.c_str(), bAppend ? FILE_APPEND_DATA : GENERIC_WRITE, bAppend ? FILE_SHARE_READ : 0, NULL, bAppend ? OPEN_ALWAYS : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)) != INVALID_HANDLE_VALUE) {
 		uint32_t dwBytesWritten;
-		if (WriteFile(hFile, this->GetData(), this->GetSize(), (PDWORD)&dwBytesWritten, 0)) {
+		if (WriteFile(hFile, this->FileData(), this->FileSize(), (PDWORD)&dwBytesWritten, 0)) {
 			bWritten = true;
 		}
 

@@ -33,29 +33,29 @@ MEMORY_REGION_INFORMATION* MemoryBlock::GetRegion() {
 const char* Moneta::PermissionSymbol(uint32_t dwProtection) {
 	switch (dwProtection) {
 	case PAGE_READONLY:
-		return "R   ";
+		return "R    ";
 	case PAGE_READWRITE:
-		return "RW  ";
+		return "RW   ";
 	case PAGE_EXECUTE_READ:
-		return "RX  ";
+		return "RX   ";
 	case PAGE_EXECUTE_READWRITE:
-		return "RWX ";
+		return "RWX  ";
 	case PAGE_EXECUTE_WRITECOPY:
-		return "RWXC";
+		return "RWXC ";
 	case PAGE_EXECUTE:
-		return "X   ";
+		return "X    ";
 	case PAGE_WRITECOPY:
-		return "WC  ";
+		return "WC   ";
 	case PAGE_NOACCESS:
-		return "NA  ";
+		return "NA   ";
 	case PAGE_WRITECOMBINE:
-		return "WCB ";
+		return "WCB  ";
 	case PAGE_GUARD:
-		return "PG  ";
+		return "PG   ";
 	case PAGE_NOCACHE:
-		return "NC  ";
+		return "NC   ";
 	default:
-		return "?   ";
+		return "?    ";
 	}
 }
 

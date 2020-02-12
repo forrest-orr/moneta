@@ -55,7 +55,7 @@ PeVm::Body::~Body() {
 
 MappedFile::~MappedFile() {
 	//Interface::Log("Mapped file destructor\r\n");
-	delete this->File;
+	//delete this->File;
 	//Interface::Log("Mapped file destructor2\r\n");
 }
 
@@ -90,6 +90,7 @@ uint8_t* PeVm::Body::GetPeBase() {
 	return this->PeBase;
 }
 
+/*
 void MappedFile::SetFile(const wchar_t* pFilePath, bool bMemStore) {
 	try {
 		this->File = new FileBase(pFilePath, bMemStore, false);
@@ -106,7 +107,7 @@ wstring MappedFile::GetFilePath() {
 
 bool MappedFile::IsPhantom() {
 	return this->File == nullptr ? false : this->File->IsPhantom();
-}
+}*/
 
 bool TranslateDevicePath(const wchar_t* pDevicePath, wchar_t *pTranslatedPath) {
 	wchar_t DriveLetters[MAX_PATH + 1] = { 0 };
@@ -138,7 +139,7 @@ bool TranslateDevicePath(const wchar_t* pDevicePath, wchar_t *pTranslatedPath) {
 	return bTranslated;
 }
 
-PeVm::Component::Component(std::vector<MemoryBlock*> SBlocks, uint8_t* pPeBase) : Base(SBlocks), PeBase(pPeBase) {}
+PeVm::Component::Component(std::vector<MemoryBlock*> SBlocks, uint8_t* pPeBase) : ABlock(SBlocks), PeBase(pPeBase) {}
 
 void Entity::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
@@ -147,28 +148,28 @@ void Entity::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 	this->Size = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize) - (SBlocks.front())->GetBasic()->AllocationBase;
 }
 
-Base::Base(vector<MemoryBlock*> SBlocks) {
+ABlock::ABlock(vector<MemoryBlock*> SBlocks) {
 	SetSBlocks(SBlocks);
 }
 
-PeVm::Section::Section(vector<MemoryBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase) : Base(SBlocks), PeVm::Component(SBlocks, pPeBase) {
+PeVm::Section::Section(vector<MemoryBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase) : ABlock(SBlocks), PeVm::Component(SBlocks, pPeBase) {
 	memcpy(&this->Hdr, pHdr, sizeof(IMAGE_SECTION_HEADER));
 	this->Size = this->Hdr.SizeOfRawData == 0 ? this->Hdr.Misc.VirtualSize : this->Hdr.SizeOfRawData; // Overwrite default size determined by sblocks. Verified correct order.
 }
 
-MappedFile::MappedFile(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore) : Base(SBlocks) {
+MappedFile::MappedFile(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore) : ABlock(SBlocks), FileBase(pFilePath, bMemStore, false) {
 	Interface::Log(5, "* Setting file for mapped entity object %ws (store memory: %d)\r\n", pFilePath, bMemStore);
-	this->SetFile(pFilePath, bMemStore);
+	//this->SetFile(pFilePath, bMemStore);
 }
 
-PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : Base(SBlocks), PeVm::Component(SBlocks, (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress), MappedFile(SBlocks, pFilePath, true) {
+PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : ABlock(SBlocks), PeVm::Component(SBlocks, (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress), MappedFile(SBlocks, pFilePath, true) {
 	//Interface::Log("* Runtime image base: 0x%p for %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, this->File->GetPath().c_str());
 
-	if (!this->File->IsPhantom()) {
-		if ((this->Pe = PeBase::Load(this->File->GetData(), this->File->GetSize())) != nullptr) {
-			wstring FilePath(this->GetFilePath());
-			delete this->File; // Don't double-store the file content. 
-			this->SetFile(FilePath.c_str());
+	if (!this->IsPhantom()) {
+		if ((this->Pe = PeBase::Load(this->FileData(), this->FileSize())) != nullptr) {
+			//wstring FilePath(this->GetFilePath());
+			//delete this->File; // Don't double-store the file content. 
+			//this->SetFile(FilePath.c_str());
 
 			//
 			// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
@@ -178,7 +179,7 @@ PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : Base(
 				IMAGE_SECTION_HEADER ArtificialPeHdr = { 0 }; // This will initialize other relevant fields such as VirtualAddress to 0 for the PE header edge case.
 
 				if (nX == -1) {
-					strcpy_s((char*)ArtificialPeHdr.Name, sizeof(ArtificialPeHdr.Name), "Headers");
+					strcpy_s((char*)ArtificialPeHdr.Name, sizeof(ArtificialPeHdr.Name), "Header");
 					ArtificialPeHdr.SizeOfRawData = this->Pe->GetSectHdrs()->VirtualAddress; // Consider the size of the PE headers to be all data leading up to the start of the first real section.
 				}
 				else {
@@ -258,7 +259,7 @@ Entity* Entity::Create(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks) {
 		}
 	}
 	else {
-		pNewEntity = new Base(SBlocks);
+		pNewEntity = new ABlock(SBlocks);
 	}
 
 	return pNewEntity;

@@ -9,8 +9,8 @@ public:
 	~FileBase();
 	FileBase(std::wstring TargetPath, bool bMemStore, bool bForceOpen = true);
 	FileBase(std::wstring DesiredPath, uint8_t* pDataBuf, uint32_t dwSize);
-	uint8_t* GetData();
-	uint32_t GetSize();
+	uint8_t* FileData();
+	uint32_t FileSize();
 	bool ToDisk(bool bAppend = false);
 	std::wstring GetPath();
 	bool IsPhantom();
