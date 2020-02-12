@@ -7,6 +7,7 @@ public:
 	static bool Log(int32_t nMsgVerbosity, const char *pLogFormat, ...);
 	static bool Log(const char *pLogFormat, ...);
 	static HANDLE GetOutputHandle();
+	static int32_t GetVerbosity();
 
 private:
 	static std::wstring LogFilePath;

@@ -108,3 +108,7 @@ bool Interface::Log(const char *pLogFormat, ...) {
 }
 
 HANDLE Interface::GetOutputHandle() { return Interface::Handle; }
+
+int32_t Interface::GetVerbosity() {
+	return Interface::VerbosityLvl;
+}
