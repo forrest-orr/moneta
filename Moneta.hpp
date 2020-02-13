@@ -70,12 +70,7 @@ namespace Moneta {
 	public:
 		MappedFile(std::vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore = false);
 		~MappedFile();
-		//void SetFile(const wchar_t* pFilePath, bool bMemStore = false);
-		//std::wstring GetFilePath();
-		//bool IsPhantom();
 		EntityType Type() { return EntityType::MAPPED_FILE; }
-	protected:
-		//FileBase *File = nullptr;
 	};
 
 	namespace PeVm {
@@ -112,5 +107,5 @@ namespace Moneta {
 	}
 
 	uint32_t GetPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t dwSize);
-	const char* PermissionSymbol(uint32_t dwProtection);
+	const char* PermissionSymbol(MEMORY_BASIC_INFORMATION* pBasicInfo);
 }

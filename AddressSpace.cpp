@@ -135,7 +135,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		//CloseHandle(hProcess);
 	}
 	else {
-		Interface::Log(4, "- Failed to open handle to PID %d\r\n");
+		Interface::Log(4, "- Failed to open handle to PID %d\r\n", this->Pid);
 		throw 1; // Not throwing a specific value crashes it
 	}
 }
@@ -275,7 +275,7 @@ void Process::Enumerate() {
 						AlignSectionName((const char *)(*SectItr)->GetHeader()->Name, AlignedSectName);
 
 						for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
-							Interface::Log("  0x%p:0x%08x | %s | %s | 0x%08x\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SBlockItr)->GetBasic()->Protect), AlignedSectName,
+							Interface::Log("  0x%p:0x%08x | %s | %s | 0x%08x", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SBlockItr)->GetBasic()), AlignedSectName,
 								Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SBlockItr)->GetBasic()->BaseAddress), (uint32_t)(*SBlockItr)->GetBasic()->RegionSize)
 							);
 
@@ -284,7 +284,8 @@ void Process::Enumerate() {
 							//
 
 							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Headers") == 0 && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress, (uint32_t)(*SBlockItr)->GetBasic()->RegionSize)) {
-								Interface::Log("! PE headers have private pages within %ws [%ws:%d]\r\n", PeEntity->GetPath().c_str(), this->Name.c_str(), this->Pid);
+								//Interface::Log("! PE headers have private pages within %ws [%ws:%d]\r\n", PeEntity->GetPath().c_str(), this->Name.c_str(), this->Pid);
+								Interface::Log(" | Modified header");
 								//system("pause");
 							}
 
@@ -293,9 +294,10 @@ void Process::Enumerate() {
 							//
 
 							if (PageExecutable((*SBlockItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
-								Interface::Log("! Sblock in section %s has executable permissions inconsistent with its file on disk at %ws [%ws:%d]\r\n",
-									(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
-									this->Name.c_str(), this->Pid);
+								//Interface::Log("! Sblock in section %s has executable permissions inconsistent with its file on disk at %ws [%ws:%d]\r\n",
+								//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
+								//	this->Name.c_str(), this->Pid);
+								Interface::Log(" | Inconsistent +x between disk and memory");
 								//system("pause");
 							}
 
@@ -304,12 +306,15 @@ void Process::Enumerate() {
 							//
 
 							if (PageExecutable((*SBlockItr)->GetBasic()->Protect) && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress, (uint32_t)(*SBlockItr)->GetBasic()->RegionSize)) {
-								Interface::Log("! Sblock in section %s is executable and has private pages within %ws - %ws PE on disk [%ws:%d]\r\n",
-									(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
-									((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? L"matches" : L"does not match",
-									this->Name.c_str(), this->Pid);
+								//Interface::Log("! Sblock in section %s is executable and has private pages within %ws - %ws PE on disk [%ws:%d]\r\n",
+								//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
+								//	((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? L"matches" : L"does not match",
+								//	this->Name.c_str(), this->Pid);
+								Interface::Log(" | Modified code");
 								//system("pause");
 							}
+
+							Interface::Log("\r\n");
 						}
 					}
 				}
@@ -318,11 +323,13 @@ void Process::Enumerate() {
 					Interface::Log("[ 0x%016x:0x%08x | Image | %ws [Phantom]\r\n", PeEntity->GetStartVa(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
 
 					for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
-						Interface::Log("  0x%p:0x%08x | %s\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SBlockItr)->GetBasic()->Protect));
+						Interface::Log("  0x%p:0x%08x | %s", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SBlockItr)->GetBasic()));
 						if (PageExecutable((*SBlockItr)->GetBasic()->Protect)) {
-							Interface::Log("! Phantom image memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SBlockItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
+							//Interface::Log("! Phantom image memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SBlockItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
+							Interface::Log(" | Phantom +x image memory");
 							//system("pause");
 						}
+						Interface::Log("\r\n");
 					}
 				}
 			}
@@ -334,11 +341,14 @@ void Process::Enumerate() {
 
 				for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
 					//Interface::Log("  0x%p\r\n", (*SBlockItr)->GetBasic()->BaseAddress);
-					Interface::Log("  0x%p:0x%08x | %s\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SBlockItr)->GetBasic()->Protect));
+					Interface::Log("  0x%p:0x%08x | %s", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SBlockItr)->GetBasic()));
 					if (PageExecutable((*SBlockItr)->GetBasic()->Protect)) {
-						Interface::Log("! Mapped memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SBlockItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
+						//Interface::Log("! Mapped memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SBlockItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
+						Interface::Log(" | Abnormal executable mapped memory");
 						//system("pause");
 					}
+
+					Interface::Log("\r\n");
 				}
 			}
 			else {
@@ -349,15 +359,18 @@ void Process::Enumerate() {
 				if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
 					Interface::Log("[ 0x%016x:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->AllocationBase, (uint32_t)((uint8_t*)SBlocks.back()->GetBasic()->BaseAddress - SBlocks.back()->GetBasic()->AllocationBase) + SBlocks.back()->GetBasic()->RegionSize);
 					for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
-						Interface::Log("  0x%p:0x%08x | %s\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SBlockItr)->GetBasic()->Protect));
+						Interface::Log("  0x%p:0x%08x | %s", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SBlockItr)->GetBasic()));
 						if (PageExecutable((*SBlockItr)->GetBasic()->Protect)) {
-							Interface::Log("! Private memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SBlockItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
+							//Interface::Log("! Private memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SBlockItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
+							Interface::Log(" | Abnormal executable private memory");
 							//system("pause");
 						}
+
+						Interface::Log("\r\n");
 					}
 				}
 				else {
-					Interface::Log("! Unknown memory type at 0x%p\r\n", Itr->first);
+					//Interface::Log("! Unknown memory type at 0x%p\r\n", Itr->first);
 				}
 			}
 

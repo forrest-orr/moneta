@@ -30,8 +30,8 @@ MEMORY_REGION_INFORMATION* MemoryBlock::GetRegion() {
 	return Region;
 }
 
-const char* Moneta::PermissionSymbol(uint32_t dwProtection) {
-	switch (dwProtection) {
+const char* Moneta::PermissionSymbol(MEMORY_BASIC_INFORMATION *pBasicInfo) {
+	switch (pBasicInfo->Protect) {
 	case PAGE_READONLY:
 		return "R    ";
 	case PAGE_READWRITE:
@@ -55,6 +55,13 @@ const char* Moneta::PermissionSymbol(uint32_t dwProtection) {
 	case PAGE_NOCACHE:
 		return "NC   ";
 	default:
+		if (pBasicInfo->State == MEM_FREE) {
+			return "Free ";
+		}
+		else if (pBasicInfo->State == MEM_RESERVE) {
+			return "Reserved";
+		}
+		
 		return "?    ";
 	}
 }

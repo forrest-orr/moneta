@@ -247,6 +247,7 @@ Entity* Entity::Create(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks) {
 				wcscpy_s(MapFilePath, MAX_PATH + 1, L"Page File");
 			}
 			else {
+				//Interface::Log("! Phantom image section detected.\r\n");
 				wcscpy_s(MapFilePath, MAX_PATH + 1, L"?");
 			}
 		}
