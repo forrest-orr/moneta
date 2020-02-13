@@ -3,16 +3,16 @@
 
 using namespace std;
 
-FileBase::FileBase(wstring DesiredPath, uint8_t* pDataBuf, uint32_t dwSize) : Path(DesiredPath), Data(new uint8_t[dwSize]), Size(dwSize) {
-	memcpy(this->Data, pDataBuf, dwSize);
+FileBase::FileBase(wstring DesiredPath, uint8_t* pDataBuf, uint32_t dwSize) : Path(DesiredPath), FileData(new uint8_t[dwSize]), FileSize(dwSize) {
+	memcpy(this->FileData, pDataBuf, dwSize);
 }
 
-uint8_t* FileBase::FileData() {
-	return this->Data;
+uint8_t* FileBase::GetFileBaseData() {
+	return this->FileData;
 }
 
-uint32_t FileBase::FileSize() {
-	return this->Size;
+uint32_t FileBase::GetFileBaseSize() {
+	return this->FileSize;
 }
 
 wstring FileBase::GetPath() {
@@ -20,14 +20,14 @@ wstring FileBase::GetPath() {
 }
 
 bool FileBase::ToDisk(bool bAppend) {
-	assert(this->Data != nullptr);
+	assert(this->FileData != nullptr);
 
 	HANDLE hFile;
 	bool bWritten = false;
 
 	if ((hFile = CreateFileW(this->Path.c_str(), bAppend ? FILE_APPEND_DATA : GENERIC_WRITE, bAppend ? FILE_SHARE_READ : 0, NULL, bAppend ? OPEN_ALWAYS : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)) != INVALID_HANDLE_VALUE) {
 		uint32_t dwBytesWritten;
-		if (WriteFile(hFile, this->FileData(), this->FileSize(), (PDWORD)&dwBytesWritten, 0)) {
+		if (WriteFile(hFile, this->GetFileBaseData(), this->GetFileBaseSize(), (PDWORD)&dwBytesWritten, 0)) {
 			bWritten = true;
 		}
 
@@ -43,9 +43,9 @@ FileBase::FileBase(wstring TargetPath, bool bMemStore, bool bForceOpen) : Path(T
 	if ((hFile = CreateFileW(this->Path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE) {
 		if (bMemStore) {
 			uint32_t dwBytesRead;
-			this->Size = GetFileSize(hFile, NULL);
-			this->Data = new uint8_t[this->Size];
-			if (!ReadFile(hFile, this->Data, this->Size, (PDWORD)&dwBytesRead, 0)) throw 2;
+			this->FileSize = GetFileSize(hFile, NULL);
+			this->FileData = new uint8_t[this->FileSize];
+			if (!ReadFile(hFile, this->FileData, this->FileSize, (PDWORD)&dwBytesRead, 0)) throw 2;
 		}
 
 		CloseHandle(hFile);
@@ -57,15 +57,15 @@ FileBase::FileBase(wstring TargetPath, bool bMemStore, bool bForceOpen) : Path(T
 			throw 1;
 		}
 		else {
-			this->Data = nullptr;
-			this->Size = 0;
+			this->FileData = nullptr;
+			this->FileSize = 0;
 		}
 	}
 };
 
 FileBase::~FileBase() {
-	if (this->Data != nullptr) {
-		delete this->Data;
+	if (this->FileData != nullptr) {
+		delete this->FileData;
 	}
 }
 

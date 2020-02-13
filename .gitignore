@@ -38,3 +38,6 @@ x64/Release/vc142.pdb
 *.pdb
 *.tlog
 x64/Release/Moneta.exe
+*.lock
+*.ide-shm
+*.cache

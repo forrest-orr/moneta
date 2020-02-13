@@ -26,12 +26,12 @@ namespace Moneta {
 	protected:
 		std::vector<MemoryBlock*> SBlocks;
 		uint8_t* StartVa, * EndVa;
-		uint32_t Size;
+		uint32_t EntitySize;
 	public:
 		std::vector<MemoryBlock*> GetSBlocks();
 		uint8_t* GetStartVa();
 		uint8_t* GetEndVa();
-		uint32_t GetSize();
+		uint32_t GetEntitySize();
 		static Entity* Create(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks); // Factory method for derived PE images, mapped files, unknown memory ranges.
 		void SetSBlocks(std::vector<MemoryBlock*>);
 		~Entity();
@@ -61,7 +61,7 @@ namespace Moneta {
 		HANDLE GetHandle();
 		uint32_t GetPid();
 		BOOL IsWow64();
-		Process(uint32_t, const wchar_t*);
+		Process(uint32_t);
 		void Enumerate();
 		~Process();
 	};

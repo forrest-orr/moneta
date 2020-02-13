@@ -1,0 +1,9 @@
+C:\Users\Developer\Documents\GitHub\moneta\Tests\DotNetFrameworkExe\bin\Release\DotNetFrameworkExe.exe.config
+C:\Users\Developer\Documents\GitHub\moneta\Tests\DotNetFrameworkExe\bin\Release\DotNetFrameworkExe.exe
+C:\Users\Developer\Documents\GitHub\moneta\Tests\DotNetFrameworkExe\bin\Release\DotNetFrameworkExe.pdb
+C:\Users\Developer\Documents\GitHub\moneta\Tests\DotNetFrameworkExe\obj\Release\DotNetFrameworkExe.csprojAssemblyReference.cache
+C:\Users\Developer\Documents\GitHub\moneta\Tests\DotNetFrameworkExe\obj\Release\DotNetFrameworkExe.Form1.resources
+C:\Users\Developer\Documents\GitHub\moneta\Tests\DotNetFrameworkExe\obj\Release\DotNetFrameworkExe.Properties.Resources.resources
+C:\Users\Developer\Documents\GitHub\moneta\Tests\DotNetFrameworkExe\obj\Release\DotNetFrameworkExe.csproj.GenerateResource.cache
+C:\Users\Developer\Documents\GitHub\moneta\Tests\DotNetFrameworkExe\obj\Release\DotNetFrameworkExe.exe
+C:\Users\Developer\Documents\GitHub\moneta\Tests\DotNetFrameworkExe\obj\Release\DotNetFrameworkExe.pdb

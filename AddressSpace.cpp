@@ -43,33 +43,39 @@ BOOL Process::IsWow64() {
 	return this->Wow64;
 }
 
-Process::Process(uint32_t dwPid, const wchar_t* pProcessName) : Pid(dwPid), Name(pProcessName) {
+Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	//
 	// Initialize a new entity for each allocation base and add it to this process address space map
 	//
 
-	Interface::Log(4, "* Mapping address space of PID %d [%ws]\r\n", this->Pid, this->Name.c_str());
 	this->Handle = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
 
 	if (this->Handle != nullptr) {
-		typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
-		static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
+		wchar_t ImageName[MAX_PATH + 1] = { 0 };
+		
+		if(GetModuleBaseNameW(this->Handle, nullptr, ImageName, MAX_PATH + 1)) {
+		//if(GetProcessImageFileNameW(Handle, ImageFilePath, sizeof(ImageFilePath))) {
+			this->Name = wstring(ImageName);
+			Interface::Log(4, "* Mapping address space of PID %d [%ws]\r\n", this->Pid, this->Name.c_str());
+			typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
+			static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
 
-		if (IsWow64Process != nullptr) {
-			BOOL bSelfWow64 = FALSE;
+			if (IsWow64Process != nullptr) {
+				BOOL bSelfWow64 = FALSE;
 
-			if (IsWow64Process(GetCurrentProcess(), (PBOOL)&bSelfWow64)) {
-				if (IsWow64Process(this->Handle, (PBOOL)&this->Wow64)) {
-					if (this->IsWow64()) {
-						//CloseHandle(this->Handle);
-						Interface::Log(4, "* PID %d is Wow64\r\n", this->Pid);
-						//system("pause");
-						//throw 2;
-					}
-					else {
-						if (bSelfWow64) {
-							Interface::Log(4, "* Cannot scan non-Wow64 process from Wow64 Moneta instance\r\n");
-							throw 2;
+				if (IsWow64Process(GetCurrentProcess(), (PBOOL)&bSelfWow64)) {
+					if (IsWow64Process(this->Handle, (PBOOL)&this->Wow64)) {
+						if (this->IsWow64()) {
+							//CloseHandle(this->Handle);
+							Interface::Log(4, "* PID %d is Wow64\r\n", this->Pid);
+							//system("pause");
+							//throw 2;
+						}
+						else {
+							if (bSelfWow64) {
+								Interface::Log(4, "* Cannot scan non-Wow64 process from Wow64 Moneta instance\r\n");
+								throw 2;
+							}
 						}
 					}
 				}
@@ -129,7 +135,7 @@ Process::Process(uint32_t dwPid, const wchar_t* pProcessName) : Pid(dwPid), Name
 		//CloseHandle(hProcess);
 	}
 	else {
-		Interface::Log(4, "- Failed to open handle to process\r\n");
+		Interface::Log(4, "- Failed to open handle to PID %d\r\n");
 		throw 1; // Not throwing a specific value crashes it
 	}
 }
@@ -309,7 +315,7 @@ void Process::Enumerate() {
 				}
 				else {
 					vector<MemoryBlock*> SBlocks = PeEntity->GetSBlocks();
-					Interface::Log("[ 0x%016x:0x%08x | Image | %ws [Phantom]\r\n", PeEntity->GetStartVa(), PeEntity->GetSize(), PeEntity->GetPath().c_str());
+					Interface::Log("[ 0x%016x:0x%08x | Image | %ws [Phantom]\r\n", PeEntity->GetStartVa(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
 
 					for (vector<MemoryBlock*>::iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
 						Interface::Log("  0x%p:0x%08x | %s\r\n", (*SBlockItr)->GetBasic()->BaseAddress, (*SBlockItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SBlockItr)->GetBasic()->Protect));

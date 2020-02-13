@@ -82,8 +82,8 @@ uint8_t* Entity::GetEndVa() {
 	return this->EndVa;
 }
 
-uint32_t Entity::GetSize() {
-	return this->Size;
+uint32_t Entity::GetEntitySize() {
+	return this->EntitySize;
 }
 
 uint8_t* PeVm::Body::GetPeBase() {
@@ -126,7 +126,7 @@ bool TranslateDevicePath(const wchar_t* pDevicePath, wchar_t *pTranslatedPath) {
 			if (QueryDosDeviceW(szDrive, DosPath, MAX_PATH + 1)) {
 				if (_wcsnicmp(pDevicePath, DosPath, wcslen(DosPath)) == 0) {
 					wcscpy_s(pTranslatedPath, MAX_PATH + 1, szDrive);
-					wcscat_s(pTranslatedPath, MAX_PATH + 1, L"\\");
+					//wcscat_s(pTranslatedPath, MAX_PATH + 1, L"\\");
 					wcscat_s(pTranslatedPath, MAX_PATH + 1, pDevicePath + wcslen(DosPath));
 					bTranslated = true;
 				}
@@ -145,7 +145,7 @@ void Entity::SetSBlocks(vector<MemoryBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
 	this->StartVa = (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress;
 	this->EndVa = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize);
-	this->Size = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize) - (SBlocks.front())->GetBasic()->AllocationBase;
+	this->EntitySize = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize) - (SBlocks.front())->GetBasic()->AllocationBase;
 }
 
 ABlock::ABlock(vector<MemoryBlock*> SBlocks) {
@@ -154,7 +154,7 @@ ABlock::ABlock(vector<MemoryBlock*> SBlocks) {
 
 PeVm::Section::Section(vector<MemoryBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase) : ABlock(SBlocks), PeVm::Component(SBlocks, pPeBase) {
 	memcpy(&this->Hdr, pHdr, sizeof(IMAGE_SECTION_HEADER));
-	this->Size = this->Hdr.SizeOfRawData == 0 ? this->Hdr.Misc.VirtualSize : this->Hdr.SizeOfRawData; // Overwrite default size determined by sblocks. Verified correct order.
+	this->EntitySize = this->Hdr.SizeOfRawData == 0 ? this->Hdr.Misc.VirtualSize : this->Hdr.SizeOfRawData; // Overwrite default size determined by sblocks. Verified correct order.
 }
 
 MappedFile::MappedFile(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore) : ABlock(SBlocks), FileBase(pFilePath, bMemStore, false) {
@@ -166,7 +166,7 @@ PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : ABloc
 	//Interface::Log("* Runtime image base: 0x%p for %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, this->File->GetPath().c_str());
 
 	if (!this->IsPhantom()) {
-		if ((this->Pe = PeBase::Load(this->FileData(), this->FileSize())) != nullptr) {
+		if ((this->Pe = PeBase::Load(this->GetFileBaseData(), this->GetFileBaseSize())) != nullptr) {
 			//wstring FilePath(this->GetFilePath());
 			//delete this->File; // Don't double-store the file content. 
 			//this->SetFile(FilePath.c_str());

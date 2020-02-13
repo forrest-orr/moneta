@@ -48,7 +48,7 @@ enum class SelectedOutputType {
 	Statistics
 };
 
-#define DEBUG
+//#define DEBUG
 
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	vector<wstring> Args(&pArgv[0], &pArgv[0 + nArgc]);
@@ -118,10 +118,24 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			return 0;
 		}
 
-		if (ProcType == SelectedProcessType::SpecificPid || ProcType == SelectedProcessType::SelfPid) {
+		if (ProcType == SelectedProcessType::SelfPid) {
 			wchar_t SelfPath[MAX_PATH + 1] = { 0 };
 			GetModuleFileNameW(NULL, SelfPath, MAX_PATH + 1);
-			Process TargetProc(dwSelectedPid, SelfPath);
+			Process TargetProc(dwSelectedPid);
+			//list<MemoryBlock*> ProcessMem = QueryProcessMem(dwSelectedPid);
+
+			if (OutputType == SelectedOutputType::Raw) {
+				TargetProc.Enumerate();
+			}
+			else if (OutputType == SelectedOutputType::Statistics) {
+				//MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(TargetProc.GetBlocks());
+				//MemPermRec->ShowRecords();
+			}
+		}
+		if (ProcType == SelectedProcessType::SpecificPid) {
+			//wchar_t SelfPath[MAX_PATH + 1] = { 0 };
+			//GetProcessImageFileNameW();
+			Process TargetProc(dwSelectedPid);
 			//list<MemoryBlock*> ProcessMem = QueryProcessMem(dwSelectedPid);
 
 			if (OutputType == SelectedOutputType::Raw) {
@@ -151,7 +165,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 #endif
 						try {
 							//TargetProc = new Process(ProcEntry.th32ProcessID);
-							Process TargetProc(ProcEntry.th32ProcessID, ProcEntry.szExeFile);
+							Process TargetProc(ProcEntry.th32ProcessID);
 							if (OutputType == SelectedOutputType::Raw) {
 								TargetProc.Enumerate();
 							}
