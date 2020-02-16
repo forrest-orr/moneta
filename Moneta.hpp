@@ -1,24 +1,4 @@
-class MemoryBlock {
-protected:
-	MEMORY_BASIC_INFORMATION* Basic = nullptr;
-	MEMORY_REGION_INFORMATION* Region = nullptr;
-
-public:
-	MemoryBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo);
-	~MemoryBlock();
-	MEMORY_BASIC_INFORMATION* GetBasic();
-	MEMORY_REGION_INFORMATION* GetRegion();
-};
-
-class MemoryPermissionRecord { // Record takes basic/region memory structures, and sorts them into a map. Class can be used to show the map.
-protected:
-	std::map<uint32_t, std::map<uint32_t, uint32_t>>* MemPermMap; // Primary key is the memory type, secondary map key is the permission attribute (and its pair value is the count).
-
-public:
-	void UpdateMap(std::list<MemoryBlock*> MemBasicRecords);
-	MemoryPermissionRecord(std::list<MemoryBlock*> MemBasicRecords);
-	void ShowRecords();
-};
+typedef class MemoryBlock;
 
 namespace Moneta {
 	enum class EntityType{UNKNOWN, PE_FILE, MAPPED_FILE, PE_SECTION};
@@ -49,21 +29,6 @@ namespace Moneta {
 		std::map<uint8_t*, Entity *> Entities; // An ablock can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
 	public:
 		~AddressSpace();
-	};
-
-	class Process : public AddressSpace {
-	protected:
-		uint32_t Pid;
-		HANDLE Handle;
-		std::wstring Name;
-		BOOL Wow64; // bool and BOOL translate to different sizes, IsWow64Process pointed at a bool will corrupt memory.
-	public:
-		HANDLE GetHandle();
-		uint32_t GetPid();
-		BOOL IsWow64();
-		Process(uint32_t);
-		void Enumerate();
-		~Process();
 	};
 
 	class MappedFile : public FileBase, virtual public ABlock { // Virtual inheritance from entity prevents classes derived from multiple classes derived from entity from having ambiguous/conflicting content.

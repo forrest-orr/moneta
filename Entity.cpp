@@ -30,6 +30,8 @@ ________________________________________________________________________________
 #include "FileIo.hpp"
 #include "PE.hpp"
 #include "Moneta.hpp"
+#include "Process.hpp"
+#include "Blocks.hpp"
 #include "Interface.hpp"
 
 using namespace std;
@@ -198,15 +200,15 @@ PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : ABloc
 
 				vector<MemoryBlock*> OverlapSBlock;
 
-				for (vector<MemoryBlock*>::const_iterator SBlockItr = SBlocks.begin(); SBlockItr != SBlocks.end(); ++SBlockItr) {
-					uint8_t* pSBlockStartVa = (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress;
-					uint8_t* pSBlockEndVa = (uint8_t*)(*SBlockItr)->GetBasic()->BaseAddress + (*SBlockItr)->GetBasic()->RegionSize;
+				for (vector<MemoryBlock*>::const_iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+					uint8_t* pSBlockStartVa = (uint8_t*)(*SbItr)->GetBasic()->BaseAddress;
+					uint8_t* pSBlockEndVa = (uint8_t*)(*SbItr)->GetBasic()->BaseAddress + (*SbItr)->GetBasic()->RegionSize;
 
 					if ((pSBlockStartVa >= pSectStartVa && pSBlockStartVa < pSectEndVa) || (pSBlockEndVa > pSectStartVa&& pSBlockEndVa <= pSectEndVa) || (pSBlockStartVa < pSectStartVa && pSBlockEndVa > pSectEndVa)) {
 						//Interface::Log("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, pSectStartVa, pSectEndVa, pSBlockStartVa, pSBlockEndVa);
 						MEMORY_BASIC_INFORMATION* pBasicInfo = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
-						memcpy(pBasicInfo, (*SBlockItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
-						OverlapSBlock.push_back(new MemoryBlock(pBasicInfo, nullptr));
+						memcpy(pBasicInfo, (*SbItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
+						OverlapSBlock.push_back(new MemoryBlock(pBasicInfo, nullptr, (*SbItr)->GetThreads()));
 					}
 
 					//Sect->SetSBlocks(OverlapSBlock);

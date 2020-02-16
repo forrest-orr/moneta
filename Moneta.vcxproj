@@ -136,13 +136,16 @@
     <ClCompile Include="Entity.cpp" />
     <ClCompile Include="Interface.cpp" />
     <ClCompile Include="PE.cpp" />
+    <ClCompile Include="Process.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Blocks.hpp" />
     <ClInclude Include="FileIo.hpp" />
     <ClInclude Include="Interface.hpp" />
     <ClInclude Include="Moneta.hpp" />
     <ClInclude Include="NtMem.h" />
     <ClInclude Include="PE.hpp" />
+    <ClInclude Include="Process.hpp" />
     <ClInclude Include="StdAfx.h" />
   </ItemGroup>
   <ItemGroup>

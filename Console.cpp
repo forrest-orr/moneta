@@ -30,6 +30,8 @@ ________________________________________________________________________________
 #include "FileIo.hpp"
 #include "PE.hpp"
 #include "Moneta.hpp"
+#include "Process.hpp"
+#include "Blocks.hpp"
 #include "Interface.hpp"
 
 using namespace std;

@@ -2,13 +2,23 @@
 #include "FileIo.hpp"
 #include "PE.hpp"
 #include "Moneta.hpp"
+#include "Process.hpp"
+#include "Blocks.hpp"
 #include "Interface.hpp"
 
 using namespace std;
 using namespace PeFile;
 using namespace Moneta;
 
-MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo) : Basic(pMemBasicInfo), Region(pMemRegionInfo) {}
+MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo, vector<Thread *> Threads1) : Basic(pMemBasicInfo), Region(pMemRegionInfo) {
+	// Detect overlapping threads
+	for (vector<Thread *>::const_iterator ThItr = Threads1.begin(); ThItr != Threads1.end(); ++ThItr) {
+		if ((*ThItr)->GetEntryPoint() >= this->Basic->BaseAddress && (*ThItr)->GetEntryPoint() < ((uint8_t *)this->Basic->BaseAddress + this->Basic->RegionSize)) {
+			//Thread* SbTh = new Thread((*ThItr)->GetTid());
+			this->Threads.push_back(new Thread((*ThItr)->GetTid(), (*ThItr)->GetEntryPoint()));
+		}
+	}
+}
 
 MemoryBlock::~MemoryBlock() {
 	//Interface::Log("mem destructor\r\n");
@@ -20,6 +30,10 @@ MemoryBlock::~MemoryBlock() {
 		delete Region;
 	}
 	//Interface::Log("mem destructor2\r\n");
+}
+
+std::vector<Thread*> MemoryBlock::GetThreads() {
+	return this->Threads;
 }
 
 MEMORY_BASIC_INFORMATION* MemoryBlock::GetBasic() {
