@@ -34,7 +34,6 @@ AddressSpace::~AddressSpace() {
 }
 
 Process::Process(uint32_t dwPid) : Pid(dwPid) {
-
 	//
 	// Initialize a new entity for each allocation base and add it to this process address space map
 	//
@@ -59,22 +58,22 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 						Thread *CurrentThread = new Thread(ThreadEntry.th32ThreadID);
 						//Interface::Log("* TID: 0x%08x\r\n", CurrentThread.GetTid());
 						HANDLE hThread = OpenThread(THREAD_QUERY_INFORMATION, false, CurrentThread->GetTid());
-
+						
 						if (hThread != nullptr) {
 							typedef NTSTATUS(NTAPI* NtQueryInformationThread_t) (HANDLE, THREADINFOCLASS, void*, uint32_t, uint32_t*);
 							static NtQueryInformationThread_t NtQueryInformationThread = (NtQueryInformationThread_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationThread");
 							void* pStartAddress = nullptr;
-							HANDLE hNewThreadHandle = nullptr;
+							HANDLE hDupThread = nullptr;
 							
-							if (DuplicateHandle(GetCurrentProcess(), hThread, GetCurrentProcess(), &hNewThreadHandle, THREAD_QUERY_INFORMATION, FALSE, 0)) { // Without duplicating this handle NtQueryInformationThread will consistently fail to query the start address.
-								NTSTATUS NtStatus = NtQueryInformationThread(hNewThreadHandle, (THREADINFOCLASS)ThreadQuerySetWin32StartAddress, &pStartAddress, sizeof(pStartAddress), nullptr);
+							if (DuplicateHandle(GetCurrentProcess(), hThread, GetCurrentProcess(), &hDupThread, THREAD_QUERY_INFORMATION, FALSE, 0)) { // Without duplicating this handle NtQueryInformationThread will consistently fail to query the start address.
+								NTSTATUS NtStatus = NtQueryInformationThread(hDupThread, (THREADINFOCLASS)ThreadQuerySetWin32StartAddress, &pStartAddress, sizeof(pStartAddress), nullptr);
 
 								if (NT_SUCCESS(NtStatus)) {
 									CurrentThread->SetEntryPoint(pStartAddress);
 									//Interface::Log("* Start address: 0x%p\r\n", CurrentThread.GetEntryPoint());
 								}
 
-								CloseHandle(hNewThreadHandle);
+								CloseHandle(hDupThread);
 							}
 
 							this->Threads.push_back(CurrentThread);
