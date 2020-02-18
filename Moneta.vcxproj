@@ -129,7 +129,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="AddressSpace.cpp" />
     <ClCompile Include="Blocks.cpp" />
     <ClCompile Include="FileIo.cpp" />
     <ClCompile Include="Console.cpp" />

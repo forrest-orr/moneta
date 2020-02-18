@@ -58,6 +58,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	SYSTEM_INFO SystemInfo = { 0 };
 	typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
 	static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
+	bool bDumpSuspicious = false;
 
 	if (IsWow64Process != nullptr) {
 		BOOL bSelfWow64 = FALSE;
@@ -73,7 +74,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	}
 
 	if (nArgc < 5) {
-		Interface::Log("* Usage: %ws --target (PID) --output-type (see remarks)\r\n\r\n"
+		Interface::Log("* Usage: %ws --target (PID) --output-type (see remarks) --dump-suspicious (optional)\r\n\r\n"
 			"  Remarks:\r\n"
 			"  ~ PID field may be \"self\" to target the current process, an arbitrart PID, or \"*\" to target all accessible processes.\r\n"
 			"  ~ Output type field may be \"raw\" to display all queried memory info for each region, or may be \"stats\" to gather statistically common memory characteristics among the target(s)\r\n", pArgv[0]);
@@ -108,6 +109,9 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 					OutputType = SelectedOutputType::Statistics;
 				}
 			}
+			else if (Arg == L"--dump-suspicious") {
+				bDumpSuspicious = true;
+			}
 		}
 
 		if (ProcType == SelectedProcessType::InvalidPid) {
@@ -125,7 +129,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			//list<MemoryBlock*> ProcessMem = QueryProcessMem(dwSelectedPid);
 
 			if (OutputType == SelectedOutputType::Raw) {
-				TargetProc.Enumerate();
+				TargetProc.Enumerate(bDumpSuspicious);
 			}
 			else if (OutputType == SelectedOutputType::Statistics) {
 				//MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(TargetProc.GetBlocks());
@@ -153,7 +157,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 							//TargetProc = new Process(ProcEntry.th32ProcessID);
 							Process TargetProc(ProcEntry.th32ProcessID);
 							if (OutputType == SelectedOutputType::Raw) {
-								TargetProc.Enumerate();
+								TargetProc.Enumerate(bDumpSuspicious);
 							}
 
 						}

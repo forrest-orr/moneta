@@ -24,13 +24,6 @@ namespace Moneta {
 		EntityType Type() { return EntityType::UNKNOWN; }
 	};
 
-	class AddressSpace {
-	protected:
-		std::map<uint8_t*, Entity *> Entities; // An ablock can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
-	public:
-		~AddressSpace();
-	};
-
 	class MappedFile : public FileBase, virtual public ABlock { // Virtual inheritance from entity prevents classes derived from multiple classes derived from entity from having ambiguous/conflicting content.
 	public:
 		MappedFile(std::vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore = false);

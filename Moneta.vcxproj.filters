@@ -30,9 +30,6 @@
     <ClCompile Include="FileIo.cpp">
       <Filter>Source Files\Classes</Filter>
     </ClCompile>
-    <ClCompile Include="AddressSpace.cpp">
-      <Filter>Source Files\Classes\Moneta</Filter>
-    </ClCompile>
     <ClCompile Include="Blocks.cpp">
       <Filter>Source Files\Classes\Moneta</Filter>
     </ClCompile>

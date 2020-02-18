@@ -29,6 +29,11 @@ MemoryBlock::~MemoryBlock() {
 	if (this->Region != nullptr) {
 		delete Region;
 	}
+
+	for (vector<Thread*>::const_iterator Itr = this->Threads.begin(); Itr != this->Threads.end(); ++Itr) {
+		delete* Itr;
+	}
+
 	//Interface::Log("mem destructor2\r\n");
 }
 
