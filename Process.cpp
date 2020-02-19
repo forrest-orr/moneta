@@ -319,7 +319,6 @@ void Process::Enumerate(bool bDumpSuspicious) {
 		//
 
 		if (Interface::GetVerbosity() >= 3 || (Interface::GetVerbosity() < 3 && nSuspiciousObjCount > 0)) {
-			SIZE_T cbBytesRead;
 			nSuspiciousObjCount = 0;
 
 			if (!bShownProc) {
@@ -342,6 +341,7 @@ void Process::Enumerate(bool bDumpSuspicious) {
 						AlignSectionName((const char*)(*SectItr)->GetHeader()->Name, AlignedSectName);
 
 						for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+							bool bSuspicius = false;
 							Interface::Log("  0x%p:0x%08x | %s | %s | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SbItr)->GetBasic()), AlignedSectName,
 								Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize)
 							);
@@ -350,10 +350,10 @@ void Process::Enumerate(bool bDumpSuspicious) {
 							// Headers with private pages
 							//
 
-							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Headers") == 0 && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
+							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
 								//Interface::Log("! PE headers have private pages within %ws [%ws:%d]\r\n", PeEntity->GetPath().c_str(), this->Name.c_str(), this->Pid);
 								Interface::Log(" | Modified header");
-								nSuspiciousObjCount++;
+								bSuspicius = true;
 								//system("pause");
 							}
 
@@ -366,7 +366,7 @@ void Process::Enumerate(bool bDumpSuspicious) {
 								//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
 								//	this->Name.c_str(), this->Pid);
 								Interface::Log(" | Inconsistent +x between disk and memory");
-								nSuspiciousObjCount++;
+								bSuspicius = true;
 								//system("pause");
 							}
 
@@ -380,7 +380,7 @@ void Process::Enumerate(bool bDumpSuspicious) {
 								//	((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? L"matches" : L"does not match",
 								//	this->Name.c_str(), this->Pid);
 								Interface::Log(" | Modified code");
-								nSuspiciousObjCount++;
+								bSuspicius = true;
 								//system("pause");
 							}
 
@@ -393,15 +393,15 @@ void Process::Enumerate(bool bDumpSuspicious) {
 								//system("pause");
 							}
 
-							if (bDumpSuspicious && nSuspiciousObjCount > 0) {
-								uint8_t* pBuf = (uint8_t*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (*SbItr)->GetBasic()->RegionSize);
-
-								if (ReadProcessMemory(this->Handle, (*SbItr)->GetBasic()->BaseAddress, pBuf, (*SbItr)->GetBasic()->RegionSize, (SIZE_T *)&cbBytesRead)) {
-									Interface::Log("      ~ Memory dumped to \r\n");
+							if (bDumpSuspicious && bSuspicius) {
+								wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
+								/*
+								if (MemoryDump((uint8_t *)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
+									Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 								}
 								else {
 									Interface::Log("      ~ Memory dump failed.\r\n");
-								}
+								}*/
 							}
 						}
 					}
@@ -411,11 +411,12 @@ void Process::Enumerate(bool bDumpSuspicious) {
 					Interface::Log("[ 0x%016x:0x%08x | Image | %ws [Phantom]\r\n", PeEntity->GetStartVa(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
 
 					for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+						bool bSuspicius = false;
 						Interface::Log("  0x%p:0x%08x | %s", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SbItr)->GetBasic()));
 						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 							//Interface::Log("! Phantom image memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 							Interface::Log(" | Phantom +x image memory");
-							nSuspiciousObjCount;
+							bSuspicius = true;
 							//system("pause");
 						}
 						Interface::Log("\r\n");
@@ -427,15 +428,16 @@ void Process::Enumerate(bool bDumpSuspicious) {
 							system("pause");
 						}
 
-						if (bDumpSuspicious && nSuspiciousObjCount > 0) {
-							uint8_t* pBuf = (uint8_t*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (*SbItr)->GetBasic()->RegionSize);
+						if (bDumpSuspicious && bSuspicius) {
+							/*
+							wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
 
-							if (ReadProcessMemory(this->Handle, (*SbItr)->GetBasic()->BaseAddress, pBuf, (*SbItr)->GetBasic()->RegionSize, (SIZE_T*)&cbBytesRead)) {
-								Interface::Log("      ~ Memory dumped to \r\n");
+							if (MemoryDump((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
+								Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 							}
 							else {
 								Interface::Log("      ~ Memory dump failed.\r\n");
-							}
+							}*/
 						}
 					}
 				}
@@ -447,13 +449,14 @@ void Process::Enumerate(bool bDumpSuspicious) {
 				//Interface::Log("S-Blocks:\r\n");
 
 				for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+					bool bSuspicius = false;
 					//Interface::Log("  0x%p\r\n", (*SbItr)->GetBasic()->BaseAddress);
 					Interface::Log("  0x%p:0x%08x | %s", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SbItr)->GetBasic()));
 					if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 						//Interface::Log("! Mapped memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 						Interface::Log(" | Abnormal executable mapped memory");
 						//system("pause");
-						nSuspiciousObjCount++;
+						bSuspicius = true;
 					}
 
 					Interface::Log("\r\n");
@@ -465,15 +468,15 @@ void Process::Enumerate(bool bDumpSuspicious) {
 						system("pause");
 					}
 
-					if (bDumpSuspicious && nSuspiciousObjCount > 0) {
-						uint8_t* pBuf = (uint8_t*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (*SbItr)->GetBasic()->RegionSize);
-
-						if (ReadProcessMemory(this->Handle, (*SbItr)->GetBasic()->BaseAddress, pBuf, (*SbItr)->GetBasic()->RegionSize, (SIZE_T*)&cbBytesRead)) {
-							Interface::Log("      ~ Memory dumped to \r\n");
+					if (bDumpSuspicious && bSuspicius) {
+						wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
+						/*
+						if (MemoryDump((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
+							Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 						}
 						else {
 							Interface::Log("      ~ Memory dump failed.\r\n");
-						}
+						}*/
 					}
 				}
 			}
@@ -485,12 +488,13 @@ void Process::Enumerate(bool bDumpSuspicious) {
 				if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
 					Interface::Log("[ 0x%016x:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->AllocationBase, (uint32_t)((uint8_t*)SBlocks.back()->GetBasic()->BaseAddress - SBlocks.back()->GetBasic()->AllocationBase) + SBlocks.back()->GetBasic()->RegionSize);
 					for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+						bool bSuspicius = false;
 						Interface::Log("  0x%p:0x%08x | %s", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SbItr)->GetBasic()));
 						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 							//Interface::Log("! Private memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 							Interface::Log(" | Abnormal executable private memory");
 							//system("pause");
-							nSuspiciousObjCount++;
+							bSuspicius = true;
 						}
 
 						Interface::Log("\r\n");
@@ -502,15 +506,15 @@ void Process::Enumerate(bool bDumpSuspicious) {
 							system("pause");
 						}
 
-						if (bDumpSuspicious && nSuspiciousObjCount > 0) {
-							uint8_t* pBuf = (uint8_t*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (*SbItr)->GetBasic()->RegionSize);
-
-							if (ReadProcessMemory(this->Handle, (*SbItr)->GetBasic()->BaseAddress, pBuf, (*SbItr)->GetBasic()->RegionSize, (SIZE_T*)&cbBytesRead)) {
-								Interface::Log("      ~ Memory dumped to \r\n");
+						if (bDumpSuspicious && bSuspicius) {
+							wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
+							/*
+							if (MemoryDump((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
+								Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 							}
 							else {
 								Interface::Log("      ~ Memory dump failed.\r\n");
-							}
+							}*/
 						}
 					}
 				}
