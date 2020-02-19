@@ -5,6 +5,7 @@
 #include "Process.hpp"
 #include "Blocks.hpp"
 #include "Interface.hpp"
+#include "MemDump.hpp"
 
 using namespace std;
 using namespace PeFile;
@@ -227,6 +228,8 @@ void AlignSectionName(const char* pOriginalName, char* pAlignedName) {
 
 void Process::Enumerate(bool bDumpSuspicious) {
 	bool bShownProc = false;
+	MemDump ProcDmp(this->Handle, this->Pid);
+	wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
 
 	//
 	// Walk ablocks (entities) and list the corresponding sblocks of each.
@@ -394,14 +397,12 @@ void Process::Enumerate(bool bDumpSuspicious) {
 							}
 
 							if (bDumpSuspicious && bSuspicius) {
-								wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
-								/*
-								if (MemoryDump((uint8_t *)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
+								if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
 									Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 								}
 								else {
 									Interface::Log("      ~ Memory dump failed.\r\n");
-								}*/
+								}
 							}
 						}
 					}
@@ -412,7 +413,9 @@ void Process::Enumerate(bool bDumpSuspicious) {
 
 					for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 						bool bSuspicius = false;
-						Interface::Log("  0x%p:0x%08x | %s", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SbItr)->GetBasic()));
+						Interface::Log("  0x%p:0x%08x | %s | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SbItr)->GetBasic()),
+							Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+
 						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 							//Interface::Log("! Phantom image memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 							Interface::Log(" | Phantom +x image memory");
@@ -429,15 +432,12 @@ void Process::Enumerate(bool bDumpSuspicious) {
 						}
 
 						if (bDumpSuspicious && bSuspicius) {
-							/*
-							wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
-
-							if (MemoryDump((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
+							if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
 								Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 							}
 							else {
 								Interface::Log("      ~ Memory dump failed.\r\n");
-							}*/
+							}
 						}
 					}
 				}
@@ -469,14 +469,12 @@ void Process::Enumerate(bool bDumpSuspicious) {
 					}
 
 					if (bDumpSuspicious && bSuspicius) {
-						wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
-						/*
-						if (MemoryDump((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
+						if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
 							Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 						}
 						else {
 							Interface::Log("      ~ Memory dump failed.\r\n");
-						}*/
+						}
 					}
 				}
 			}
@@ -507,14 +505,12 @@ void Process::Enumerate(bool bDumpSuspicious) {
 						}
 
 						if (bDumpSuspicious && bSuspicius) {
-							wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
-							/*
-							if (MemoryDump((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
+							if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
 								Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 							}
 							else {
 								Interface::Log("      ~ Memory dump failed.\r\n");
-							}*/
+							}
 						}
 					}
 				}

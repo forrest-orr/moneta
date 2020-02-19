@@ -27,7 +27,7 @@ bool MemDump::Initialize() {
 	wchar_t MemDmpFolder[MAX_PATH + 1] = { 0 };
 
 	GetLocalTime(&SysTime);
-	swprintf_s(MemDmpFolder, MAX_PATH + 1, L"dmp-%d-%d-%d~%d.%d.%d", SysTime.wMonth, SysTime.wDay, SysTime.wYear, SysTime.wHour, SysTime.wMinute, SysTime.wSecond);
+	swprintf_s(MemDmpFolder, MAX_PATH + 1, L"memdmp-%d-%d-%d~%d.%d.%d", SysTime.wMonth, SysTime.wDay, SysTime.wYear, SysTime.wHour, SysTime.wMinute, SysTime.wSecond);
 	MemDump::Folder = wstring(MemDmpFolder);
 
 	return CreateDirectoryW(MemDump::Folder.c_str(), nullptr);

@@ -60,8 +60,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
 	static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
 	bool bDumpSuspicious = false;
-	MemDump::Initialize();
-	system("pause");
+	
 	if (IsWow64Process != nullptr) {
 		BOOL bSelfWow64 = FALSE;
 
@@ -124,6 +123,10 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		if (OutputType == SelectedOutputType::InvalidOutput) {
 			Interface::Log("- Invalid scan output type selected\r\n");
 			return 0;
+		}
+
+		if (bDumpSuspicious) {
+			MemDump::Initialize();
 		}
 
 		if (ProcType == SelectedProcessType::SelfPid || ProcType == SelectedProcessType::SpecificPid) {
