@@ -24,7 +24,7 @@ namespace Moneta {
 		uint32_t GetPid();
 		BOOL IsWow64();
 		Process(uint32_t);
-		void Enumerate(bool bDumpSuspicious);
+		void Enumerate(uint64_t qwMemdmpOptFlags);
 		~Process();
 	};
 }

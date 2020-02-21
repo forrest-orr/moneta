@@ -226,7 +226,7 @@ void AlignSectionName(const char* pOriginalName, char* pAlignedName) {
 	}
 }
 
-void Process::Enumerate(bool bDumpSuspicious) {
+void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 	bool bShownProc = false;
 	MemDump ProcDmp(this->Handle, this->Pid);
 	wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
@@ -395,14 +395,23 @@ void Process::Enumerate(bool bDumpSuspicious) {
 								Interface::Log("    Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
 								//system("pause");
 							}
-
-							if (bDumpSuspicious && bSuspicius) {
+							
+							if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspicius) {
 								if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
 									Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 								}
 								else {
 									Interface::Log("      ~ Memory dump failed.\r\n");
 								}
+							}
+						}
+
+						if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE)) {
+							if (Entity::Dump(ProcDmp, *(Itr->second))) {
+								Interface::Log("      ~ Generated full region dump\r\n");
+							}
+							else {
+								Interface::Log("      ~ Failed to generate full region dump\r\n");
 							}
 						}
 					}
@@ -431,13 +440,22 @@ void Process::Enumerate(bool bDumpSuspicious) {
 							system("pause");
 						}
 
-						if (bDumpSuspicious && bSuspicius) {
+						if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspicius) {
 							if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
 								Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 							}
 							else {
 								Interface::Log("      ~ Memory dump failed.\r\n");
 							}
+						}
+					}
+
+					if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE)) {
+						if (Entity::Dump(ProcDmp, *(Itr->second))) {
+							Interface::Log("      ~ Generated full region dump\r\n");
+						}
+						else {
+							Interface::Log("      ~ Failed to generate full region dump\r\n");
 						}
 					}
 				}
@@ -468,13 +486,22 @@ void Process::Enumerate(bool bDumpSuspicious) {
 						system("pause");
 					}
 
-					if (bDumpSuspicious && bSuspicius) {
+					if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspicius) {
 						if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
 							Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 						}
 						else {
 							Interface::Log("      ~ Memory dump failed.\r\n");
 						}
+					}
+				}
+
+				if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE)) {
+					if (Entity::Dump(ProcDmp, *(Itr->second))) {
+						Interface::Log("      ~ Generated full region dump\r\n");
+					}
+					else {
+						Interface::Log("      ~ Failed to generate full region dump\r\n");
 					}
 				}
 			}
@@ -504,13 +531,23 @@ void Process::Enumerate(bool bDumpSuspicious) {
 							system("pause");
 						}
 
-						if (bDumpSuspicious && bSuspicius) {
+						if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspicius) {
+							//printf("start va: 0x%p, size: 0x%08x\r\n", Itr->second->GetStartVa(), Itr->second->GetEntitySize());
 							if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
 								Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 							}
 							else {
 								Interface::Log("      ~ Memory dump failed.\r\n");
 							}
+						}
+					}
+
+					if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE)) {
+						if (Entity::Dump(ProcDmp, *(Itr->second))) {
+							Interface::Log("      ~ Generated full region dump\r\n");
+						}
+						else {
+							Interface::Log("      ~ Failed to generate full region dump\r\n");
 						}
 					}
 				}

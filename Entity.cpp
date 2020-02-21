@@ -33,6 +33,7 @@ ________________________________________________________________________________
 #include "Process.hpp"
 #include "Blocks.hpp"
 #include "Interface.hpp"
+#include "MemDump.hpp"
 
 using namespace std;
 using namespace PeFile;
@@ -270,4 +271,23 @@ Entity* Entity::Create(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks) {
 
 vector<MemoryBlock*> Entity::GetSBlocks() {
 	return this->SBlocks;
+}
+
+bool Entity::Dump(MemDump & ProcDmp, Entity& Target) {
+	vector<MemoryBlock*> SBlocks = Target.GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
+	wchar_t DumpFolder[MAX_PATH + 1] = { 0 };
+	int32_t nDumpCount = 0;
+
+	swprintf_s(DumpFolder, MAX_PATH + 1, L"%d_%p.dat", ProcDmp.GetPid(), Target.GetStartVa());
+
+	for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+		if ((*SbItr)->GetBasic()->State == MEM_COMMIT) {
+			wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
+			if (ProcDmp.Create(DumpFolder, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
+				nDumpCount++;
+			}
+		}
+	}
+
+	return nDumpCount ? true : false;
 }

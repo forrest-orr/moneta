@@ -1,4 +1,5 @@
 typedef class MemoryBlock;
+typedef class MemDump;
 
 namespace Moneta {
 	enum class EntityType{UNKNOWN, PE_FILE, MAPPED_FILE, PE_SECTION};
@@ -13,6 +14,7 @@ namespace Moneta {
 		uint8_t* GetEndVa();
 		uint32_t GetEntitySize();
 		static Entity* Create(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks); // Factory method for derived PE images, mapped files, unknown memory ranges.
+		static bool Dump(MemDump& ProcDmp, Entity& Target);
 		void SetSBlocks(std::vector<MemoryBlock*>);
 		~Entity();
 		virtual EntityType Type() = 0;
