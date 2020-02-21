@@ -49,10 +49,10 @@ Entity::~Entity() {
 }
 
 PeVm::Body::~Body() {
-	//Interface::Log("PE destructor\r\n");
 	for (vector<Section*>::const_iterator Itr = this->Sections.begin(); Itr != this->Sections.end(); ++Itr) {
 		delete* Itr;
 	}
+
 	delete this->Pe;
 }
 
@@ -145,10 +145,6 @@ PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : ABloc
 
 	if (!this->IsPhantom()) {
 		if ((this->Pe = PeBase::Load(this->GetFileBaseData(), this->GetFileBaseSize())) != nullptr) {
-			//wstring FilePath(this->GetFilePath());
-			//delete this->File; // Don't double-store the file content. 
-			//this->SetFile(FilePath.c_str());
-
 			//
 			// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
 			//
@@ -253,12 +249,12 @@ bool Entity::Dump(MemDump & ProcDmp, Entity& Target) {
 	wchar_t DumpFolder[MAX_PATH + 1] = { 0 };
 	int32_t nDumpCount = 0;
 
-	swprintf_s(DumpFolder, MAX_PATH + 1, L"%d_%p", ProcDmp.GetPid(), Target.GetStartVa());
+	swprintf_s(DumpFolder, MAX_PATH + 1, L"%d_%p_%ws", ProcDmp.GetPid(), Target.GetStartVa(), MemoryBlock::TypeSymbol(SBlocks.front()->GetBasic()->Type));
 
 	for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 		if ((*SbItr)->GetBasic()->State == MEM_COMMIT) {
 			wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
-			if (ProcDmp.Create(DumpFolder, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
+			if (ProcDmp.Create(DumpFolder, (*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
 				nDumpCount++;
 			}
 		}

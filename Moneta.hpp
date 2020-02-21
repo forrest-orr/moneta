@@ -66,5 +66,4 @@ namespace Moneta {
 	}
 
 	uint32_t GetPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t dwSize);
-	const char* PermissionSymbol(MEMORY_BASIC_INFORMATION* pMbi);
 }

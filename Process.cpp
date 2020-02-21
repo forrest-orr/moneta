@@ -214,15 +214,23 @@ bool PageExecutable(uint32_t dwProtect) {
 	return (dwProtect == PAGE_EXECUTE || dwProtect == PAGE_EXECUTE_READ || dwProtect == PAGE_EXECUTE_READWRITE);
 }
 
-void AlignSectionName(const char* pOriginalName, char* pAlignedName) { // Make generic and move to interface?
-	if (strlen(pOriginalName)) {
-		strncpy_s(pAlignedName, 9, pOriginalName, 8);
-		for (int32_t nX = strlen(pAlignedName); nX < 8; nX++) {
-			strcat_s(pAlignedName, 9, " ");
+void AlignName(const wchar_t* pOriginalName, wchar_t* pAlignedName, int32_t nAlignTo) { // Make generic and move to interface?
+	assert(nAlignTo >= 1);
+
+	if (wcslen(pOriginalName)) {
+		if (wcslen(pOriginalName) < nAlignTo) {
+			wcsncpy_s(pAlignedName, (nAlignTo + 1), pOriginalName, nAlignTo);
+			for (int32_t nX = wcslen(pAlignedName); nX < nAlignTo; nX++) {
+				wcscat_s(pAlignedName, (nAlignTo + 1), L" ");
+			}
 		}
 	}
 	else {
-		strcpy_s(pAlignedName, 9, "         ");
+		wcscpy_s(pAlignedName, (nAlignTo + 1), L" ");
+
+		for (int32_t nX = 1; nX < nAlignTo; nX++) {
+			wcscat_s(pAlignedName, (nAlignTo + 1), L" ");
+		}
 	}
 }
 
@@ -339,13 +347,17 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					vector<PeVm::Section*> Sections = PeEntity->GetSections();
 					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
 						vector<MemoryBlock*> SBlocks = (*SectItr)->GetSBlocks();
-						char AlignedSectName[10] = { 0 };
+						wchar_t AlignedSectName[10] = { 0 };
 
-						AlignSectionName((const char*)(*SectItr)->GetHeader()->Name, AlignedSectName);
+						AlignName((const wchar_t*)(*SectItr)->GetHeader()->Name, AlignedSectName, 8);
 
 						for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 							bool bSuspiciousSblock = false;
-							Interface::Log("  0x%p:0x%08x | %s | %s | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SbItr)->GetBasic()), AlignedSectName,
+							wchar_t AlignedAttribDesc[6] = { 0 };
+
+							AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
+
+							Interface::Log("  0x%p:0x%08x | %s | %s | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
 								Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize)
 							);
 
@@ -400,7 +412,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 							}
 							
 							if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
-								if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
+								if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
 									Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 								}
 								else {
@@ -416,7 +428,11 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 					for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 						bool bSuspiciousSblock = false;
-						Interface::Log("  0x%p:0x%08x | %s | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SbItr)->GetBasic()),
+						wchar_t AlignedAttribDesc[6] = { 0 };
+
+						AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
+
+						Interface::Log("  0x%p:0x%08x | %s | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
 							Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
 
 						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
@@ -436,7 +452,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 						}
 
 						if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
-							if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
+							if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
 								Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 							}
 							else {
@@ -454,8 +470,12 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 				for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 					bool bSuspiciousSblock = false;
+					wchar_t AlignedAttribDesc[6] = { 0 };
+
+					AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
+
 					//Interface::Log("  0x%p\r\n", (*SbItr)->GetBasic()->BaseAddress);
-					Interface::Log("  0x%p:0x%08x | %s", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SbItr)->GetBasic()));
+					Interface::Log("  0x%p:0x%08x | %s", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
 					if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 						//Interface::Log("! Mapped memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 						Interface::Log(" | Abnormal executable mapped memory");
@@ -474,7 +494,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					}
 
 					if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
-						if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
+						if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
 							Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 						}
 						else {
@@ -492,7 +512,11 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					Interface::Log("[ 0x%016x:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->AllocationBase, (uint32_t)((uint8_t*)SBlocks.back()->GetBasic()->BaseAddress - SBlocks.back()->GetBasic()->AllocationBase) + SBlocks.back()->GetBasic()->RegionSize);
 					for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 						bool bSuspiciousSblock = false;
-						Interface::Log("  0x%p:0x%08x | %s", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SbItr)->GetBasic()));
+						wchar_t AlignedAttribDesc[6] = { 0 };
+
+						AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
+
+						Interface::Log("  0x%p:0x%08x | %s", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
 						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 							//Interface::Log("! Private memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 							Interface::Log(" | Abnormal executable private memory");
@@ -512,7 +536,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 						if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
 							//printf("start va: 0x%p, size: 0x%08x\r\n", Itr->second->GetStartVa(), Itr->second->GetEntitySize());
-							if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
+							if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
 								Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 							}
 							else {

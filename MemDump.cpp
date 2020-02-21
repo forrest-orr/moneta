@@ -1,6 +1,10 @@
 #include "StdAfx.h"
 #include "MemDump.hpp"
 #include "FileIo.hpp"
+#include "PE.hpp"
+#include "Moneta.hpp"
+#include "Process.hpp"
+#include "Blocks.hpp"
 
 using namespace std;
 
@@ -8,12 +12,12 @@ wstring MemDump::Folder;
 
 MemDump::MemDump(HANDLE hProcess, uint32_t dwPid) : Handle(hProcess), Pid(dwPid) {}
 
-bool MemDump::Create(wstring Folder, uint8_t* pAddress, SIZE_T cbSize, wchar_t* pDumpFilePath, size_t ccDumpFilePathLen) {
+bool MemDump::Create(wstring Folder, MEMORY_BASIC_INFORMATION *pMbi, wchar_t* pDumpFilePath, size_t ccDumpFilePathLen) {
 	SIZE_T cbBytesRead = 0;
-	uint8_t* pBuf = new uint8_t[cbSize];
+	uint8_t* pBuf = new uint8_t[pMbi->RegionSize];
 	wstring TargetDmpFolder;
 
-	if (ReadProcessMemory(this->Handle, pAddress, pBuf, cbSize, (SIZE_T*)&cbBytesRead)) {
+	if (ReadProcessMemory(this->Handle, pMbi->BaseAddress, pBuf, pMbi->RegionSize, (SIZE_T*)&cbBytesRead)) {
 		if (!Folder.empty()) {
 			TargetDmpFolder = MemDump::Folder + L"\\" + Folder;
 
@@ -26,7 +30,7 @@ bool MemDump::Create(wstring Folder, uint8_t* pAddress, SIZE_T cbSize, wchar_t* 
 			TargetDmpFolder = MemDump::Folder;
 		}
 
-		swprintf_s(pDumpFilePath, ccDumpFilePathLen, L"%ws\\%d_%p.dat", TargetDmpFolder.c_str(), this->Pid, pAddress);
+		swprintf_s(pDumpFilePath, ccDumpFilePathLen, L"%ws\\%d_%p_%ws.dat", TargetDmpFolder.c_str(), this->Pid, pMbi->BaseAddress, MemoryBlock::AttribDesc(pMbi));
 		FileBase DumpFile(pDumpFilePath, pBuf, cbBytesRead);
 		return DumpFile.ToDisk();
 	}
@@ -35,8 +39,8 @@ bool MemDump::Create(wstring Folder, uint8_t* pAddress, SIZE_T cbSize, wchar_t* 
 	}
 }
 
-bool MemDump::Create(uint8_t* pAddress, SIZE_T cbSize, wchar_t* pDumpFilePath, size_t ccDumpFilePathLen) {
-	return Create(L"", pAddress, cbSize, pDumpFilePath, ccDumpFilePathLen);
+bool MemDump::Create(MEMORY_BASIC_INFORMATION* pMbi, wchar_t* pDumpFilePath, size_t ccDumpFilePathLen) {
+	return Create(L"", pMbi, pDumpFilePath, ccDumpFilePathLen);
 }
 
 bool MemDump::Initialize() {

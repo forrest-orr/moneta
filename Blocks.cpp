@@ -49,39 +49,60 @@ MEMORY_REGION_INFORMATION* MemoryBlock::GetRegion() {
 	return Region;
 }
 
-const char* Moneta::PermissionSymbol(MEMORY_BASIC_INFORMATION *pMbi) {
-	switch (pMbi->Protect) {
+const wchar_t* MemoryBlock::ProtectSymbol(uint32_t dwProtect) {
+	switch (dwProtect) {
 	case PAGE_READONLY:
-		return "R    ";
+		return L"R";
 	case PAGE_READWRITE:
-		return "RW   ";
+		return L"RW";
 	case PAGE_EXECUTE_READ:
-		return "RX   ";
+		return L"RX";
 	case PAGE_EXECUTE_READWRITE:
-		return "RWX  ";
+		return L"RWX";
 	case PAGE_EXECUTE_WRITECOPY:
-		return "RWXC ";
+		return L"RWXC";
 	case PAGE_EXECUTE:
-		return "X    ";
+		return L"X";
 	case PAGE_WRITECOPY:
-		return "WC   ";
+		return L"WC";
 	case PAGE_NOACCESS:
-		return "NA   ";
+		return L"NA";
 	case PAGE_WRITECOMBINE:
-		return "WCB  ";
+		return L"WCB";
 	case PAGE_GUARD:
-		return "PG   ";
+		return L"PG";
 	case PAGE_NOCACHE:
-		return "NC   ";
-	default:
-		if (pMbi->State == MEM_FREE) {
-			return "Free ";
-		}
-		else if (pMbi->State == MEM_RESERVE) {
-			return "Reserved";
-		}
+		return L"NC";
+	default: return L"?";
+	}
+}
+
+const wchar_t* MemoryBlock::AttribDesc(MEMORY_BASIC_INFORMATION *pMbi) {
+	if (pMbi->State == MEM_COMMIT) {
+		return ProtectSymbol(pMbi->Protect);
+	}
+	else if (pMbi->State == MEM_FREE) {
+		return L"FREE";
+	}
+	else if (pMbi->State == MEM_RESERVE) {
+		return L"RSRV";
+	}
 		
-		return "?    ";
+	return L"?";
+}
+
+const wchar_t* MemoryBlock::TypeSymbol(uint32_t dwType) {
+	if (dwType == MEM_IMAGE) {
+		return L"IMG";
+	}
+	else if (dwType == MEM_MAPPED) {
+		return L"MAP";
+	}
+	else if (dwType == MEM_PRIVATE) {
+		return L"PRV";
+	}
+	else {
+		return L"?";
 	}
 }
 
