@@ -278,7 +278,7 @@ bool Entity::Dump(MemDump & ProcDmp, Entity& Target) {
 	wchar_t DumpFolder[MAX_PATH + 1] = { 0 };
 	int32_t nDumpCount = 0;
 
-	swprintf_s(DumpFolder, MAX_PATH + 1, L"%d_%p.dat", ProcDmp.GetPid(), Target.GetStartVa());
+	swprintf_s(DumpFolder, MAX_PATH + 1, L"%d_%p", ProcDmp.GetPid(), Target.GetStartVa());
 
 	for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 		if ((*SbItr)->GetBasic()->State == MEM_COMMIT) {

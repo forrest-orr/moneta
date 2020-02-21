@@ -17,8 +17,8 @@ bool MemDump::Create(wstring Folder, uint8_t* pAddress, SIZE_T cbSize, wchar_t* 
 		if (!Folder.empty()) {
 			TargetDmpFolder = MemDump::Folder + L"\\" + Folder;
 
-			if (!CreateDirectoryW(TargetDmpFolder.c_str(), nullptr)) {
-				delete pBuf;
+			if (!CreateDirectoryW(TargetDmpFolder.c_str(), nullptr) && GetLastError() != ERROR_ALREADY_EXISTS) {
+				delete [] pBuf;
 				return false;
 			}
 		}
