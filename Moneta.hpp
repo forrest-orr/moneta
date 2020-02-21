@@ -29,7 +29,6 @@ namespace Moneta {
 	class MappedFile : public FileBase, virtual public ABlock { // Virtual inheritance from entity prevents classes derived from multiple classes derived from entity from having ambiguous/conflicting content.
 	public:
 		MappedFile(std::vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore = false);
-		~MappedFile();
 		EntityType Type() { return EntityType::MAPPED_FILE; }
 	};
 
@@ -67,5 +66,5 @@ namespace Moneta {
 	}
 
 	uint32_t GetPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t dwSize);
-	const char* PermissionSymbol(MEMORY_BASIC_INFORMATION* pBasicInfo);
+	const char* PermissionSymbol(MEMORY_BASIC_INFORMATION* pMbi);
 }

@@ -159,10 +159,10 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		//if (this->Pid == 3272) system("pause");
 
 		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += cbRegionSize) {
-			MEMORY_BASIC_INFORMATION* pBasicInfo = new MEMORY_BASIC_INFORMATION;
+			MEMORY_BASIC_INFORMATION* pMbi = new MEMORY_BASIC_INFORMATION;
 
-			if (VirtualQueryEx(this->Handle, pBaseAddr, (MEMORY_BASIC_INFORMATION*)pBasicInfo, sizeof(MEMORY_BASIC_INFORMATION)) == sizeof(MEMORY_BASIC_INFORMATION)) {
-				cbRegionSize = pBasicInfo->RegionSize;
+			if (VirtualQueryEx(this->Handle, pBaseAddr, (MEMORY_BASIC_INFORMATION*)pMbi, sizeof(MEMORY_BASIC_INFORMATION)) == sizeof(MEMORY_BASIC_INFORMATION)) {
+				cbRegionSize = pMbi->RegionSize;
 
 				if (!SBlocks.empty()) { // If the sblock list is empty then there is no ablock for comparison
 					//
@@ -171,7 +171,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 
 					Interface::Log(5, "Sblock list not empty\r\n");
 
-					if (pBasicInfo->AllocationBase != (*ABlock)->GetBasic()->AllocationBase) {
+					if (pMbi->AllocationBase != (*ABlock)->GetBasic()->AllocationBase) {
 						Interface::Log(5, "Found a new ablock. Saving sblock list to new entity entry.\r\n");
 						//CurrentEntity->SetSBlocks(SBlocks);
 						this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, Entity::Create(this->Handle, SBlocks)));
@@ -181,13 +181,13 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				}
 
 				Interface::Log(5, "Adding mew sblock to list\r\n");
-				SBlocks.push_back(new MemoryBlock((MEMORY_BASIC_INFORMATION*)pBasicInfo, nullptr, this->Threads));
+				SBlocks.push_back(new MemoryBlock((MEMORY_BASIC_INFORMATION*)pMbi, nullptr, this->Threads));
 				ABlock = SBlocks.begin(); // This DOES fix a bug.
 			}
 			else {
 				Interface::Log(5, "VirtualQuery failed\r\n");
 				//system("pause");
-				delete pBasicInfo;
+				delete pMbi;
 				if (!SBlocks.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
 					this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, Entity::Create(this->Handle, SBlocks)));
 				}
@@ -214,7 +214,7 @@ bool PageExecutable(uint32_t dwProtect) {
 	return (dwProtect == PAGE_EXECUTE || dwProtect == PAGE_EXECUTE_READ || dwProtect == PAGE_EXECUTE_READWRITE);
 }
 
-void AlignSectionName(const char* pOriginalName, char* pAlignedName) {
+void AlignSectionName(const char* pOriginalName, char* pAlignedName) { // Make generic and move to interface?
 	if (strlen(pOriginalName)) {
 		strncpy_s(pAlignedName, 9, pOriginalName, 8);
 		for (int32_t nX = strlen(pAlignedName); nX < 8; nX++) {
@@ -322,7 +322,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 		//
 
 		if (Interface::GetVerbosity() >= 3 || (Interface::GetVerbosity() < 3 && nSuspiciousObjCount > 0)) {
-			nSuspiciousObjCount = 0;
+			nSuspiciousObjCount = 0; // Suspicious object count must be re-calculated since it cannot be known if this entity enumeration is occuring due to verbosity level or genuine suspicion
 
 			if (!bShownProc) {
 				Interface::Log("[ %ws : %d : %ws\r\n", this->Name.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
@@ -344,7 +344,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 						AlignSectionName((const char*)(*SectItr)->GetHeader()->Name, AlignedSectName);
 
 						for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-							bool bSuspicius = false;
+							bool bSuspiciousSblock = false;
 							Interface::Log("  0x%p:0x%08x | %s | %s | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SbItr)->GetBasic()), AlignedSectName,
 								Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize)
 							);
@@ -356,7 +356,8 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
 								//Interface::Log("! PE headers have private pages within %ws [%ws:%d]\r\n", PeEntity->GetPath().c_str(), this->Name.c_str(), this->Pid);
 								Interface::Log(" | Modified header");
-								bSuspicius = true;
+								bSuspiciousSblock = true;
+								nSuspiciousObjCount++;
 								//system("pause");
 							}
 
@@ -369,7 +370,8 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 								//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
 								//	this->Name.c_str(), this->Pid);
 								Interface::Log(" | Inconsistent +x between disk and memory");
-								bSuspicius = true;
+								bSuspiciousSblock = true;
+								nSuspiciousObjCount++;
 								//system("pause");
 							}
 
@@ -383,7 +385,8 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 								//	((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? L"matches" : L"does not match",
 								//	this->Name.c_str(), this->Pid);
 								Interface::Log(" | Modified code");
-								bSuspicius = true;
+								bSuspiciousSblock = true;
+								nSuspiciousObjCount++;
 								//system("pause");
 							}
 
@@ -396,22 +399,13 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 								//system("pause");
 							}
 							
-							if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspicius) {
+							if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
 								if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
 									Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 								}
 								else {
 									Interface::Log("      ~ Memory dump failed.\r\n");
 								}
-							}
-						}
-
-						if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE)) {
-							if (Entity::Dump(ProcDmp, *(Itr->second))) {
-								Interface::Log("      ~ Generated full region dump\r\n");
-							}
-							else {
-								Interface::Log("      ~ Failed to generate full region dump\r\n");
 							}
 						}
 					}
@@ -421,14 +415,15 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					Interface::Log("[ 0x%016x:0x%08x | Image | %ws [Phantom]\r\n", PeEntity->GetStartVa(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
 
 					for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-						bool bSuspicius = false;
+						bool bSuspiciousSblock = false;
 						Interface::Log("  0x%p:0x%08x | %s | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SbItr)->GetBasic()),
 							Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
 
 						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 							//Interface::Log("! Phantom image memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 							Interface::Log(" | Phantom +x image memory");
-							bSuspicius = true;
+							bSuspiciousSblock = true;
+							nSuspiciousObjCount++;
 							//system("pause");
 						}
 						Interface::Log("\r\n");
@@ -440,22 +435,13 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 							system("pause");
 						}
 
-						if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspicius) {
+						if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
 							if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
 								Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 							}
 							else {
 								Interface::Log("      ~ Memory dump failed.\r\n");
 							}
-						}
-					}
-
-					if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE)) {
-						if (Entity::Dump(ProcDmp, *(Itr->second))) {
-							Interface::Log("      ~ Generated full region dump\r\n");
-						}
-						else {
-							Interface::Log("      ~ Failed to generate full region dump\r\n");
 						}
 					}
 				}
@@ -467,14 +453,15 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 				//Interface::Log("S-Blocks:\r\n");
 
 				for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-					bool bSuspicius = false;
+					bool bSuspiciousSblock = false;
 					//Interface::Log("  0x%p\r\n", (*SbItr)->GetBasic()->BaseAddress);
 					Interface::Log("  0x%p:0x%08x | %s", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SbItr)->GetBasic()));
 					if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 						//Interface::Log("! Mapped memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 						Interface::Log(" | Abnormal executable mapped memory");
 						//system("pause");
-						bSuspicius = true;
+						bSuspiciousSblock = true;
+						nSuspiciousObjCount++;
 					}
 
 					Interface::Log("\r\n");
@@ -486,22 +473,13 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 						system("pause");
 					}
 
-					if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspicius) {
+					if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
 						if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
 							Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 						}
 						else {
 							Interface::Log("      ~ Memory dump failed.\r\n");
 						}
-					}
-				}
-
-				if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE)) {
-					if (Entity::Dump(ProcDmp, *(Itr->second))) {
-						Interface::Log("      ~ Generated full region dump\r\n");
-					}
-					else {
-						Interface::Log("      ~ Failed to generate full region dump\r\n");
 					}
 				}
 			}
@@ -513,13 +491,14 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 				if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
 					Interface::Log("[ 0x%016x:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->AllocationBase, (uint32_t)((uint8_t*)SBlocks.back()->GetBasic()->BaseAddress - SBlocks.back()->GetBasic()->AllocationBase) + SBlocks.back()->GetBasic()->RegionSize);
 					for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-						bool bSuspicius = false;
+						bool bSuspiciousSblock = false;
 						Interface::Log("  0x%p:0x%08x | %s", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, Moneta::PermissionSymbol((*SbItr)->GetBasic()));
 						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 							//Interface::Log("! Private memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 							Interface::Log(" | Abnormal executable private memory");
 							//system("pause");
-							bSuspicius = true;
+							bSuspiciousSblock = true;
+							nSuspiciousObjCount++;
 						}
 
 						Interface::Log("\r\n");
@@ -531,7 +510,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 							system("pause");
 						}
 
-						if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspicius) {
+						if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
 							//printf("start va: 0x%p, size: 0x%08x\r\n", Itr->second->GetStartVa(), Itr->second->GetEntitySize());
 							if (ProcDmp.Create((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, DumpFilePath, MAX_PATH + 1)) {
 								Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
@@ -541,18 +520,18 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 							}
 						}
 					}
-
-					if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE)) {
-						if (Entity::Dump(ProcDmp, *(Itr->second))) {
-							Interface::Log("      ~ Generated full region dump\r\n");
-						}
-						else {
-							Interface::Log("      ~ Failed to generate full region dump\r\n");
-						}
-					}
 				}
 				else {
 					//Interface::Log("! Unknown memory type at 0x%p\r\n", Itr->first);
+				}
+			}
+
+			if (nSuspiciousObjCount > 0 && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE)) { // Suspicious object count must be re-calculated since it cannot be known if this entity enumeration is occuring due to verbosity level or genuine suspicion
+				if (Entity::Dump(ProcDmp, *(Itr->second))) {
+					Interface::Log("      ~ Generated full region dump\r\n");
+				}
+				else {
+					Interface::Log("      ~ Failed to generate full region dump\r\n");
 				}
 			}
 

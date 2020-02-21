@@ -56,12 +56,6 @@ PeVm::Body::~Body() {
 	delete this->Pe;
 }
 
-MappedFile::~MappedFile() {
-	//Interface::Log("Mapped file destructor\r\n");
-	//delete this->File;
-	//Interface::Log("Mapped file destructor2\r\n");
-}
-
 uint8_t* PeVm::Component::GetPeBase() {
 	return this->PeBase;
 }
@@ -92,25 +86,6 @@ uint32_t Entity::GetEntitySize() {
 uint8_t* PeVm::Body::GetPeBase() {
 	return this->PeBase;
 }
-
-/*
-void MappedFile::SetFile(const wchar_t* pFilePath, bool bMemStore) {
-	try {
-		this->File = new FileBase(pFilePath, bMemStore, false);
-	}
-	catch (...) {
-		Interface::Log("- Failed to open %ws\r\n", pFilePath);
-		this->File = nullptr;
-	}
-}
-
-wstring MappedFile::GetFilePath() {
-	return this->File == nullptr ? L"?" : this->File->GetPath();
-}
-
-bool MappedFile::IsPhantom() {
-	return this->File == nullptr ? false : this->File->IsPhantom();
-}*/
 
 bool TranslateDevicePath(const wchar_t* pDevicePath, wchar_t *pTranslatedPath) {
 	wchar_t DriveLetters[MAX_PATH + 1] = { 0 };
@@ -207,9 +182,9 @@ PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : ABloc
 
 					if ((pSBlockStartVa >= pSectStartVa && pSBlockStartVa < pSectEndVa) || (pSBlockEndVa > pSectStartVa&& pSBlockEndVa <= pSectEndVa) || (pSBlockStartVa < pSectStartVa && pSBlockEndVa > pSectEndVa)) {
 						//Interface::Log("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, pSectStartVa, pSectEndVa, pSBlockStartVa, pSBlockEndVa);
-						MEMORY_BASIC_INFORMATION* pBasicInfo = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
-						memcpy(pBasicInfo, (*SbItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
-						OverlapSBlock.push_back(new MemoryBlock(pBasicInfo, nullptr, (*SbItr)->GetThreads()));
+						MEMORY_BASIC_INFORMATION* pMbi = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
+						memcpy(pMbi, (*SbItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
+						OverlapSBlock.push_back(new MemoryBlock(pMbi, nullptr, (*SbItr)->GetThreads()));
 					}
 
 					//Sect->SetSBlocks(OverlapSBlock);
