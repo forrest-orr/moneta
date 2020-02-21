@@ -238,6 +238,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 	bool bShownProc = false;
 	MemDump ProcDmp(this->Handle, this->Pid);
 	wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
+	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
 
 	//
 	// Walk ablocks (entities) and list the corresponding sblocks of each.
@@ -347,17 +348,19 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					vector<PeVm::Section*> Sections = PeEntity->GetSections();
 					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
 						vector<MemoryBlock*> SBlocks = (*SectItr)->GetSBlocks();
-						wchar_t AlignedSectName[10] = { 0 };
-
-						AlignName((const wchar_t*)(*SectItr)->GetHeader()->Name, AlignedSectName, 8);
+						wchar_t AlignedSectName[9] = { 0 };
+						char AnsiSectName[9];
+						strncpy_s(AnsiSectName, 9, (char *)(*SectItr)->GetHeader()->Name, 8);
+						wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
+						AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
 
 						for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 							bool bSuspiciousSblock = false;
 							wchar_t AlignedAttribDesc[6] = { 0 };
-
+							
 							AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
-							Interface::Log("  0x%p:0x%08x | %s | %s | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
+							Interface::Log("  0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
 								Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize)
 							);
 
@@ -432,7 +435,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 						AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
-						Interface::Log("  0x%p:0x%08x | %s | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
+						Interface::Log("  0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
 							Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
 
 						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
@@ -475,7 +478,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
 					//Interface::Log("  0x%p\r\n", (*SbItr)->GetBasic()->BaseAddress);
-					Interface::Log("  0x%p:0x%08x | %s", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
+					Interface::Log("  0x%p:0x%08x | %ws", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
 					if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 						//Interface::Log("! Mapped memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 						Interface::Log(" | Abnormal executable mapped memory");
@@ -516,7 +519,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 						AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
-						Interface::Log("  0x%p:0x%08x | %s", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
+						Interface::Log("  0x%p:0x%08x | %ws", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
 						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 							//Interface::Log("! Private memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 							Interface::Log(" | Abnormal executable private memory");
