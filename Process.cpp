@@ -351,10 +351,21 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					//Interface::Log("File path: %ws (%ws)\r\n", ((Moneta::PE *)Itr->second)->GetFilePath().c_str(), dynamic_cast<PeVm::Body *>(Itr->second)->GetPe()->GetPeMagic() == IMAGE_NT_OPTIONAL_HDR64_MAGIC ? L"64-bit" : L"32-bit");
 					//Interface::Log("Path from PEB: %ws\r\n", PeEntity->GetPebModule().GetPath().c_str());
 
+					//
+					// Determine whether this image has a corresponding entry in the PEB, and whether or not this entry accurately reflects the mapped file it is associated with.
+					//
+
 					if (!PeEntity->GetPebModule().Exists()) {
 						Interface::Log(" | Missing PEB module");
 						nSuspiciousObjCount++;
 						bTotalEntitySuspicion = true;
+					}
+					else {
+						if (PeEntity->GetPebModule().GetBase() != PeEntity->GetStartVa()) { // This case is currently invalid due to the PEB module entry being looked up by base. If relevant in the future a list of PEB links with artifacts connected to an image region can be implemented.
+							Interface::Log(" | Mismatching PEB module");
+							nSuspiciousObjCount++;
+							bTotalEntitySuspicion = true;
+						}
 					}
 
 					Interface::Log("\r\n");

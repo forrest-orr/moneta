@@ -143,10 +143,6 @@ bool PeVm::Body::PebModule::Exists() {
 
 PeVm::Body::PebModule::PebModule(HANDLE hProcess, uint8_t* pModBase) {
 	if (hProcess != nullptr) {
-		//
-		// Determine whether this image has a corresponding entry in the PEB, and whether or not this entry accurately reflects the mapped file it is associated with.
-		//
-
 		if (GetModuleInformation(hProcess, (HMODULE)pModBase, &this->Info, sizeof(this->Info))) {
 			wchar_t ModuleName[MAX_PATH + 1] = { 0 }, ModulePath[MAX_PATH + 1] = { 0 };
 
@@ -168,6 +164,10 @@ PeVm::Body::PebModule::PebModule(HANDLE hProcess, uint8_t* pModBase) {
 
 wstring PeVm::Body::PebModule::GetPath() {
 	return this->Path;
+}
+
+uint8_t *PeVm::Body::PebModule::GetBase() {
+	return (uint8_t *)this->Info.lpBaseOfDll;
 }
 
 PeVm::Body::PebModule &PeVm::Body::GetPebModule() {
