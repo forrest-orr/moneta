@@ -355,13 +355,13 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					// Determine whether this image has a corresponding entry in the PEB, and whether or not this entry accurately reflects the mapped file it is associated with.
 					//
 
-					if (!PeEntity->GetPebModule().Exists()) {
+					if (!PeEntity->GetPebModule().Exists()) { // The PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx
 						Interface::Log(" | Missing PEB module");
 						nSuspiciousObjCount++;
 						bTotalEntitySuspicion = true;
 					}
 					else {
-						if (PeEntity->GetPebModule().GetBase() != PeEntity->GetStartVa()) { // This case is currently invalid due to the PEB module entry being looked up by base. If relevant in the future a list of PEB links with artifacts connected to an image region can be implemented.
+						if (_wcsicmp(PeEntity->GetPebModule().GetPath().c_str(), PeEntity->GetPath().c_str()) != 0) { // Since the PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx, there may be a PEB link with a base address matching this image region but with a misleading name/path
 							Interface::Log(" | Mismatching PEB module");
 							nSuspiciousObjCount++;
 							bTotalEntitySuspicion = true;
