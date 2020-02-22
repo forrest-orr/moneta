@@ -173,7 +173,6 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 
 					if (pMbi->AllocationBase != (*ABlock)->GetBasic()->AllocationBase) {
 						Interface::Log(5, "Found a new ablock. Saving sblock list to new entity entry.\r\n");
-						//CurrentEntity->SetSBlocks(SBlocks);
 						this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, Entity::Create(this->Handle, SBlocks)));
 						SBlocks.clear();
 					}
@@ -251,6 +250,10 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 			PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
 			if (PeEntity->GetPe() != nullptr) {
+				if (!PeEntity->GetPebModule().Exists()) {
+					nSuspiciousObjCount++;
+				}
+
 				vector<PeVm::Section*> Sections = PeEntity->GetSections();
 				for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
 					vector<MemoryBlock*> SBlocks = (*SectItr)->GetSBlocks();
@@ -331,6 +334,8 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 		//
 
 		if (Interface::GetVerbosity() >= 3 || (Interface::GetVerbosity() < 3 && nSuspiciousObjCount > 0)) {
+			bool bTotalEntitySuspicion = false; // Indicates a full entity dump rather than an individual sblock regardless of "from-base" dump setting. For example for PEB unlinked modules.
+
 			nSuspiciousObjCount = 0; // Suspicious object count must be re-calculated since it cannot be known if this entity enumeration is occuring due to verbosity level or genuine suspicion
 
 			if (!bShownProc) {
@@ -342,8 +347,17 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
 				if (PeEntity->GetPe() != nullptr) {
-					Interface::Log("[ 0x%016x:0x%08x | Image | %ws\r\n", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetPath().c_str());
+					Interface::Log("[ 0x%016x:0x%08x | Image | %ws", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetPath().c_str());
 					//Interface::Log("File path: %ws (%ws)\r\n", ((Moneta::PE *)Itr->second)->GetFilePath().c_str(), dynamic_cast<PeVm::Body *>(Itr->second)->GetPe()->GetPeMagic() == IMAGE_NT_OPTIONAL_HDR64_MAGIC ? L"64-bit" : L"32-bit");
+					//Interface::Log("Path from PEB: %ws\r\n", PeEntity->GetPebModule().GetPath().c_str());
+
+					if (!PeEntity->GetPebModule().Exists()) {
+						Interface::Log(" | Missing PEB module");
+						nSuspiciousObjCount++;
+						bTotalEntitySuspicion = true;
+					}
+
+					Interface::Log("\r\n");
 
 					vector<PeVm::Section*> Sections = PeEntity->GetSections();
 					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
@@ -406,7 +420,6 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 							}
 
 							Interface::Log("\r\n");
-
 							vector<Thread*> Threads = (*SbItr)->GetThreads();
 
 							for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
@@ -445,8 +458,8 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 							nSuspiciousObjCount++;
 							//system("pause");
 						}
-						Interface::Log("\r\n");
 
+						Interface::Log("\r\n");
 						vector<Thread*> Threads = (*SbItr)->GetThreads();
 
 						for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
@@ -488,7 +501,6 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					}
 
 					Interface::Log("\r\n");
-
 					vector<Thread*> Threads = (*SbItr)->GetThreads();
 
 					for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
@@ -553,7 +565,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 				}
 			}
 
-			if (nSuspiciousObjCount > 0 && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE)) { // Suspicious object count must be re-calculated since it cannot be known if this entity enumeration is occuring due to verbosity level or genuine suspicion
+			if (nSuspiciousObjCount > 0 && (bTotalEntitySuspicion || (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE))) { // Suspicious object count must be re-calculated since it cannot be known if this entity enumeration is occuring due to verbosity level or genuine suspicion
 				if (Entity::Dump(ProcDmp, *(Itr->second))) {
 					Interface::Log("      ~ Generated full region dump\r\n");
 				}

@@ -135,12 +135,46 @@ PeVm::Section::Section(vector<MemoryBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr,
 	this->EntitySize = this->Hdr.SizeOfRawData == 0 ? this->Hdr.Misc.VirtualSize : this->Hdr.SizeOfRawData; // Overwrite default size determined by sblocks. Verified correct order.
 }
 
-MappedFile::MappedFile(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore) : ABlock(SBlocks), FileBase(pFilePath, bMemStore, false) {
-	Interface::Log(5, "* Setting file for mapped entity object %ws (store memory: %d)\r\n", pFilePath, bMemStore);
-	//this->SetFile(pFilePath, bMemStore);
+MappedFile::MappedFile(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore) : ABlock(SBlocks), FileBase(pFilePath, bMemStore, false) {}
+
+bool PeVm::Body::PebModule::Exists() {
+	return (this->Missing ? false : true);
 }
 
-PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : ABlock(SBlocks), PeVm::Component(SBlocks, (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress), MappedFile(SBlocks, pFilePath, true) {
+PeVm::Body::PebModule::PebModule(HANDLE hProcess, uint8_t* pModBase) {
+	if (hProcess != nullptr) {
+		//
+		// Determine whether this image has a corresponding entry in the PEB, and whether or not this entry accurately reflects the mapped file it is associated with.
+		//
+
+		if (GetModuleInformation(hProcess, (HMODULE)pModBase, &this->Info, sizeof(this->Info))) {
+			wchar_t ModuleName[MAX_PATH + 1] = { 0 }, ModulePath[MAX_PATH + 1] = { 0 };
+
+			if (GetModuleBaseNameW(hProcess, (HMODULE)pModBase, ModuleName, MAX_PATH + 1)) {
+				this->Name = ModuleName;
+			}
+
+			if (GetModuleFileNameExW(hProcess, (HMODULE)pModBase, ModulePath, MAX_PATH + 1)) {
+				this->Path = ModulePath;
+			}
+
+			this->Missing = false;
+		}
+		else {
+			this->Missing = true;
+		}
+	}
+}
+
+wstring PeVm::Body::PebModule::GetPath() {
+	return this->Path;
+}
+
+PeVm::Body::PebModule &PeVm::Body::GetPebModule() {
+	return this->PebMod;
+}
+
+PeVm::Body::Body(HANDLE hProcess, vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : ABlock(SBlocks), PeVm::Component(SBlocks, (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress), MappedFile(SBlocks, pFilePath, true), PebMod(hProcess, this->PeBase) {
 	//Interface::Log("* Runtime image base: 0x%p for %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, this->File->GetPath().c_str());
 
 	if (!this->IsPhantom()) {
@@ -166,6 +200,7 @@ PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : ABloc
 
 				//Interface::Log("%s [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa, pSectEndVa);
 				//Interface::Log("%s [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase, pSectEndVa - (uint8_t*)SBlocks.front()->GetBasic()->AllocationBase);
+
 				//
 				// Calculate the sblocks overlapping between this PE entity and the current section.
 				//
@@ -182,8 +217,6 @@ PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : ABloc
 						memcpy(pMbi, (*SbItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
 						OverlapSBlock.push_back(new MemoryBlock(pMbi, nullptr, (*SbItr)->GetThreads()));
 					}
-
-					//Sect->SetSBlocks(OverlapSBlock);
 				}
 
 				this->Sections.push_back(new Section(OverlapSBlock, &ArtificialPeHdr, this->PeBase));
@@ -193,7 +226,6 @@ PeVm::Body::Body(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : ABloc
 			Interface::Log("- Failed to load PE file using factory method in PE body constructor\r\n");
 		}
 	}
-	//Interface::Log("PE body sblocks done\r\n");
 }
 
 /*
@@ -230,7 +262,7 @@ Entity* Entity::Create(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks) {
 			pNewEntity = new MappedFile(SBlocks, MapFilePath);
 		}
 		else if (SBlocks.front()->GetBasic()->Type == MEM_IMAGE) {
-			pNewEntity = new PeVm::Body(SBlocks, MapFilePath);
+			pNewEntity = new PeVm::Body(hProcess, SBlocks, MapFilePath);
 		}
 	}
 	else {

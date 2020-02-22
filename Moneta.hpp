@@ -43,16 +43,30 @@ namespace Moneta {
 
 		typedef class Section;
 		class Body : public MappedFile, public Component {
+		protected:
+			std::vector<Section*> Sections;
+			PeFile::PeBase* Pe;
+
+			class PebModule {
+			public:
+				MODULEINFO* GetInfo();
+				std::wstring GetPath();
+				PebModule(HANDLE hProcess, uint8_t* pModBase);
+				bool Exists();
+			protected:
+				MODULEINFO Info;
+				std::wstring Name;
+				std::wstring Path;
+				bool Missing;
+			} PebMod;
 		public:
 			EntityType Type() { return EntityType::PE_FILE; }
 			uint8_t* GetPeBase();
 			PeFile::PeBase* GetPe();
 			std::vector<Section*> GetSections();
-			Body(std::vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath);
+			PebModule &GetPebModule();
+			Body(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath);
 			~Body();
-		protected:
-			std::vector<Section*> Sections;
-			PeFile::PeBase* Pe;
 		};
 
 		class Section : public Component {
