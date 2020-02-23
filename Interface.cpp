@@ -107,6 +107,35 @@ bool Interface::Log(const char *pLogFormat, ...) {
 	return WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), (PDWORD)&dwBytesWritten, NULL);
 }
 
+bool Interface::Log(WORD wColorAttribute, const char* pLogFormat, ...) {
+	char LogBuffer[4000] = { 0 };
+	char* pVarList;
+	uint32_t dwBytesWritten = 0;
+	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+	WORD saved_attributes;
+
+	if (Interface::IsStdout) {
+		GetConsoleScreenBufferInfo(Interface::Handle, &consoleInfo);
+		saved_attributes = consoleInfo.wAttributes;
+
+		SetConsoleTextAttribute(Interface::Handle, FOREGROUND_BLUE);
+	}
+
+	va_start(pVarList, pLogFormat);
+
+	if (_vsnprintf_s(LogBuffer, sizeof(LogBuffer), _TRUNCATE, pLogFormat, pVarList) == -1) {
+		LogBuffer[sizeof(LogBuffer) - 1] = '\0';
+	}
+
+	va_end(pVarList);
+
+	if (Interface::IsStdout) {
+		SetConsoleTextAttribute(Interface::Handle, saved_attributes);
+	}
+
+	return WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), (PDWORD)&dwBytesWritten, NULL);
+}
+
 HANDLE Interface::GetOutputHandle() { return Interface::Handle; }
 
 int32_t Interface::GetVerbosity() {

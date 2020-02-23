@@ -249,6 +249,10 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 		if (Itr->second->Type() == EntityType::PE_FILE) {
 			PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
+			if (PeEntity->IsSigned()) {
+				nSuspiciousObjCount++;
+			}
+
 			if (PeEntity->GetPe() != nullptr) {
 				if (!PeEntity->GetPebModule().Exists()) {
 					nSuspiciousObjCount++;
@@ -346,8 +350,13 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 			if (Itr->second->Type() == EntityType::PE_FILE) {
 				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
+				if (!PeEntity->IsSigned()) {
+					nSuspiciousObjCount++;
+					bTotalEntitySuspicion = true;
+				}
+
 				if (PeEntity->GetPe() != nullptr) {
-					Interface::Log("[ 0x%016x:0x%08x | Image | %ws", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetPath().c_str());
+					Interface::Log("[ 0x%016x:0x%08x | Image | %ws | %ws", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetPath().c_str(), PeEntity->IsSigned() ? L"Signed" : L"Unsigned");
 					//Interface::Log("File path: %ws (%ws)\r\n", ((Moneta::PE *)Itr->second)->GetFilePath().c_str(), dynamic_cast<PeVm::Body *>(Itr->second)->GetPe()->GetPeMagic() == IMAGE_NT_OPTIONAL_HDR64_MAGIC ? L"64-bit" : L"32-bit");
 					//Interface::Log("Path from PEB: %ws\r\n", PeEntity->GetPebModule().GetPath().c_str());
 
@@ -576,12 +585,14 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 				}
 			}
 
-			if (nSuspiciousObjCount > 0 && (bTotalEntitySuspicion || (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE))) { // Suspicious object count must be re-calculated since it cannot be known if this entity enumeration is occuring due to verbosity level or genuine suspicion
-				if (Entity::Dump(ProcDmp, *(Itr->second))) {
-					Interface::Log("      ~ Generated full region dump\r\n");
-				}
-				else {
-					Interface::Log("      ~ Failed to generate full region dump\r\n");
+			if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS)) {
+				if (nSuspiciousObjCount > 0 && (bTotalEntitySuspicion || (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE))) { // Suspicious object count must be re-calculated since it cannot be known if this entity enumeration is occuring due to verbosity level or genuine suspicion
+					if (Entity::Dump(ProcDmp, *(Itr->second))) {
+						Interface::Log("      ~ Generated full region dump\r\n");
+					}
+					else {
+						Interface::Log("      ~ Failed to generate full region dump\r\n");
+					}
 				}
 			}
 

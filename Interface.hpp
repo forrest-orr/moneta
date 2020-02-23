@@ -6,6 +6,7 @@ public:
 	static void Initialize(std::vector<std::wstring> &Args);
 	static bool Log(int32_t nMsgVerbosity, const char *pLogFormat, ...);
 	static bool Log(const char *pLogFormat, ...);
+	static bool Log(WORD wColorAttribute, const char* pLogFormat, ...);
 	static HANDLE GetOutputHandle();
 	static int32_t GetVerbosity();
 

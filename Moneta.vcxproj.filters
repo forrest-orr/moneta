@@ -45,6 +45,12 @@
     <ClCompile Include="Process.cpp">
       <Filter>Source Files\Classes\Moneta</Filter>
     </ClCompile>
+    <ClCompile Include="MemDump.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Signing.cpp">
+      <Filter>Source Files\Classes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NtMem.h">
@@ -69,6 +75,12 @@
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
     <ClInclude Include="Blocks.hpp">
+      <Filter>Header Files\Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="MemDump.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Signing.hpp">
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
   </ItemGroup>

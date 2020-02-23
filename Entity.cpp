@@ -34,6 +34,7 @@ ________________________________________________________________________________
 #include "Blocks.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
+#include "Signing.hpp"
 
 using namespace std;
 using namespace PeFile;
@@ -174,10 +175,14 @@ PeVm::Body::PebModule &PeVm::Body::GetPebModule() {
 	return this->PebMod;
 }
 
-PeVm::Body::Body(HANDLE hProcess, vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : ABlock(SBlocks), PeVm::Component(SBlocks, (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress), MappedFile(SBlocks, pFilePath, true), PebMod(hProcess, this->PeBase) {
-	//Interface::Log("* Runtime image base: 0x%p for %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, this->File->GetPath().c_str());
+bool PeVm::Body::IsSigned() {
+	return this->Signed;
+}
 
+PeVm::Body::Body(HANDLE hProcess, vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : ABlock(SBlocks), PeVm::Component(SBlocks, (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress), MappedFile(SBlocks, pFilePath, true), PebMod(hProcess, this->PeBase) {
 	if (!this->IsPhantom()) {
+		this->Signed = VerifyEmbeddedSignature(pFilePath);
+
 		if ((this->Pe = PeBase::Load(this->GetFileBaseData(), this->GetFileBaseSize())) != nullptr) {
 			//
 			// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.

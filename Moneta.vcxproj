@@ -137,6 +137,7 @@
     <ClCompile Include="MemDump.cpp" />
     <ClCompile Include="PE.cpp" />
     <ClCompile Include="Process.cpp" />
+    <ClCompile Include="Signing.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Blocks.hpp" />
@@ -147,6 +148,7 @@
     <ClInclude Include="NtMem.h" />
     <ClInclude Include="PE.hpp" />
     <ClInclude Include="Process.hpp" />
+    <ClInclude Include="Signing.hpp" />
     <ClInclude Include="StdAfx.h" />
   </ItemGroup>
   <ItemGroup>

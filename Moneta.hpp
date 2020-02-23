@@ -46,7 +46,7 @@ namespace Moneta {
 		protected:
 			std::vector<Section*> Sections;
 			PeFile::PeBase* Pe;
-
+			bool Signed;
 			class PebModule {
 			public:
 				uint8_t* GetBase();
@@ -63,6 +63,7 @@ namespace Moneta {
 			EntityType Type() { return EntityType::PE_FILE; }
 			uint8_t* GetPeBase();
 			PeFile::PeBase* GetPe();
+			bool IsSigned();
 			std::vector<Section*> GetSections();
 			PebModule &GetPebModule();
 			Body(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath);

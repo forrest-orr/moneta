@@ -1,0 +1,1 @@
+bool VerifyEmbeddedSignature(LPCWSTR pwszSourceFile);
