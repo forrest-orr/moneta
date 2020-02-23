@@ -179,7 +179,23 @@ bool PeVm::Body::IsSigned() {
 	return this->Signed;
 }
 
+bool PeVm::Body::IsNonExecutableImage() {
+	return this->NonExecutableImage;
+}
+
 PeVm::Body::Body(HANDLE hProcess, vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : ABlock(SBlocks), PeVm::Component(SBlocks, (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress), MappedFile(SBlocks, pFilePath, true), PebMod(hProcess, this->PeBase) {
+	static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory");
+	MEMORY_IMAGE_INFORMATION Mii = { 0 };
+	NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, this->PeBase, MemoryImageInformation, &Mii, sizeof(MEMORY_IMAGE_INFORMATION), nullptr);
+
+	if (NT_SUCCESS(NtStatus)) {
+		//Interface::Log("ImageNotExecutable: %d\r\n", Mii.ImageNotExecutable);
+		this->NonExecutableImage = Mii.ImageNotExecutable;
+	}
+	else {
+		Interface::Log("- NtQueryVirtualMemory failed for image information (0x%08x)\r\n", NtStatus);
+	}
+
 	if (!this->IsPhantom()) {
 		this->Signed = VerifyEmbeddedSignature(pFilePath);
 

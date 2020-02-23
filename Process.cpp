@@ -233,6 +233,91 @@ void AlignName(const wchar_t* pOriginalName, wchar_t* pAlignedName, int32_t nAli
 	}
 }
 
+/*
+
+ArchWow64PathExpand
+
+The purpose of this function is to receive an unformatted file path (which may
+contain architecture folders or environment variables) and convert the two
+ambiguous architecture directories to Wow64 if applicable.
+
+1. Expand all environment variables.
+2. Check whether the path begins with either of the ambiguous architecture
+folders: C:\Windows\system32, C:\Program Files
+3. If the path does not begin with an ambiguous arch folder return it as is.
+4. If the path does begin with an ambiguous arch folder then convert it to
+the Wow64 equivalent and return it.
+
+Examples:
+
+%programfiles%\example1\example.exe -> C:\Program Files (x86)\example1\example.exe
+C:\Program Files (x86)\example2\example.exe -> C:\Program Files (x86)\example2\example.exe
+C:\Program Files\example3\example.exe -> C:\Program Files (x86)\example3\example.exe
+C:\Windows\system32\notepad.exe -> C:\Windows\syswow64\notepad.exe
+
+*/
+
+#define MAX_ENV_VAR_SIZE 32767
+
+bool ArchWow64PathExpand(const wchar_t* pTargetFilePath, wchar_t* pOutputPath, size_t OutputPathLength) {
+	bool bExpandedPath = false;
+	uint64_t qwPathLength;
+	wchar_t* pProgFilePath64, * pProgFilePathWow64;
+	wchar_t SystemDirectory[MAX_PATH + 1] = { 0 }, SysWow64Directory[MAX_PATH + 1] = { 0 }, ExpandedTargetPath[MAX_PATH + 1] = { 0 };
+	SYSTEM_INFO SystemInfo = { 0 };
+
+	if (ExpandEnvironmentStringsW(pTargetFilePath, ExpandedTargetPath, MAX_PATH + 1)) {
+		bExpandedPath = true;
+		wcscpy_s(pOutputPath, OutputPathLength, ExpandedTargetPath);
+
+		GetNativeSystemInfo(&SystemInfo); // Native version of this call works on both Wow64 and x64 as opposed to just x64 for GetSystemInfo. Works on XP+
+
+		if (SystemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) {
+			//
+			// Resolve the 32 and 64-bit versions of the most problematic paths (Program Files, System32)
+			//
+
+			if ((qwPathLength = GetSystemWow64DirectoryW(SysWow64Directory, MAX_PATH + 1))) {
+				if ((qwPathLength = GetSystemDirectoryW(SystemDirectory, MAX_PATH + 1))) {
+					pProgFilePath64 = (wchar_t*)new uint8_t[MAX_ENV_VAR_SIZE]; // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
+
+					if ((qwPathLength = GetEnvironmentVariableW(L"ProgramW6432", pProgFilePath64, MAX_ENV_VAR_SIZE))) {
+						pProgFilePathWow64 = (wchar_t*)new uint8_t[MAX_ENV_VAR_SIZE]; // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
+
+						if ((qwPathLength = GetEnvironmentVariableW(L"ProgramFiles(x86)", pProgFilePathWow64, MAX_ENV_VAR_SIZE))) {
+							//
+							// Is the target path within one of the two ambiguous architecture directories?
+							//
+
+							if (_wcsnicmp(pProgFilePathWow64, ExpandedTargetPath, wcslen(pProgFilePathWow64)) == 0) {
+								// The target path is already within the Wow64 program files path. Do nothing.
+							}
+							else if (_wcsnicmp(SysWow64Directory, ExpandedTargetPath, wcslen(SysWow64Directory)) == 0) {
+								// The target path is already within the Wow64 system path. Do nothing.
+							}
+							else if (_wcsnicmp(SystemDirectory, ExpandedTargetPath, wcslen(SystemDirectory)) == 0) {
+								wcscpy_s(pOutputPath, OutputPathLength, SysWow64Directory);
+								wcscat_s(pOutputPath, OutputPathLength, ExpandedTargetPath + wcslen(SystemDirectory));
+							}
+							else if (_wcsnicmp(pProgFilePath64, ExpandedTargetPath, wcslen(pProgFilePath64)) == 0) {
+								wcscpy_s(pOutputPath, OutputPathLength, pProgFilePathWow64);
+								wcscat_s(pOutputPath, OutputPathLength, ExpandedTargetPath + wcslen(pProgFilePath64));
+							}
+						}
+
+						delete[] pProgFilePathWow64;
+					}
+
+					delete[] pProgFilePath64;
+				}
+			}
+		}
+	}
+
+	return bExpandedPath;
+}
+
+
 void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 	bool bShownProc = false;
 	MemDump ProcDmp(this->Handle, this->Pid);
@@ -249,60 +334,78 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 		if (Itr->second->Type() == EntityType::PE_FILE) {
 			PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
-			if (PeEntity->IsSigned()) {
-				nSuspiciousObjCount++;
-			}
-
-			if (PeEntity->GetPe() != nullptr) {
-				if (!PeEntity->GetPebModule().Exists()) {
+			if (!PeEntity->IsNonExecutableImage()) {
+				if (!PeEntity->IsSigned()) {
 					nSuspiciousObjCount++;
 				}
 
-				vector<PeVm::Section*> Sections = PeEntity->GetSections();
-				for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
-					vector<MemoryBlock*> SBlocks = (*SectItr)->GetSBlocks();
+				if (PeEntity->GetPe() != nullptr) {
+					if (!PeEntity->GetPebModule().Exists()) {
+						nSuspiciousObjCount++;
+					}
+					else {
+						if (_wcsicmp(PeEntity->GetPebModule().GetPath().c_str(), PeEntity->GetPath().c_str()) != 0) { // Since the PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx, there may be a PEB link with a base address matching this image region but with a misleading name/path
+							if (this->IsWow64()) { // This is an edge case in which in Wow64 a module may appear as C:\Windows\System32\kernel32.dll although the true path is C:\Windows\SysWOW64\kernel32.dll due to Wow64 FS redirection.
+								wchar_t ReFormattedPath[MAX_PATH + 1] = { 0 };
 
-					for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-						//
-						// Headers with private pages
-						//
-
-						if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
-							//Interface::Log("! PE headers have private pages within %ws [%ws:%d]\r\n", PeEntity->GetFilePath().c_str(), this->Name.c_str(), this->Pid);
-							//system("pause");
-							nSuspiciousObjCount++;
+								if (ArchWow64PathExpand(PeEntity->GetPebModule().GetPath().c_str(), ReFormattedPath, MAX_PATH + 1)) {
+									if (_wcsicmp(ReFormattedPath, PeEntity->GetPath().c_str()) != 0) {
+										nSuspiciousObjCount++;
+									}
+								}
+							}
+							else {
+								nSuspiciousObjCount++;
+							}
 						}
+					}
 
-						//
-						// Executable regions within sections that are not marked as executable on disk. For example: data is +rw on disk but has +x sblock
-						//
+					vector<PeVm::Section*> Sections = PeEntity->GetSections();
+					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
+						vector<MemoryBlock*> SBlocks = (*SectItr)->GetSBlocks();
 
-						if (PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
-							//Interface::Log("! Sblock in section %s has executable permissions inconsistent with its file on disk at %ws [%ws:%d]\r\n", (*SectItr)->GetHeader()->Name, PeEntity->GetFilePath().c_str(), this->Name.c_str(), this->Pid);
-							//system("pause");
-							nSuspiciousObjCount++;
-						}
+						for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+							//
+							// Headers with private pages
+							//
 
-						//
-						// Executable regions in memory with private pages. Whether their +x is consistent with their section on disk is examined as well.
-						//
+							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
+								//Interface::Log("! PE headers have private pages within %ws [%ws:%d]\r\n", PeEntity->GetFilePath().c_str(), this->Name.c_str(), this->Pid);
+								//system("pause");
+								nSuspiciousObjCount++;
+							}
 
-						if (PageExecutable((*SbItr)->GetBasic()->Protect) && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
-							//Interface::Log("! Sblock in section %s is executable and has private pages within %ws - %ws PE on disk [%ws:%d]\r\n", (*SectItr)->GetHeader()->Name, PeEntity->GetFilePath().c_str(), ((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? L"matches" : L"does not match", this->Name.c_str(), this->Pid);
-							//system("pause");
-							nSuspiciousObjCount++;
+							//
+							// Executable regions within sections that are not marked as executable on disk. For example: data is +rw on disk but has +x sblock
+							//
+
+							if (PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
+								//Interface::Log("! Sblock in section %s has executable permissions inconsistent with its file on disk at %ws [%ws:%d]\r\n", (*SectItr)->GetHeader()->Name, PeEntity->GetFilePath().c_str(), this->Name.c_str(), this->Pid);
+								//system("pause");
+								nSuspiciousObjCount++;
+							}
+
+							//
+							// Executable regions in memory with private pages. Whether their +x is consistent with their section on disk is examined as well.
+							//
+
+							if (PageExecutable((*SbItr)->GetBasic()->Protect) && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
+								//Interface::Log("! Sblock in section %s is executable and has private pages within %ws - %ws PE on disk [%ws:%d]\r\n", (*SectItr)->GetHeader()->Name, PeEntity->GetFilePath().c_str(), ((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? L"matches" : L"does not match", this->Name.c_str(), this->Pid);
+								//system("pause");
+								nSuspiciousObjCount++;
+							}
 						}
 					}
 				}
-			}
-			else {
-				vector<MemoryBlock*> SBlocks = PeEntity->GetSBlocks();
+				else {
+					vector<MemoryBlock*> SBlocks = PeEntity->GetSBlocks();
 
-				for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-					if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
-						//Interface::Log("! Phantom image memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
-						//system("pause");
-						nSuspiciousObjCount++;
+					for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
+							//Interface::Log("! Phantom image memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
+							//system("pause");
+							nSuspiciousObjCount++;
+						}
 					}
 				}
 			}
@@ -356,103 +459,130 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 				}
 
 				if (PeEntity->GetPe() != nullptr) {
-					Interface::Log("[ 0x%016x:0x%08x | Image | %ws | %ws", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetPath().c_str(), PeEntity->IsSigned() ? L"Signed" : L"Unsigned");
-					//Interface::Log("File path: %ws (%ws)\r\n", ((Moneta::PE *)Itr->second)->GetFilePath().c_str(), dynamic_cast<PeVm::Body *>(Itr->second)->GetPe()->GetPeMagic() == IMAGE_NT_OPTIONAL_HDR64_MAGIC ? L"64-bit" : L"32-bit");
-					//Interface::Log("Path from PEB: %ws\r\n", PeEntity->GetPebModule().GetPath().c_str());
-
-					//
-					// Determine whether this image has a corresponding entry in the PEB, and whether or not this entry accurately reflects the mapped file it is associated with.
-					//
-
-					if (!PeEntity->GetPebModule().Exists()) { // The PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx
-						Interface::Log(" | Missing PEB module");
-						nSuspiciousObjCount++;
-						bTotalEntitySuspicion = true;
+					if (PeEntity->IsNonExecutableImage()) {
+						Interface::Log("[ 0x%016x:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetPath().c_str());
 					}
 					else {
-						if (_wcsicmp(PeEntity->GetPebModule().GetPath().c_str(), PeEntity->GetPath().c_str()) != 0) { // Since the PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx, there may be a PEB link with a base address matching this image region but with a misleading name/path
-							Interface::Log(" | Mismatching PEB module");
+						Interface::Log("[ 0x%016x:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetPath().c_str());
+						//Interface::Log("File path: %ws (%ws)\r\n", ((Moneta::PE *)Itr->second)->GetFilePath().c_str(), dynamic_cast<PeVm::Body *>(Itr->second)->GetPe()->GetPeMagic() == IMAGE_NT_OPTIONAL_HDR64_MAGIC ? L"64-bit" : L"32-bit");
+						//Interface::Log("Path from PEB: %ws\r\n", PeEntity->GetPebModule().GetPath().c_str());
+
+						if (!PeEntity->IsSigned()) {
+							Interface::Log((WORD)FOREGROUND_RED, " | Unsigned");
+						}
+						else {
+							Interface::Log(" | Signed");
+						}
+
+						//
+						// Determine whether this image has a corresponding entry in the PEB, and whether or not this entry accurately reflects the mapped file it is associated with.
+						//
+
+						if (!PeEntity->GetPebModule().Exists()) { // The PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx
+							Interface::Log((WORD)FOREGROUND_RED, " | Missing PEB module");
 							nSuspiciousObjCount++;
 							bTotalEntitySuspicion = true;
 						}
-					}
+						else {
+							if (_wcsicmp(PeEntity->GetPebModule().GetPath().c_str(), PeEntity->GetPath().c_str()) != 0) { // Since the PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx, there may be a PEB link with a base address matching this image region but with a misleading name/path
+								if (this->IsWow64()) { // This is an edge case in which in Wow64 a module may appear as C:\Windows\System32\kernel32.dll although the true path is C:\Windows\SysWOW64\kernel32.dll due to Wow64 FS redirection.
+									wchar_t ReFormattedPath[MAX_PATH + 1] = { 0 };
 
-					Interface::Log("\r\n");
+									if (ArchWow64PathExpand(PeEntity->GetPebModule().GetPath().c_str(), ReFormattedPath, MAX_PATH + 1)) {
+										//Interface::Log("* Translated %ws to %ws\r\n", PeEntity->GetPebModule().GetPath().c_str(), ReFormattedPath);
 
-					vector<PeVm::Section*> Sections = PeEntity->GetSections();
-					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
-						vector<MemoryBlock*> SBlocks = (*SectItr)->GetSBlocks();
-						wchar_t AlignedSectName[9] = { 0 };
-						char AnsiSectName[9];
-						strncpy_s(AnsiSectName, 9, (char *)(*SectItr)->GetHeader()->Name, 8);
-						wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
-						AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
-
-						for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-							bool bSuspiciousSblock = false;
-							wchar_t AlignedAttribDesc[6] = { 0 };
-							
-							AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
-
-							Interface::Log("  0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
-								Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize)
-							);
-
-							//
-							// Headers with private pages
-							//
-
-							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
-								//Interface::Log("! PE headers have private pages within %ws [%ws:%d]\r\n", PeEntity->GetPath().c_str(), this->Name.c_str(), this->Pid);
-								Interface::Log(" | Modified header");
-								bSuspiciousSblock = true;
-								nSuspiciousObjCount++;
-								//system("pause");
-							}
-
-							//
-							// Executable regions within sections that are not marked as executable on disk. For example: data is +rw on disk but has +x sblock
-							//
-
-							if (PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
-								//Interface::Log("! Sblock in section %s has executable permissions inconsistent with its file on disk at %ws [%ws:%d]\r\n",
-								//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
-								//	this->Name.c_str(), this->Pid);
-								Interface::Log(" | Inconsistent +x between disk and memory");
-								bSuspiciousSblock = true;
-								nSuspiciousObjCount++;
-								//system("pause");
-							}
-
-							//
-							// Executable regions in memory with private pages. Whether their +x is consistent with their section on disk is examined as well.
-							//
-
-							if (PageExecutable((*SbItr)->GetBasic()->Protect) && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
-								//Interface::Log("! Sblock in section %s is executable and has private pages within %ws - %ws PE on disk [%ws:%d]\r\n",
-								//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
-								//	((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? L"matches" : L"does not match",
-								//	this->Name.c_str(), this->Pid);
-								Interface::Log(" | Modified code");
-								bSuspiciousSblock = true;
-								nSuspiciousObjCount++;
-								//system("pause");
-							}
-
-							Interface::Log("\r\n");
-							vector<Thread*> Threads = (*SbItr)->GetThreads();
-
-							for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
-								Interface::Log("    Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
-								//system("pause");
-							}
-							
-							if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
-								if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
-									Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
+										if (_wcsicmp(ReFormattedPath, PeEntity->GetPath().c_str()) != 0) {
+											Interface::Log((WORD)FOREGROUND_RED, " | Mismatching PEB module");
+											nSuspiciousObjCount++;
+											bTotalEntitySuspicion = true;
+										}
+									}
 								}
 								else {
-									Interface::Log("      ~ Memory dump failed.\r\n");
+									Interface::Log((WORD)FOREGROUND_RED, " | Mismatching PEB module");
+									nSuspiciousObjCount++;
+									bTotalEntitySuspicion = true;
+								}
+							}
+						}
+
+						Interface::Log("\r\n");
+
+						vector<PeVm::Section*> Sections = PeEntity->GetSections();
+						for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
+							vector<MemoryBlock*> SBlocks = (*SectItr)->GetSBlocks();
+							wchar_t AlignedSectName[9] = { 0 };
+							char AnsiSectName[9];
+							strncpy_s(AnsiSectName, 9, (char*)(*SectItr)->GetHeader()->Name, 8);
+							wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
+							AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
+
+							for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+								bool bSuspiciousSblock = false;
+								wchar_t AlignedAttribDesc[6] = { 0 };
+
+								AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
+
+								Interface::Log("  0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
+									Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize)
+								);
+
+								//
+								// Headers with private pages
+								//
+
+								if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
+									//Interface::Log("! PE headers have private pages within %ws [%ws:%d]\r\n", PeEntity->GetPath().c_str(), this->Name.c_str(), this->Pid);
+									Interface::Log((WORD)FOREGROUND_RED, " | Modified header");
+									bSuspiciousSblock = true;
+									nSuspiciousObjCount++;
+									//system("pause");
+								}
+
+								//
+								// Executable regions within sections that are not marked as executable on disk. For example: data is +rw on disk but has +x sblock
+								//
+
+								if (PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
+									//Interface::Log("! Sblock in section %s has executable permissions inconsistent with its file on disk at %ws [%ws:%d]\r\n",
+									//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
+									//	this->Name.c_str(), this->Pid);
+									Interface::Log((WORD)FOREGROUND_RED, " | Inconsistent +x between disk and memory");
+									bSuspiciousSblock = true;
+									nSuspiciousObjCount++;
+									//system("pause");
+								}
+
+								//
+								// Executable regions in memory with private pages. Whether their +x is consistent with their section on disk is examined as well.
+								//
+
+								if (PageExecutable((*SbItr)->GetBasic()->Protect) && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
+									//Interface::Log("! Sblock in section %s is executable and has private pages within %ws - %ws PE on disk [%ws:%d]\r\n",
+									//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
+									//	((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? L"matches" : L"does not match",
+									//	this->Name.c_str(), this->Pid);
+									Interface::Log((WORD)FOREGROUND_RED, " | Modified code");
+									bSuspiciousSblock = true;
+									nSuspiciousObjCount++;
+									//system("pause");
+								}
+
+								Interface::Log("\r\n");
+								vector<Thread*> Threads = (*SbItr)->GetThreads();
+
+								for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
+									Interface::Log("    Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
+									//system("pause");
+								}
+
+								if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
+									if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
+										Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
+									}
+									else {
+										Interface::Log("      ~ Memory dump failed.\r\n");
+									}
 								}
 							}
 						}
@@ -460,7 +590,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 				}
 				else {
 					vector<MemoryBlock*> SBlocks = PeEntity->GetSBlocks();
-					Interface::Log("[ 0x%016x:0x%08x | Image | %ws [Phantom]\r\n", PeEntity->GetStartVa(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+					Interface::Log((WORD)FOREGROUND_RED, "[ 0x%016x:0x%08x | Image | %ws [Phantom]\r\n", PeEntity->GetStartVa(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
 
 					for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 						bool bSuspiciousSblock = false;
@@ -473,7 +603,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 							//Interface::Log("! Phantom image memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
-							Interface::Log(" | Phantom +x image memory");
+							Interface::Log((WORD)FOREGROUND_RED, " | Phantom +x image memory");
 							bSuspiciousSblock = true;
 							nSuspiciousObjCount++;
 							//system("pause");
@@ -514,7 +644,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					Interface::Log("  0x%p:0x%08x | %ws", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
 					if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 						//Interface::Log("! Mapped memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
-						Interface::Log(" | Abnormal executable mapped memory");
+						Interface::Log((WORD)FOREGROUND_RED, " | Abnormal executable mapped memory");
 						//system("pause");
 						bSuspiciousSblock = true;
 						nSuspiciousObjCount++;
@@ -554,7 +684,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 						Interface::Log("  0x%p:0x%08x | %ws", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
 						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 							//Interface::Log("! Private memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
-							Interface::Log(" | Abnormal executable private memory");
+							Interface::Log((WORD)FOREGROUND_RED, " | Abnormal executable private memory");
 							//system("pause");
 							bSuspiciousSblock = true;
 							nSuspiciousObjCount++;

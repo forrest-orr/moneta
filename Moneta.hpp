@@ -47,6 +47,7 @@ namespace Moneta {
 			std::vector<Section*> Sections;
 			PeFile::PeBase* Pe;
 			bool Signed;
+			bool NonExecutableImage;
 			class PebModule {
 			public:
 				uint8_t* GetBase();
@@ -64,6 +65,7 @@ namespace Moneta {
 			uint8_t* GetPeBase();
 			PeFile::PeBase* GetPe();
 			bool IsSigned();
+			bool IsNonExecutableImage();
 			std::vector<Section*> GetSections();
 			PebModule &GetPebModule();
 			Body(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath);

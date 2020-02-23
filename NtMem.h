@@ -43,6 +43,23 @@ typedef struct _MEMORY_REGION_INFORMATION
 	ULONG_PTR PartitionId; // 19H1
 } MEMORY_REGION_INFORMATION, * PMEMORY_REGION_INFORMATION;
 
+typedef struct _MEMORY_IMAGE_INFORMATION
+{
+	PVOID ImageBase;
+	SIZE_T SizeOfImage;
+	union
+	{
+		ULONG ImageFlags;
+		struct
+		{
+			ULONG ImagePartialMap : 1;
+			ULONG ImageNotExecutable : 1;
+			ULONG ImageSigningLevel : 4; // REDSTONE3
+			ULONG Reserved : 26;
+		};
+	};
+} MEMORY_IMAGE_INFORMATION, * PMEMORY_IMAGE_INFORMATION;
+
 #pragma pack(pop)
 
 typedef NTSTATUS(__stdcall* NtQueryVirtualMemory_t)(HANDLE, void *, MEMORY_INFORMATION_CLASS, void *, SIZE_T, SIZE_T *);
