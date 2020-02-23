@@ -464,20 +464,20 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					}
 					else {
 						Interface::Log("[ 0x%016x:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetPath().c_str());
-						//Interface::Log("File path: %ws (%ws)\r\n", ((Moneta::PE *)Itr->second)->GetFilePath().c_str(), dynamic_cast<PeVm::Body *>(Itr->second)->GetPe()->GetPeMagic() == IMAGE_NT_OPTIONAL_HDR64_MAGIC ? L"64-bit" : L"32-bit");
-						//Interface::Log("Path from PEB: %ws\r\n", PeEntity->GetPebModule().GetPath().c_str());
+					}
 
-						if (!PeEntity->IsSigned()) {
-							Interface::Log((WORD)FOREGROUND_RED, " | Unsigned");
-						}
-						else {
-							Interface::Log(" | Signed");
-						}
+					if (!PeEntity->IsSigned()) {
+						Interface::Log((WORD)FOREGROUND_RED, " | Unsigned");
+					}
+					else {
+						Interface::Log(" | Signed");
+					}
 
-						//
-						// Determine whether this image has a corresponding entry in the PEB, and whether or not this entry accurately reflects the mapped file it is associated with.
-						//
+					//
+					// Determine whether this image has a corresponding entry in the PEB, and whether or not this entry accurately reflects the mapped file it is associated with.
+					//
 
+					if (!PeEntity->IsNonExecutableImage()) {
 						if (!PeEntity->GetPebModule().Exists()) { // The PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx
 							Interface::Log((WORD)FOREGROUND_RED, " | Missing PEB module");
 							nSuspiciousObjCount++;
@@ -505,84 +505,87 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 								}
 							}
 						}
+					}
 
-						Interface::Log("\r\n");
+					Interface::Log("\r\n");
 
-						vector<PeVm::Section*> Sections = PeEntity->GetSections();
-						for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
-							vector<MemoryBlock*> SBlocks = (*SectItr)->GetSBlocks();
-							wchar_t AlignedSectName[9] = { 0 };
-							char AnsiSectName[9];
-							strncpy_s(AnsiSectName, 9, (char*)(*SectItr)->GetHeader()->Name, 8);
-							wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
-							AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
+					vector<PeVm::Section*> Sections = PeEntity->GetSections();
+					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
+						vector<MemoryBlock*> SBlocks = (*SectItr)->GetSBlocks();
+						wchar_t AlignedSectName[9] = { 0 };
+						char AnsiSectName[9];
+						strncpy_s(AnsiSectName, 9, (char*)(*SectItr)->GetHeader()->Name, 8);
+						wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
+						AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
 
-							for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-								bool bSuspiciousSblock = false;
-								wchar_t AlignedAttribDesc[6] = { 0 };
+						for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+							bool bSuspiciousSblock = false;
+							wchar_t AlignedAttribDesc[6] = { 0 };
 
-								AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
+							AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
-								Interface::Log("  0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
-									Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize)
-								);
+							Interface::Log("  0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
+								Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize)
+							);
 
-								//
-								// Headers with private pages
-								//
+							//
+							// Headers with private pages
+							//
 
-								if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
-									//Interface::Log("! PE headers have private pages within %ws [%ws:%d]\r\n", PeEntity->GetPath().c_str(), this->Name.c_str(), this->Pid);
-									Interface::Log((WORD)FOREGROUND_RED, " | Modified header");
-									bSuspiciousSblock = true;
-									nSuspiciousObjCount++;
-									//system("pause");
+							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
+								//Interface::Log("! PE headers have private pages within %ws [%ws:%d]\r\n", PeEntity->GetPath().c_str(), this->Name.c_str(), this->Pid);
+								Interface::Log((WORD)FOREGROUND_RED, " | Modified header");
+								bSuspiciousSblock = true;
+								nSuspiciousObjCount++;
+								//system("pause");
+							}
+
+							//
+							// Executable regions within sections that are not marked as executable on disk. For example: data is +rw on disk but has +x sblock
+							//
+
+							if (PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
+								//Interface::Log("! Sblock in section %s has executable permissions inconsistent with its file on disk at %ws [%ws:%d]\r\n",
+								//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
+								//	this->Name.c_str(), this->Pid);
+								Interface::Log((WORD)FOREGROUND_RED, " | Inconsistent +x between disk and memory");
+								bSuspiciousSblock = true;
+								nSuspiciousObjCount++;
+								//system("pause");
+							}
+
+							//
+							// Executable regions in memory with private pages. Whether their +x is consistent with their section on disk is examined as well.
+							//
+
+							if (PageExecutable((*SbItr)->GetBasic()->Protect) && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
+								//Interface::Log("! Sblock in section %s is executable and has private pages within %ws - %ws PE on disk [%ws:%d]\r\n",
+								//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
+								//	((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? L"matches" : L"does not match",
+								//	this->Name.c_str(), this->Pid);
+								Interface::Log((WORD)FOREGROUND_RED, " | Modified code");
+								bSuspiciousSblock = true;
+								nSuspiciousObjCount++;
+								//system("pause");
+							}
+
+							Interface::Log("\r\n");
+							vector<Thread*> Threads = (*SbItr)->GetThreads();
+
+							for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
+								Interface::Log("    Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
+								if (PeEntity->IsNonExecutableImage()) {
+									Interface::Log("    !! Thread in non-executable image!\r\n");
+									system("pause");
 								}
+							}
 
-								//
-								// Executable regions within sections that are not marked as executable on disk. For example: data is +rw on disk but has +x sblock
-								//
-
-								if (PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
-									//Interface::Log("! Sblock in section %s has executable permissions inconsistent with its file on disk at %ws [%ws:%d]\r\n",
-									//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
-									//	this->Name.c_str(), this->Pid);
-									Interface::Log((WORD)FOREGROUND_RED, " | Inconsistent +x between disk and memory");
-									bSuspiciousSblock = true;
-									nSuspiciousObjCount++;
-									//system("pause");
+							if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
+								if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
+									Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
 								}
-
-								//
-								// Executable regions in memory with private pages. Whether their +x is consistent with their section on disk is examined as well.
-								//
-
-								if (PageExecutable((*SbItr)->GetBasic()->Protect) && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
-									//Interface::Log("! Sblock in section %s is executable and has private pages within %ws - %ws PE on disk [%ws:%d]\r\n",
-									//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
-									//	((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? L"matches" : L"does not match",
-									//	this->Name.c_str(), this->Pid);
-									Interface::Log((WORD)FOREGROUND_RED, " | Modified code");
-									bSuspiciousSblock = true;
-									nSuspiciousObjCount++;
-									//system("pause");
-								}
-
-								Interface::Log("\r\n");
-								vector<Thread*> Threads = (*SbItr)->GetThreads();
-
-								for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
-									Interface::Log("    Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
-									//system("pause");
-								}
-
-								if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
-									if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
-										Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
-									}
-									else {
-										Interface::Log("      ~ Memory dump failed.\r\n");
-									}
+								else {
+									Interface::Log("      ~ Memory dump failed.\r\n");
 								}
 							}
 						}
