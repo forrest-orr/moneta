@@ -220,13 +220,12 @@ bool PageExecutable(uint32_t dwProtect) {
 
 void AlignName(const wchar_t* pOriginalName, wchar_t* pAlignedName, int32_t nAlignTo) { // Make generic and move to interface?
 	assert(nAlignTo >= 1);
+	assert(wcslen(pOriginalName) <= nAlignTo);
 
 	if (wcslen(pOriginalName)) {
-		if (wcslen(pOriginalName) < nAlignTo) {
-			wcsncpy_s(pAlignedName, (nAlignTo + 1), pOriginalName, nAlignTo);
-			for (int32_t nX = wcslen(pAlignedName); nX < nAlignTo; nX++) {
-				wcscat_s(pAlignedName, (nAlignTo + 1), L" ");
-			}
+		wcsncpy_s(pAlignedName, (nAlignTo + 1), pOriginalName, nAlignTo);
+		for (int32_t nX = wcslen(pAlignedName); nX < nAlignTo; nX++) {
+			wcscat_s(pAlignedName, (nAlignTo + 1), L" ");
 		}
 	}
 	else {
