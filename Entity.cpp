@@ -88,36 +88,6 @@ uint8_t* PeVm::Body::GetPeBase() {
 	return this->PeBase;
 }
 
-bool TranslateDevicePath(const wchar_t* pDevicePath, wchar_t *pTranslatedPath) {
-	wchar_t DriveLetters[MAX_PATH + 1] = { 0 };
-	bool bTranslated = false;
-
-	if (GetLogicalDriveStringsW(MAX_PATH + 1, DriveLetters))
-	{
-		wchar_t DosPath[MAX_PATH + 1];
-		wchar_t szDrive[3] = L" :";
-		wchar_t* p = DriveLetters;
-
-		do
-		{
-			*szDrive = *p;
-
-			if (QueryDosDeviceW(szDrive, DosPath, MAX_PATH + 1)) {
-				if (_wcsnicmp(pDevicePath, DosPath, wcslen(DosPath)) == 0) {
-					wcscpy_s(pTranslatedPath, MAX_PATH + 1, szDrive);
-					//wcscat_s(pTranslatedPath, MAX_PATH + 1, L"\\");
-					wcscat_s(pTranslatedPath, MAX_PATH + 1, pDevicePath + wcslen(DosPath));
-					bTranslated = true;
-				}
-			}
-
-			p++;
-		} while (!bTranslated && *p);
-	}
-
-	return bTranslated;
-}
-
 PeVm::Component::Component(std::vector<MemoryBlock*> SBlocks, uint8_t* pPeBase) : ABlock(SBlocks), PeBase(pPeBase) {}
 
 void Entity::SetSBlocks(vector<MemoryBlock*> SBlocks) {
@@ -197,7 +167,7 @@ PeVm::Body::Body(HANDLE hProcess, vector<MemoryBlock*> SBlocks, const wchar_t* p
 	}
 
 	if (!this->IsPhantom()) {
-		this->Signed = VerifyEmbeddedSignature(pFilePath);
+		this->Signed = CheckSigning(pFilePath);
 
 		if ((this->Pe = PeBase::Load(this->GetFileBaseData(), this->GetFileBaseSize())) != nullptr) {
 			//
@@ -264,7 +234,7 @@ Entity* Entity::Create(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks) {
 		wchar_t MapFilePath[MAX_PATH + 1] = { 0 };
 
 		if (GetMappedFileNameW(hProcess, (HMODULE)SBlocks.front()->GetBasic()->AllocationBase, DevFilePath, MAX_PATH)) {
-			if (!TranslateDevicePath(DevFilePath, MapFilePath)) {
+			if (!FileBase::TranslateDevicePath(DevFilePath, MapFilePath)) {
 				Interface::Log("! Failed to translate device path: %ws\r\n", DevFilePath);
 				wcscpy_s(MapFilePath, MAX_PATH + 1, L"?");
 			}

@@ -116,30 +116,35 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		}
 		//system("pause");
 
-		wchar_t ImageName[MAX_PATH + 1] = { 0 };
+		wchar_t ImageName[MAX_PATH + 1] = { 0 }, DevFilePath[MAX_PATH + 1] = { 0 };
 
-		if (GetModuleBaseNameW(this->Handle, nullptr, ImageName, MAX_PATH + 1)) {
-			//if(GetProcessImageFileNameW(Handle, ImageFilePath, sizeof(ImageFilePath))) {
-			this->Name = wstring(ImageName);
-			Interface::Log(4, "* Mapping address space of PID %d [%ws]\r\n", this->Pid, this->Name.c_str());
-			typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
-			static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
+		if (GetModuleBaseNameW(this->Handle, nullptr, ImageName, MAX_PATH + 1) && GetProcessImageFileNameW(this->Handle, DevFilePath, sizeof(DevFilePath))) {
+			wchar_t ImageFilePath[MAX_PATH + 1] = { 0 };
 
-			if (IsWow64Process != nullptr) {
-				BOOL bSelfWow64 = FALSE;
+			if (FileBase::TranslateDevicePath(DevFilePath, ImageFilePath)) {
+				//printf("Translated %ws to %ws\r\n", DevFilePath, ImageFilePath);
+				this->Name = wstring(ImageName);
+				this->ImageFilePath = wstring(ImageFilePath);
+				Interface::Log(4, "* Mapping address space of PID %d [%ws]\r\n", this->Pid, this->Name.c_str());
+				typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
+				static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
 
-				if (IsWow64Process(GetCurrentProcess(), (PBOOL)&bSelfWow64)) {
-					if (IsWow64Process(this->Handle, (PBOOL)&this->Wow64)) {
-						if (this->IsWow64()) {
-							//CloseHandle(this->Handle);
-							Interface::Log(4, "* PID %d is Wow64\r\n", this->Pid);
-							//system("pause");
-							//throw 2;
-						}
-						else {
-							if (bSelfWow64) {
-								Interface::Log(4, "* Cannot scan non-Wow64 process from Wow64 Moneta instance\r\n");
-								throw 2;
+				if (IsWow64Process != nullptr) {
+					BOOL bSelfWow64 = FALSE;
+
+					if (IsWow64Process(GetCurrentProcess(), (PBOOL)&bSelfWow64)) {
+						if (IsWow64Process(this->Handle, (PBOOL)&this->Wow64)) {
+							if (this->IsWow64()) {
+								//CloseHandle(this->Handle);
+								Interface::Log(4, "* PID %d is Wow64\r\n", this->Pid);
+								//system("pause");
+								//throw 2;
+							}
+							else {
+								if (bSelfWow64) {
+									Interface::Log(4, "* Cannot scan non-Wow64 process from Wow64 Moneta instance\r\n");
+									throw 2;
+								}
 							}
 						}
 					}
@@ -344,25 +349,9 @@ bool ArchWow64PathExpand(const wchar_t* pTargetFilePath, wchar_t* pOutputPath, s
 | Something.exe : 314 : x64
  \ 0x0000000090be0000:0x00004000 | Mapped | C:\Windows\System32\en-US\windows.ui.xaml.dll.mui
   \  0x0000019390BE0000:0x00004000 | R
-[ 0x0000000090bf0000:0x00001000 | Private
-  0x0000019390BF0000:0x00001000 | RW
-[ 0x0000000090c00000:0x00200000 | Private
-  0x0000019390C00000:0x00049000 | RW
-[ 0x00000000d7850000:0x00022000 | Executable image | C:\Windows\System32\WinMetadata\Windows.Storage.winmd | Signed | Missing PEB module
-  0x000002D5D7850000:0x00022000 | R     | Header   | 0x00000000
-  0x000002D5D7850000:0x00022000 | R     | .text    | 0x00000000
-  0x000002D5D7850000:0x00022000 | R     | .rsrc    | 0x00000000
-[ 0x00000000d7880000:0x00020000 | Private
-  0x000002D5D7880000:0x00001000 | RW
-  0x000002D5D7881000:0x00001000 | RSRV
-  0x000002D5D7882000:0x00001000 | RW
-  0x000002D5D7883000:0x00001000 | RSRV
-  0x000002D5D7884000:0x00008000 | RW
-  0x000002D5D788C000:0x00002000 | RSRV
-  0x000002D5D788E000:0x0000c000 | RW
-  0x000002D5D789A000:0x00002000 | RSRV
-  0x000002D5D789C000:0x00004000 | RW
+
 */
+
 void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 	bool bShownProc = false;
 	MemDump ProcDmp(this->Handle, this->Pid);
@@ -491,7 +480,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 			nSuspiciousObjCount = 0; // Suspicious object count must be re-calculated since it cannot be known if this entity enumeration is occuring due to verbosity level or genuine suspicion
 
 			if (!bShownProc) {
-				Interface::Log("[ %ws : %d : %ws\r\n", this->Name.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
+				Interface::Log("\r\n%ws [%ws] : %d : %ws\r\n", this->Name.c_str(), this->ImageFilePath.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
 				bShownProc = true;
 			}
 
@@ -505,10 +494,10 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 				if (PeEntity->GetPe() != nullptr) {
 					if (PeEntity->IsNonExecutableImage()) {
-						Interface::Log("[ 0x%016x:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetPath().c_str());
+						Interface::Log("  0x%016x:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetPath().c_str());
 					}
 					else {
-						Interface::Log("[ 0x%016x:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetPath().c_str());
+						Interface::Log("  0x%016x:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetPath().c_str());
 					}
 
 					if (!PeEntity->IsSigned()) {
@@ -569,7 +558,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 							AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
-							Interface::Log("  0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
+							Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
 								Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize)
 							);
 
@@ -618,7 +607,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 							vector<Thread*> Threads = (*SbItr)->GetThreads();
 
 							for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
-								Interface::Log("    Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
+								Interface::Log("      Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
 								if (PeEntity->IsNonExecutableImage()) {
 									Interface::Log("    !! Thread in non-executable image!\r\n");
 									system("pause");
@@ -638,7 +627,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 				}
 				else {
 					vector<MemoryBlock*> SBlocks = PeEntity->GetSBlocks();
-					Interface::Log((WORD)FOREGROUND_RED, "[ 0x%016x:0x%08x | Image | %ws [Phantom]\r\n", PeEntity->GetStartVa(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+					Interface::Log((WORD)FOREGROUND_RED, "  0x%016x:0x%08x | Image | %ws [Phantom]\r\n", PeEntity->GetStartVa(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
 
 					for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 						bool bSuspiciousSblock = false;
@@ -646,7 +635,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 						AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
-						Interface::Log("  0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
+						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
 							Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
 
 						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
@@ -661,7 +650,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 						vector<Thread*> Threads = (*SbItr)->GetThreads();
 
 						for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
-							Interface::Log("    Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
+							Interface::Log("      Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
 							system("pause");
 						}
 
@@ -679,7 +668,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 			else if (Itr->second->Type() == EntityType::MAPPED_FILE) {
 				vector<MemoryBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 
-				Interface::Log("[ 0x%016x:0x%08x | Mapped | %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, SBlocks.front()->GetBasic()->RegionSize, dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
+				Interface::Log("  0x%016x:0x%08x | Mapped | %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, SBlocks.front()->GetBasic()->RegionSize, dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
 				//Interface::Log("S-Blocks:\r\n");
 
 				for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
@@ -689,7 +678,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
 					//Interface::Log("  0x%p\r\n", (*SbItr)->GetBasic()->BaseAddress);
-					Interface::Log("  0x%p:0x%08x | %ws", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
+					Interface::Log("    0x%p:0x%08x | %ws", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
 					if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 						//Interface::Log("! Mapped memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 						Interface::Log((WORD)FOREGROUND_RED, " | Abnormal executable mapped memory");
@@ -702,7 +691,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					vector<Thread*> Threads = (*SbItr)->GetThreads();
 
 					for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
-						Interface::Log("    Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
+						Interface::Log("      Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
 						system("pause");
 					}
 
@@ -722,14 +711,14 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 				vector<MemoryBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 
 				if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
-					Interface::Log("[ 0x%016x:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->AllocationBase, (uint32_t)((uint8_t*)SBlocks.back()->GetBasic()->BaseAddress - SBlocks.back()->GetBasic()->AllocationBase) + SBlocks.back()->GetBasic()->RegionSize);
+					Interface::Log("  0x%016x:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->AllocationBase, (uint32_t)((uint8_t*)SBlocks.back()->GetBasic()->BaseAddress - SBlocks.back()->GetBasic()->AllocationBase) + SBlocks.back()->GetBasic()->RegionSize);
 					for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 						bool bSuspiciousSblock = false;
 						wchar_t AlignedAttribDesc[6] = { 0 };
 
 						AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
-						Interface::Log("  0x%p:0x%08x | %ws", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
+						Interface::Log("    0x%p:0x%08x | %ws", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
 						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 							//Interface::Log("! Private memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 							Interface::Log((WORD)FOREGROUND_RED, " | Abnormal executable private memory");
@@ -743,7 +732,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 						vector<Thread*> Threads = (*SbItr)->GetThreads();
 
 						for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
-							Interface::Log("    Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
+							Interface::Log("      Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
 							system("pause");
 						}
 

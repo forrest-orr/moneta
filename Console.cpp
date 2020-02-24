@@ -54,6 +54,31 @@ enum class SelectedOutputType {
 //#define DEBUG
 
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
+	/*
+	printf(
+		"| YourPhone.exe : 4760 : x64\r\n"
+		" \\ 0x0000000090bb0000:0x00001000 | Mapped | Page File\r\n"
+		"  \\  0x0000019390BB0000:0x00001000 | RW\r\n"
+		" _|\r\n"
+		" \\ 0x0000000090bc0000:0x00004000 | Mapped | C:\\Users\\Developer\\AppData\\Local\\Microsoft\\Windows\\Caches\\cversions.3.db\r\n"
+		"  \\  0x0000019390BC0000:0x00004000 | R\r\n"
+		" _|\r\n"
+		" \\ 0x0000000090bd0000:0x0000d000 | Non-executable image | C:\\Windows\\System32\\Windows.UI.Xaml.Resources.Common.dll | Signed\r\n"
+		"  \\  0x0000019390BD0000:0x0000d000 | R     | Header   | 0x00000000\r\n"
+		"  |  0x0000019390BD0000:0x0000d000 | R     | .rdata   | 0x00000000\r\n"
+		"  |  0x0000019390BD0000:0x0000d000 | R     | .rsrc    | 0x00000000\r\n"
+		" _|  \r\n"
+		" \\ 0x0000000061a20000:0x0023a000 | Executable image | C:\\Windows\\SysWOW64\\msmpeg2vdec.dll | Signed\r\n"
+		"  \\  0x0000000061A20000:0x00001000 | R     | Header   | 0x00000000\r\n"
+		"  |  0x0000000061A21000:0x00215000 | RX    | .text    | 0x00003000 | Modified code\r\n"
+		"  |  0x0000000061C36000:0x00001000 | RW    | .data    | 0x00001000\r\n"
+		"  |  0x0000000061C37000:0x00002000 | WC    | .data    | 0x00000000\r\n"
+		"  |  0x0000000061C39000:0x00004000 | RW    | .data    | 0x00004000\r\n"
+		"  |  0x0000000061C43000:0x00017000 | R     | .idata   | 0x00002000\r\n"
+		"  |  0x0000000061C43000:0x00017000 | R     | .didat   | 0x00002000\r\n"
+		"  |  0x0000000061C43000:0x00017000 | R     | .rsrc    | 0x00002000\r\n"
+		"  |  0x0000000061C43000:0x00017000 | R     | .reloc   | 0x00002000\r\n"
+	);*/
 	vector<wstring> Args(&pArgv[0], &pArgv[0 + nArgc]);
 	Interface::Initialize(Args);
 	SYSTEM_INFO SystemInfo = { 0 };

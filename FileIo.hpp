@@ -14,4 +14,5 @@ public:
 	bool ToDisk(bool bAppend = false);
 	std::wstring GetPath();
 	bool IsPhantom();
+	static bool TranslateDevicePath(const wchar_t* pDevicePath, wchar_t* pTranslatedPath);
 };

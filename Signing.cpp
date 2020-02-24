@@ -2,10 +2,13 @@
 #include <stdlib.h>
 #include <windows.h>
 #include <Softpub.h>
+#include <stdint.h>
+#include <mscat.h>
 #include <wincrypt.h>
 #include <wintrust.h>
 
 #pragma comment (lib, "Wintrust.lib")
+#pragma comment (lib, "Crypt32.lib")
 
 bool VerifyEmbeddedSignature(LPCWSTR pwszSourceFile) {
     LONG lStatus;
@@ -162,4 +165,116 @@ bool VerifyEmbeddedSignature(LPCWSTR pwszSourceFile) {
         &WinTrustData);
 
     return bSigned;
+}
+
+wchar_t* GetWindowsPECatalogIssuer(const wchar_t* pTargetFilePath)
+{
+    uint32_t dwEncoding = 0, dwContentType = 0, dwFormatType = 0, dwHashSize = 0, dwSignerInfoSize, dwCertNameLength;
+    HCERTSTORE hCertStore = NULL;
+    HCRYPTMSG hMsg = NULL;
+    HCATADMIN hCatalogContext = NULL;
+    HCATINFO hTargetCatalog = NULL;
+    CATALOG_INFO CatalogInfo = { 0 };
+    wchar_t* pCerificateIssuer = NULL;
+    HANDLE hFile;
+    PCMSG_SIGNER_INFO pSignerInfo;
+    PCCERT_CONTEXT pCertContext = NULL;
+    CERT_INFO CertInfo;
+
+    CatalogInfo.cbStruct = sizeof(CATALOG_INFO);
+
+    if (CryptCATAdminAcquireContext(&hCatalogContext, NULL, 0))
+    {
+        if ((hFile = CreateFileW(pTargetFilePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE)
+        {
+            if (CryptCATAdminCalcHashFromFileHandle(hFile, (PDWORD)&dwHashSize, NULL, 0) && dwHashSize != 0)
+            {
+                uint8_t* pHashBuffer = new uint8_t[dwHashSize];
+
+                if (CryptCATAdminCalcHashFromFileHandle(hFile, (PDWORD)&dwHashSize, pHashBuffer, 0))
+                {
+                    if ((hTargetCatalog = CryptCATAdminEnumCatalogFromHash(hCatalogContext, pHashBuffer, dwHashSize, 0, NULL)) != NULL)
+                    {
+                        if (CryptCATCatalogInfoFromContext(hTargetCatalog, &CatalogInfo, 0))
+                        {
+                           // printf("[*] Path from catalog info is %ws\r\n", CatalogInfo.wszCatalogFile);
+
+                            if (CryptQueryObject(CERT_QUERY_OBJECT_FILE, CatalogInfo.wszCatalogFile, CERT_QUERY_CONTENT_FLAG_PKCS7_SIGNED_EMBED, CERT_QUERY_FORMAT_FLAG_BINARY, 0, (PDWORD)&dwEncoding, (PDWORD)&dwContentType, (PDWORD)&dwFormatType, &hCertStore, &hMsg, NULL))
+                            {
+                                if (CryptMsgGetParam(hMsg, CMSG_SIGNER_INFO_PARAM, 0, NULL, (PDWORD)&dwSignerInfoSize) && dwSignerInfoSize)
+                                {
+                                    pSignerInfo = (PCMSG_SIGNER_INFO)new uint8_t[dwSignerInfoSize];
+
+                                    if (CryptMsgGetParam(hMsg, CMSG_SIGNER_INFO_PARAM, 0, (void*)pSignerInfo, (PDWORD)&dwSignerInfoSize))
+                                    {
+                                        CertInfo.Issuer = pSignerInfo->Issuer;
+                                        CertInfo.SerialNumber = pSignerInfo->SerialNumber;
+
+                                        if ((pCertContext = CertFindCertificateInStore(hCertStore, (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING), 0, CERT_FIND_SUBJECT_CERT, (void*)&CertInfo, NULL)) != NULL)
+                                        {
+                                            if ((dwCertNameLength = CertGetNameStringW(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, CERT_NAME_ISSUER_FLAG, NULL, NULL, 0)))
+                                            {
+                                                pCerificateIssuer = (wchar_t*)new uint8_t[((dwCertNameLength + 1) * sizeof(wchar_t))]; // Documentation says the length returned is in characters not bytes.
+
+                                                if (!CertGetNameStringW(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, CERT_NAME_ISSUER_FLAG, NULL, pCerificateIssuer, dwCertNameLength))
+                                                {
+                                                    delete pCerificateIssuer;
+
+                                                    pCerificateIssuer = NULL;
+                                                }
+                                                else
+                                                {
+                                                   // printf("[*] The cert issuer name is \"%ws\"\r\n", pCerificateIssuer);
+                                                }
+                                            }
+
+                                            CertFreeCertificateContext(pCertContext);
+                                        }
+                                    }
+
+                                    delete pSignerInfo;
+                                }
+
+                                CryptMsgClose(hMsg);
+                                CertCloseStore(hCertStore, CERT_CLOSE_STORE_CHECK_FLAG);
+                            }
+                        }
+
+                        CryptCATAdminReleaseCatalogContext(hCatalogContext, hTargetCatalog, 0);
+                    }
+                }
+
+                delete pHashBuffer;
+            }
+
+            CloseHandle(hFile);
+        }
+
+        CryptCATAdminReleaseContext(hCatalogContext, 0);
+    }
+
+    return pCerificateIssuer;
+}
+
+BOOL IsCatalogSigned(const wchar_t* pTargetFilePath)
+{
+    wchar_t* pCerificateIssuer;
+    BOOL bIsSigned = FALSE;
+
+    if ((pCerificateIssuer = GetWindowsPECatalogIssuer(pTargetFilePath)) != NULL)
+    {
+        bIsSigned = TRUE;
+        delete pCerificateIssuer;
+    }
+
+    return bIsSigned;
+}
+
+bool CheckSigning(const wchar_t* pTargetFilePath) {
+    if (!VerifyEmbeddedSignature(pTargetFilePath)) {
+        return IsCatalogSigned(pTargetFilePath);
+    }
+    else {
+        return true;
+    }
 }

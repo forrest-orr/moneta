@@ -72,3 +72,33 @@ FileBase::~FileBase() {
 bool FileBase::IsPhantom() {
 	return this->Phantom;
 }
+
+bool FileBase::TranslateDevicePath(const wchar_t* pDevicePath, wchar_t* pTranslatedPath) {
+	wchar_t DriveLetters[MAX_PATH + 1] = { 0 };
+	bool bTranslated = false;
+
+	if (GetLogicalDriveStringsW(MAX_PATH + 1, DriveLetters))
+	{
+		wchar_t DosPath[MAX_PATH + 1];
+		wchar_t szDrive[3] = L" :";
+		wchar_t* p = DriveLetters;
+
+		do
+		{
+			*szDrive = *p;
+
+			if (QueryDosDeviceW(szDrive, DosPath, MAX_PATH + 1)) {
+				if (_wcsnicmp(pDevicePath, DosPath, wcslen(DosPath)) == 0) {
+					wcscpy_s(pTranslatedPath, MAX_PATH + 1, szDrive);
+					//wcscat_s(pTranslatedPath, MAX_PATH + 1, L"\\");
+					wcscat_s(pTranslatedPath, MAX_PATH + 1, pDevicePath + wcslen(DosPath));
+					bTranslated = true;
+				}
+			}
+
+			p++;
+		} while (!bTranslated && *p);
+	}
+
+	return bTranslated;
+}

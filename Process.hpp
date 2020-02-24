@@ -16,6 +16,7 @@ namespace Moneta {
 		uint32_t Pid;
 		HANDLE Handle;
 		std::wstring Name;
+		std::wstring ImageFilePath;
 		BOOL Wow64; // bool and BOOL translate to different sizes, IsWow64Process pointed at a bool will corrupt memory.
 		std::vector<Thread *> Threads;
 		std::map<uint8_t*, Entity*> Entities; // An ablock can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
