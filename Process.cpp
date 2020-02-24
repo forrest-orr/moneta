@@ -317,7 +317,52 @@ bool ArchWow64PathExpand(const wchar_t* pTargetFilePath, wchar_t* pOutputPath, s
 	return bExpandedPath;
 }
 
+/*
+| YourPhone.exe : 4760 : x64
+ \ 0x0000000090bb0000:0x00001000 | Mapped | Page File
+  \  0x0000019390BB0000:0x00001000 | RW
+ _|
+ \ 0x0000000090bc0000:0x00004000 | Mapped | C:\Users\Developer\AppData\Local\Microsoft\Windows\Caches\cversions.3.db
+  \  0x0000019390BC0000:0x00004000 | R
+ _|
+ \ 0x0000000090bd0000:0x0000d000 | Non-executable image | C:\Windows\System32\Windows.UI.Xaml.Resources.Common.dll | Signed
+  \  0x0000019390BD0000:0x0000d000 | R     | Header   | 0x00000000
+  |  0x0000019390BD0000:0x0000d000 | R     | .rdata   | 0x00000000
+  |  0x0000019390BD0000:0x0000d000 | R     | .rsrc    | 0x00000000
+ _|  
+ \ 0x0000000061a20000:0x0023a000 | Executable image | C:\Windows\SysWOW64\msmpeg2vdec.dll | Signed
+  \  0x0000000061A20000:0x00001000 | R     | Header   | 0x00000000
+  |  0x0000000061A21000:0x00215000 | RX    | .text    | 0x00003000 | Modified code
+  |  0x0000000061C36000:0x00001000 | RW    | .data    | 0x00001000
+  |  0x0000000061C37000:0x00002000 | WC    | .data    | 0x00000000
+  |  0x0000000061C39000:0x00004000 | RW    | .data    | 0x00004000
+  |  0x0000000061C43000:0x00017000 | R     | .idata   | 0x00002000
+  |  0x0000000061C43000:0x00017000 | R     | .didat   | 0x00002000
+  |  0x0000000061C43000:0x00017000 | R     | .rsrc    | 0x00002000
+  |  0x0000000061C43000:0x00017000 | R     | .reloc   | 0x00002000
 
+| Something.exe : 314 : x64
+ \ 0x0000000090be0000:0x00004000 | Mapped | C:\Windows\System32\en-US\windows.ui.xaml.dll.mui
+  \  0x0000019390BE0000:0x00004000 | R
+[ 0x0000000090bf0000:0x00001000 | Private
+  0x0000019390BF0000:0x00001000 | RW
+[ 0x0000000090c00000:0x00200000 | Private
+  0x0000019390C00000:0x00049000 | RW
+[ 0x00000000d7850000:0x00022000 | Executable image | C:\Windows\System32\WinMetadata\Windows.Storage.winmd | Signed | Missing PEB module
+  0x000002D5D7850000:0x00022000 | R     | Header   | 0x00000000
+  0x000002D5D7850000:0x00022000 | R     | .text    | 0x00000000
+  0x000002D5D7850000:0x00022000 | R     | .rsrc    | 0x00000000
+[ 0x00000000d7880000:0x00020000 | Private
+  0x000002D5D7880000:0x00001000 | RW
+  0x000002D5D7881000:0x00001000 | RSRV
+  0x000002D5D7882000:0x00001000 | RW
+  0x000002D5D7883000:0x00001000 | RSRV
+  0x000002D5D7884000:0x00008000 | RW
+  0x000002D5D788C000:0x00002000 | RSRV
+  0x000002D5D788E000:0x0000c000 | RW
+  0x000002D5D789A000:0x00002000 | RSRV
+  0x000002D5D789C000:0x00004000 | RW
+*/
 void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 	bool bShownProc = false;
 	MemDump ProcDmp(this->Handle, this->Pid);

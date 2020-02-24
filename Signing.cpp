@@ -10,6 +10,7 @@
 bool VerifyEmbeddedSignature(LPCWSTR pwszSourceFile) {
     LONG lStatus;
     DWORD dwLastError;
+    bool bSigned = false;
 
     // Initialize the WINTRUST_FILE_INFO structure.
 
@@ -104,6 +105,7 @@ bool VerifyEmbeddedSignature(LPCWSTR pwszSourceFile) {
                 "Yes" when asked to install and run the signed
                 subject.
         */
+        bSigned = true;
         break;
 
     case TRUST_E_NOSIGNATURE:
@@ -159,5 +161,5 @@ bool VerifyEmbeddedSignature(LPCWSTR pwszSourceFile) {
         &WVTPolicyGUID,
         &WinTrustData);
 
-    return true;
+    return bSigned;
 }
