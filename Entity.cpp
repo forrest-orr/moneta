@@ -42,7 +42,7 @@ using namespace Moneta;
 
 Entity::~Entity() {
 	//Interface::Log("Entity destructor\r\n");
-	for (vector<MemoryBlock*>::const_iterator Itr = this->SBlocks.begin(); Itr != this->SBlocks.end(); ++Itr) {
+	for (vector<SBlock*>::const_iterator Itr = this->SBlocks.begin(); Itr != this->SBlocks.end(); ++Itr) {
 		//if(!(*Itr)) Interface::Log("null itr\r\n");
 		delete * Itr;
 	}
@@ -88,25 +88,25 @@ uint8_t* PeVm::Body::GetPeBase() {
 	return this->PeBase;
 }
 
-PeVm::Component::Component(std::vector<MemoryBlock*> SBlocks, uint8_t* pPeBase) : ABlock(SBlocks), PeBase(pPeBase) {}
+PeVm::Component::Component(std::vector<SBlock*> SBlocks, uint8_t* pPeBase) : ABlock(SBlocks), PeBase(pPeBase) {}
 
-void Entity::SetSBlocks(vector<MemoryBlock*> SBlocks) {
+void Entity::SetSBlocks(vector<SBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
 	this->StartVa = (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress;
 	this->EndVa = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize);
 	this->EntitySize = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize) - (SBlocks.front())->GetBasic()->AllocationBase;
 }
 
-ABlock::ABlock(vector<MemoryBlock*> SBlocks) {
+ABlock::ABlock(vector<SBlock*> SBlocks) {
 	SetSBlocks(SBlocks);
 }
 
-PeVm::Section::Section(vector<MemoryBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase) : ABlock(SBlocks), PeVm::Component(SBlocks, pPeBase) {
+PeVm::Section::Section(vector<SBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase) : ABlock(SBlocks), PeVm::Component(SBlocks, pPeBase) {
 	memcpy(&this->Hdr, pHdr, sizeof(IMAGE_SECTION_HEADER));
 	this->EntitySize = this->Hdr.SizeOfRawData == 0 ? this->Hdr.Misc.VirtualSize : this->Hdr.SizeOfRawData; // Overwrite default size determined by sblocks. Verified correct order.
 }
 
-MappedFile::MappedFile(vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore) : ABlock(SBlocks), FileBase(pFilePath, bMemStore, false) {}
+MappedFile::MappedFile(vector<SBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore) : ABlock(SBlocks), FileBase(pFilePath, bMemStore, false) {}
 
 bool PeVm::Body::PebModule::Exists() {
 	return (this->Missing ? false : true);
@@ -153,7 +153,7 @@ bool PeVm::Body::IsNonExecutableImage() {
 	return this->NonExecutableImage;
 }
 
-PeVm::Body::Body(HANDLE hProcess, vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath) : ABlock(SBlocks), PeVm::Component(SBlocks, (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress), MappedFile(SBlocks, pFilePath, true), PebMod(hProcess, this->PeBase) {
+PeVm::Body::Body(HANDLE hProcess, vector<SBlock*> SBlocks, const wchar_t* pFilePath) : ABlock(SBlocks), PeVm::Component(SBlocks, (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress), MappedFile(SBlocks, pFilePath, true), PebMod(hProcess, this->PeBase) {
 	static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory");
 	MEMORY_IMAGE_INFORMATION Mii = { 0 };
 	NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, this->PeBase, MemoryImageInformation, &Mii, sizeof(MEMORY_IMAGE_INFORMATION), nullptr);
@@ -196,9 +196,9 @@ PeVm::Body::Body(HANDLE hProcess, vector<MemoryBlock*> SBlocks, const wchar_t* p
 				// Calculate the sblocks overlapping between this PE entity and the current section.
 				//
 
-				vector<MemoryBlock*> OverlapSBlock;
+				vector<SBlock*> OverlapSBlock;
 
-				for (vector<MemoryBlock*>::const_iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+				for (vector<SBlock*>::const_iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 					uint8_t* pSBlockStartVa = (uint8_t*)(*SbItr)->GetBasic()->BaseAddress;
 					uint8_t* pSBlockEndVa = (uint8_t*)(*SbItr)->GetBasic()->BaseAddress + (*SbItr)->GetBasic()->RegionSize;
 
@@ -206,7 +206,7 @@ PeVm::Body::Body(HANDLE hProcess, vector<MemoryBlock*> SBlocks, const wchar_t* p
 						//Interface::Log("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, pSectStartVa, pSectEndVa, pSBlockStartVa, pSBlockEndVa);
 						MEMORY_BASIC_INFORMATION* pMbi = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
 						memcpy(pMbi, (*SbItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
-						OverlapSBlock.push_back(new MemoryBlock(pMbi, nullptr, (*SbItr)->GetThreads()));
+						OverlapSBlock.push_back(new SBlock(pMbi, nullptr, (*SbItr)->GetThreads()));
 					}
 				}
 
@@ -226,7 +226,7 @@ Given a set of sblocks with a common allocation base, determine what type of ent
 
 */
 
-Entity* Entity::Create(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks) {
+Entity* Entity::Create(HANDLE hProcess, std::vector<SBlock*> SBlocks) {
 	Entity* pNewEntity = nullptr;
 
 	if (SBlocks.front()->GetBasic()->Type == MEM_MAPPED || SBlocks.front()->GetBasic()->Type == MEM_IMAGE) {
@@ -263,18 +263,18 @@ Entity* Entity::Create(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks) {
 	return pNewEntity;
 }
 
-vector<MemoryBlock*> Entity::GetSBlocks() {
+vector<SBlock*> Entity::GetSBlocks() {
 	return this->SBlocks;
 }
 
 bool Entity::Dump(MemDump & ProcDmp, Entity& Target) {
-	vector<MemoryBlock*> SBlocks = Target.GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
+	vector<SBlock*> SBlocks = Target.GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 	wchar_t DumpFolder[MAX_PATH + 1] = { 0 };
 	int32_t nDumpCount = 0;
 
-	swprintf_s(DumpFolder, MAX_PATH + 1, L"%d_%p_%ws", ProcDmp.GetPid(), Target.GetStartVa(), MemoryBlock::TypeSymbol(SBlocks.front()->GetBasic()->Type));
+	swprintf_s(DumpFolder, MAX_PATH + 1, L"%d_%p_%ws", ProcDmp.GetPid(), Target.GetStartVa(), SBlock::TypeSymbol(SBlocks.front()->GetBasic()->Type));
 
-	for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+	for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 		if ((*SbItr)->GetBasic()->State == MEM_COMMIT) {
 			wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
 			if (ProcDmp.Create(DumpFolder, (*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {

@@ -1,42 +1,42 @@
-typedef class MemoryBlock;
+typedef class SBlock;
 typedef class MemDump;
 
 namespace Moneta {
-	enum class EntityType{UNKNOWN, PE_FILE, MAPPED_FILE, PE_SECTION};
 	class Entity {
 	protected:
-		std::vector<MemoryBlock*> SBlocks;
+		std::vector<SBlock*> SBlocks;
 		uint8_t* StartVa, * EndVa;
 		uint32_t EntitySize;
 	public:
-		std::vector<MemoryBlock*> GetSBlocks();
+		enum Type { UNKNOWN, PE_FILE, MAPPED_FILE, PE_SECTION };
+		std::vector<SBlock*> GetSBlocks();
 		uint8_t* GetStartVa();
 		uint8_t* GetEndVa();
 		uint32_t GetEntitySize();
-		static Entity* Create(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks); // Factory method for derived PE images, mapped files, unknown memory ranges.
+		static Entity* Create(HANDLE hProcess, std::vector<SBlock*> SBlocks); // Factory method for derived PE images, mapped files, unknown memory ranges.
 		static bool Dump(MemDump& ProcDmp, Entity& Target);
-		void SetSBlocks(std::vector<MemoryBlock*>);
+		void SetSBlocks(std::vector<SBlock*>);
 		~Entity();
-		virtual EntityType Type() = 0;
+		virtual Entity::Type GetType() = 0;
 	};
 
 	class ABlock : public Entity { // This is essential, since a parameterized constructor of the base entity class is impossible (since it is an abstract base class with a deferred method). new Entity() is impossible for this reason: only derived classes can be initialized.
 	public:
-		ABlock(std::vector<MemoryBlock*> SBlocks);
-		EntityType Type() { return EntityType::UNKNOWN; }
+		ABlock(std::vector<SBlock*> SBlocks);
+		Entity::Type GetType() { return Entity::Type::UNKNOWN; }
 	};
 
 	class MappedFile : public FileBase, virtual public ABlock { // Virtual inheritance from entity prevents classes derived from multiple classes derived from entity from having ambiguous/conflicting content.
 	public:
-		MappedFile(std::vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore = false);
-		EntityType Type() { return EntityType::MAPPED_FILE; }
+		MappedFile(std::vector<SBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore = false);
+		Entity::Type GetType() { return Entity::Type::MAPPED_FILE; }
 	};
 
 	namespace PeVm {
 		class Component : virtual public ABlock {
 		public:
 			uint8_t* GetPeBase();
-			Component(std::vector<MemoryBlock*> SBlocks, uint8_t* pPeBase);
+			Component(std::vector<SBlock*> SBlocks, uint8_t* pPeBase);
 		protected:
 			uint8_t* PeBase;
 		};
@@ -61,22 +61,22 @@ namespace Moneta {
 				bool Missing;
 			} PebMod;
 		public:
-			EntityType Type() { return EntityType::PE_FILE; }
+			Entity::Type GetType() { return Entity::Type::PE_FILE; }
 			uint8_t* GetPeBase();
 			PeFile::PeBase* GetPe();
 			bool IsSigned();
 			bool IsNonExecutableImage();
 			std::vector<Section*> GetSections();
 			PebModule &GetPebModule();
-			Body(HANDLE hProcess, std::vector<MemoryBlock*> SBlocks, const wchar_t* pFilePath);
+			Body(HANDLE hProcess, std::vector<SBlock*> SBlocks, const wchar_t* pFilePath);
 			~Body();
 		};
 
 		class Section : public Component {
 		public:
-			Section(std::vector<MemoryBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase);
+			Section(std::vector<SBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase);
 			IMAGE_SECTION_HEADER* GetHeader();
-			EntityType Type() { return EntityType::PE_SECTION; }
+			Entity::Type GetType() { return Entity::Type::PE_SECTION; }
 		protected:
 			IMAGE_SECTION_HEADER Hdr;
 		};

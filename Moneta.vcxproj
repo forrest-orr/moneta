@@ -150,6 +150,7 @@
     <ClInclude Include="Process.hpp" />
     <ClInclude Include="Signing.hpp" />
     <ClInclude Include="StdAfx.h" />
+    <ClInclude Include="Suspicions.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Moneta.rc" />

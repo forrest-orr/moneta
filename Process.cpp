@@ -35,10 +35,10 @@ Process::~Process() {
 	}
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-		if (Itr->second->Type() == EntityType::PE_FILE) {
+		if (Itr->second->GetType() == Entity::Type::PE_FILE) {
 			delete dynamic_cast<PeVm::Body*>(Itr->second); // This will call the destructors for PE, mapped file and entity all to be called in inheritted order.
 		}
-		else if (Itr->second->Type() == EntityType::MAPPED_FILE) {
+		else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
 			delete dynamic_cast<MappedFile*>(Itr->second);
 		}
 		else {
@@ -155,8 +155,8 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		Interface::Log(4, "* Scanning sblocks...\r\n");
 		//system("pause");
 		SIZE_T cbRegionSize = 0;
-		vector<MemoryBlock*> SBlocks;
-		vector<MemoryBlock*>::iterator ABlock;
+		vector<SBlock*> SBlocks;
+		vector<SBlock*>::iterator ABlock;
 		//Entity* CurrentEntity = nullptr;
 
 		//Loop memory, building list of SBlocks. Once a block is found which does not match the "current" allocation base, create a new entity containing the corresponding sblock list, and insert it into the address space entities map using the ablock as the key.
@@ -185,7 +185,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				}
 
 				Interface::Log(5, "Adding mew sblock to list\r\n");
-				SBlocks.push_back(new MemoryBlock((MEMORY_BASIC_INFORMATION*)pMbi, nullptr, this->Threads));
+				SBlocks.push_back(new SBlock((MEMORY_BASIC_INFORMATION*)pMbi, nullptr, this->Threads));
 				ABlock = SBlocks.begin(); // This DOES fix a bug.
 			}
 			else {
@@ -364,7 +364,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		int32_t nSuspiciousObjCount = 0;
 
-		if (Itr->second->Type() == EntityType::PE_FILE) {
+		if (Itr->second->GetType() == Entity::Type::PE_FILE) {
 			PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
 			if (!PeEntity->IsNonExecutableImage()) {
@@ -395,9 +395,9 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 					vector<PeVm::Section*> Sections = PeEntity->GetSections();
 					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
-						vector<MemoryBlock*> SBlocks = (*SectItr)->GetSBlocks();
+						vector<SBlock*> SBlocks = (*SectItr)->GetSBlocks();
 
-						for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+						for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 							//
 							// Headers with private pages
 							//
@@ -431,9 +431,9 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					}
 				}
 				else {
-					vector<MemoryBlock*> SBlocks = PeEntity->GetSBlocks();
+					vector<SBlock*> SBlocks = PeEntity->GetSBlocks();
 
-					for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+					for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 							//Interface::Log("! Phantom image memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 							//system("pause");
@@ -443,9 +443,9 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 				}
 			}
 		}
-		else if (Itr->second->Type() == EntityType::MAPPED_FILE) {
-			vector<MemoryBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
-			for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+		else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
+			vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
+			for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 				if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 					//Interface::Log("! Mapped memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 					//system("pause");
@@ -456,10 +456,10 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 		else {
 			//Interface::Log("S-Blocks:\r\n");
 
-			vector<MemoryBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
+			vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 
 			if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
-				for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+				for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 					if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
 						//Interface::Log("! Private memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 						//system("pause");
@@ -483,7 +483,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 				bShownProc = true;
 			}
 
-			if (Itr->second->Type() == EntityType::PE_FILE) {
+			if (Itr->second->GetType() == Entity::Type::PE_FILE) {
 				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
 				if (!PeEntity->IsSigned()) {
@@ -544,18 +544,18 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 					vector<PeVm::Section*> Sections = PeEntity->GetSections();
 					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
-						vector<MemoryBlock*> SBlocks = (*SectItr)->GetSBlocks();
+						vector<SBlock*> SBlocks = (*SectItr)->GetSBlocks();
 						wchar_t AlignedSectName[9] = { 0 };
 						char AnsiSectName[9];
 						strncpy_s(AnsiSectName, 9, (char*)(*SectItr)->GetHeader()->Name, 8);
 						wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
 						AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
 
-						for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+						for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 							bool bSuspiciousSblock = false;
 							wchar_t AlignedAttribDesc[6] = { 0 };
 
-							AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
+							AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
 							Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
 								Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize)
@@ -625,14 +625,14 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					}
 				}
 				else {
-					vector<MemoryBlock*> SBlocks = PeEntity->GetSBlocks();
+					vector<SBlock*> SBlocks = PeEntity->GetSBlocks();
 					Interface::Log((WORD)FOREGROUND_RED, "  0x%016x:0x%08x | Image | %ws [Phantom]\r\n", PeEntity->GetStartVa(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
 
-					for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+					for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 						bool bSuspiciousSblock = false;
 						wchar_t AlignedAttribDesc[6] = { 0 };
 
-						AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
+						AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
 						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
 							Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
@@ -664,17 +664,17 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					}
 				}
 			}
-			else if (Itr->second->Type() == EntityType::MAPPED_FILE) {
-				vector<MemoryBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
+			else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
+				vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 
 				Interface::Log("  0x%016x:0x%08x | Mapped | %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, SBlocks.front()->GetBasic()->RegionSize, dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
 				//Interface::Log("S-Blocks:\r\n");
 
-				for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+				for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 					bool bSuspiciousSblock = false;
 					wchar_t AlignedAttribDesc[6] = { 0 };
 
-					AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
+					AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
 					//Interface::Log("  0x%p\r\n", (*SbItr)->GetBasic()->BaseAddress);
 					Interface::Log("    0x%p:0x%08x | %ws", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
@@ -707,15 +707,15 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 			else {
 				//Interface::Log("S-Blocks:\r\n");
 
-				vector<MemoryBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
+				vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 
 				if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
 					Interface::Log("  0x%016x:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->AllocationBase, (uint32_t)((uint8_t*)SBlocks.back()->GetBasic()->BaseAddress - SBlocks.back()->GetBasic()->AllocationBase) + SBlocks.back()->GetBasic()->RegionSize);
-					for (vector<MemoryBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+					for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 						bool bSuspiciousSblock = false;
 						wchar_t AlignedAttribDesc[6] = { 0 };
 
-						AlignName(MemoryBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
+						AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
 						Interface::Log("    0x%p:0x%08x | %ws", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
 						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
@@ -771,7 +771,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 	/*
 	bool bFileRange = false, bImageRange = false;
 
-	for (list<MemoryBlock*>::const_iterator RecordItr = this->SBlocks.begin(); RecordItr != this->SBlocks.end(); ++RecordItr) {
+	for (list<SBlock*>::const_iterator RecordItr = this->SBlocks.begin(); RecordItr != this->SBlocks.end(); ++RecordItr) {
 		uint32_t dwPrivateSize = 0;
 
 		if ((*RecordItr)->GetBasic()->Type == MEM_MAPPED || (*RecordItr)->GetBasic()->Type == MEM_IMAGE) {

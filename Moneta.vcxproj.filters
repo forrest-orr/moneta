@@ -83,6 +83,9 @@
     <ClInclude Include="Signing.hpp">
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
+    <ClInclude Include="Suspicions.hpp">
+      <Filter>Header Files\Classes</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Moneta.rc">

@@ -169,7 +169,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 
 		if (ProcType == SelectedProcessType::SelfPid || ProcType == SelectedProcessType::SpecificPid) {
 			Process TargetProc(dwSelectedPid);
-			//list<MemoryBlock*> ProcessMem = QueryProcessMem(dwSelectedPid);
+			//list<SBlock*> ProcessMem = QueryProcessMem(dwSelectedPid);
 
 			if (OutputType == SelectedOutputType::Raw) {
 				TargetProc.Enumerate(qwMemdmpOptFlags);
@@ -210,7 +210,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 						}
 						/*
 						else if (OutputType == SelectedOutputType::Statistics) {
-							list<MemoryBlock*> ProcessMem = QueryProcessMem(ProcEntry.th32ProcessID);
+							list<SBlock*> ProcessMem = QueryProcessMem(ProcEntry.th32ProcessID);
 							if (MemPermRec == nullptr) {
 								MemPermRec = new MemoryPermissionRecord(ProcessMem);
 							}

@@ -10,7 +10,7 @@ using namespace std;
 using namespace PeFile;
 using namespace Moneta;
 
-MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo, vector<Thread *> Threads1) : Basic(pMemBasicInfo), Region(pMemRegionInfo) {
+SBlock::SBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo, vector<Thread *> Threads1) : Basic(pMemBasicInfo), Region(pMemRegionInfo) {
 	// Detect overlapping threads
 	for (vector<Thread *>::const_iterator ThItr = Threads1.begin(); ThItr != Threads1.end(); ++ThItr) {
 		if ((*ThItr)->GetEntryPoint() >= this->Basic->BaseAddress && (*ThItr)->GetEntryPoint() < ((uint8_t *)this->Basic->BaseAddress + this->Basic->RegionSize)) {
@@ -20,7 +20,7 @@ MemoryBlock::MemoryBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_
 	}
 }
 
-MemoryBlock::~MemoryBlock() {
+SBlock::~SBlock() {
 	//Interface::Log("mem destructor\r\n");
 	if (this->Basic != nullptr) {
 		delete Basic;
@@ -37,19 +37,19 @@ MemoryBlock::~MemoryBlock() {
 	//Interface::Log("mem destructor2\r\n");
 }
 
-std::vector<Thread*> MemoryBlock::GetThreads() {
+std::vector<Thread*> SBlock::GetThreads() {
 	return this->Threads;
 }
 
-MEMORY_BASIC_INFORMATION* MemoryBlock::GetBasic() {
+MEMORY_BASIC_INFORMATION* SBlock::GetBasic() {
 	return Basic;
 }
 
-MEMORY_REGION_INFORMATION* MemoryBlock::GetRegion() {
+MEMORY_REGION_INFORMATION* SBlock::GetRegion() {
 	return Region;
 }
 
-const wchar_t* MemoryBlock::ProtectSymbol(uint32_t dwProtect) {
+const wchar_t* SBlock::ProtectSymbol(uint32_t dwProtect) {
 	switch (dwProtect) {
 	case PAGE_READONLY:
 		return L"R";
@@ -77,7 +77,7 @@ const wchar_t* MemoryBlock::ProtectSymbol(uint32_t dwProtect) {
 	}
 }
 
-const wchar_t* MemoryBlock::AttribDesc(MEMORY_BASIC_INFORMATION *pMbi) {
+const wchar_t* SBlock::AttribDesc(MEMORY_BASIC_INFORMATION *pMbi) {
 	if (pMbi->State == MEM_COMMIT) {
 		return ProtectSymbol(pMbi->Protect);
 	}
@@ -91,7 +91,7 @@ const wchar_t* MemoryBlock::AttribDesc(MEMORY_BASIC_INFORMATION *pMbi) {
 	return L"?";
 }
 
-const wchar_t* MemoryBlock::TypeSymbol(uint32_t dwType) {
+const wchar_t* SBlock::TypeSymbol(uint32_t dwType) {
 	if (dwType == MEM_IMAGE) {
 		return L"IMG";
 	}
@@ -132,8 +132,8 @@ uint32_t Moneta::GetPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t
 
 ///////
 
-void MemoryPermissionRecord::UpdateMap(list<MemoryBlock*> MemBasicRecords) {
-	for (list<MemoryBlock*>::const_iterator RecordItr = MemBasicRecords.begin(); RecordItr != MemBasicRecords.end(); ++RecordItr) {
+void MemoryPermissionRecord::UpdateMap(list<SBlock*> MemBasicRecords) {
+	for (list<SBlock*>::const_iterator RecordItr = MemBasicRecords.begin(); RecordItr != MemBasicRecords.end(); ++RecordItr) {
 		if (!MemPermMap->count((*RecordItr)->GetBasic()->Type)) {
 			MemPermMap->insert(make_pair((*RecordItr)->GetBasic()->Type, map<uint32_t, uint32_t>()));
 		}
@@ -148,7 +148,7 @@ void MemoryPermissionRecord::UpdateMap(list<MemoryBlock*> MemBasicRecords) {
 	}
 }
 
-MemoryPermissionRecord::MemoryPermissionRecord(list<MemoryBlock*> MemBasicRecords) {
+MemoryPermissionRecord::MemoryPermissionRecord(list<SBlock*> MemBasicRecords) {
 	MemPermMap = new map<uint32_t, map<uint32_t, uint32_t>>();
 	UpdateMap(MemBasicRecords);
 }
