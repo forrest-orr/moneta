@@ -6,7 +6,7 @@ namespace Moneta {
 	public:
 		enum Type { MODIFIED_CODE, MODIFIED_HEADER, XMAP, XPRV, UNSIGNED_MODULE, MISSING_PEB_MODULE, MISMATCHING_PEB_MODULE, DISK_PERMISSION_MISMATCH, XPHANTOM_IMAGE };
 		virtual Suspicion::Type GetType() = 0;
-		static std::map<uint8_t *, Suspicion> GenerateSuspicions(Entity &);
+		static bool Generate(Entity& Parent, std::map<uint8_t*, std::vector<Suspicion>>& Suspicions);
 	protected:
 		Entity* Parent;
 		SBlock* Host;

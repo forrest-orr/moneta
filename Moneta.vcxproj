@@ -138,6 +138,7 @@
     <ClCompile Include="PE.cpp" />
     <ClCompile Include="Process.cpp" />
     <ClCompile Include="Signing.cpp" />
+    <ClCompile Include="Suspicions.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Blocks.hpp" />
