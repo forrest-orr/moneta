@@ -102,3 +102,63 @@ bool FileBase::TranslateDevicePath(const wchar_t* pDevicePath, wchar_t* pTransla
 
 	return bTranslated;
 }
+
+#define MAX_ENV_VAR_SIZE 32767
+
+bool FileBase::ArchWow64PathExpand(const wchar_t* pTargetFilePath, wchar_t* pOutputPath, size_t OutputPathLength) {
+	bool bExpandedPath = false;
+	uint64_t qwPathLength;
+	wchar_t* pProgFilePath64, * pProgFilePathWow64;
+	wchar_t SystemDirectory[MAX_PATH + 1] = { 0 }, SysWow64Directory[MAX_PATH + 1] = { 0 }, ExpandedTargetPath[MAX_PATH + 1] = { 0 };
+	SYSTEM_INFO SystemInfo = { 0 };
+
+	if (ExpandEnvironmentStringsW(pTargetFilePath, ExpandedTargetPath, MAX_PATH + 1)) {
+		bExpandedPath = true;
+		wcscpy_s(pOutputPath, OutputPathLength, ExpandedTargetPath);
+
+		GetNativeSystemInfo(&SystemInfo); // Native version of this call works on both Wow64 and x64 as opposed to just x64 for GetSystemInfo. Works on XP+
+
+		if (SystemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) {
+			//
+			// Resolve the 32 and 64-bit versions of the most problematic paths (Program Files, System32)
+			//
+
+			if ((qwPathLength = GetSystemWow64DirectoryW(SysWow64Directory, MAX_PATH + 1))) {
+				if ((qwPathLength = GetSystemDirectoryW(SystemDirectory, MAX_PATH + 1))) {
+					pProgFilePath64 = (wchar_t*)new uint8_t[MAX_ENV_VAR_SIZE]; // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
+
+					if ((qwPathLength = GetEnvironmentVariableW(L"ProgramW6432", pProgFilePath64, MAX_ENV_VAR_SIZE))) {
+						pProgFilePathWow64 = (wchar_t*)new uint8_t[MAX_ENV_VAR_SIZE]; // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
+
+						if ((qwPathLength = GetEnvironmentVariableW(L"ProgramFiles(x86)", pProgFilePathWow64, MAX_ENV_VAR_SIZE))) {
+							//
+							// Is the target path within one of the two ambiguous architecture directories?
+							//
+
+							if (_wcsnicmp(pProgFilePathWow64, ExpandedTargetPath, wcslen(pProgFilePathWow64)) == 0) {
+								// The target path is already within the Wow64 program files path. Do nothing.
+							}
+							else if (_wcsnicmp(SysWow64Directory, ExpandedTargetPath, wcslen(SysWow64Directory)) == 0) {
+								// The target path is already within the Wow64 system path. Do nothing.
+							}
+							else if (_wcsnicmp(SystemDirectory, ExpandedTargetPath, wcslen(SystemDirectory)) == 0) {
+								wcscpy_s(pOutputPath, OutputPathLength, SysWow64Directory);
+								wcscat_s(pOutputPath, OutputPathLength, ExpandedTargetPath + wcslen(SystemDirectory));
+							}
+							else if (_wcsnicmp(pProgFilePath64, ExpandedTargetPath, wcslen(pProgFilePath64)) == 0) {
+								wcscpy_s(pOutputPath, OutputPathLength, pProgFilePathWow64);
+								wcscat_s(pOutputPath, OutputPathLength, ExpandedTargetPath + wcslen(pProgFilePath64));
+							}
+						}
+
+						delete[] pProgFilePathWow64;
+					}
+
+					delete[] pProgFilePath64;
+				}
+			}
+		}
+	}
+
+	return bExpandedPath;
+}

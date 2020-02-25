@@ -129,6 +129,10 @@ uint32_t Moneta::GetPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t
 	return dwPrivateSize;
 }
 
+bool SBlock::PageExecutable(uint32_t dwProtect) {
+	return (dwProtect == PAGE_EXECUTE || dwProtect == PAGE_EXECUTE_READ || dwProtect == PAGE_EXECUTE_READWRITE);
+}
+
 
 ///////
 

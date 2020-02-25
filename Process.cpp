@@ -215,10 +215,6 @@ uint32_t Process::GetPid() {
 	return this->Pid;
 }
 
-bool PageExecutable(uint32_t dwProtect) {
-	return (dwProtect == PAGE_EXECUTE || dwProtect == PAGE_EXECUTE_READ || dwProtect == PAGE_EXECUTE_READWRITE);
-}
-
 void AlignName(const wchar_t* pOriginalName, wchar_t* pAlignedName, int32_t nAlignTo) { // Make generic and move to interface?
 	assert(nAlignTo >= 1);
 	assert(wcslen(pOriginalName) <= nAlignTo);
@@ -262,95 +258,6 @@ C:\Windows\system32\notepad.exe -> C:\Windows\syswow64\notepad.exe
 
 */
 
-#define MAX_ENV_VAR_SIZE 32767
-
-bool ArchWow64PathExpand(const wchar_t* pTargetFilePath, wchar_t* pOutputPath, size_t OutputPathLength) {
-	bool bExpandedPath = false;
-	uint64_t qwPathLength;
-	wchar_t* pProgFilePath64, * pProgFilePathWow64;
-	wchar_t SystemDirectory[MAX_PATH + 1] = { 0 }, SysWow64Directory[MAX_PATH + 1] = { 0 }, ExpandedTargetPath[MAX_PATH + 1] = { 0 };
-	SYSTEM_INFO SystemInfo = { 0 };
-
-	if (ExpandEnvironmentStringsW(pTargetFilePath, ExpandedTargetPath, MAX_PATH + 1)) {
-		bExpandedPath = true;
-		wcscpy_s(pOutputPath, OutputPathLength, ExpandedTargetPath);
-
-		GetNativeSystemInfo(&SystemInfo); // Native version of this call works on both Wow64 and x64 as opposed to just x64 for GetSystemInfo. Works on XP+
-
-		if (SystemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) {
-			//
-			// Resolve the 32 and 64-bit versions of the most problematic paths (Program Files, System32)
-			//
-
-			if ((qwPathLength = GetSystemWow64DirectoryW(SysWow64Directory, MAX_PATH + 1))) {
-				if ((qwPathLength = GetSystemDirectoryW(SystemDirectory, MAX_PATH + 1))) {
-					pProgFilePath64 = (wchar_t*)new uint8_t[MAX_ENV_VAR_SIZE]; // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
-
-					if ((qwPathLength = GetEnvironmentVariableW(L"ProgramW6432", pProgFilePath64, MAX_ENV_VAR_SIZE))) {
-						pProgFilePathWow64 = (wchar_t*)new uint8_t[MAX_ENV_VAR_SIZE]; // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
-
-						if ((qwPathLength = GetEnvironmentVariableW(L"ProgramFiles(x86)", pProgFilePathWow64, MAX_ENV_VAR_SIZE))) {
-							//
-							// Is the target path within one of the two ambiguous architecture directories?
-							//
-
-							if (_wcsnicmp(pProgFilePathWow64, ExpandedTargetPath, wcslen(pProgFilePathWow64)) == 0) {
-								// The target path is already within the Wow64 program files path. Do nothing.
-							}
-							else if (_wcsnicmp(SysWow64Directory, ExpandedTargetPath, wcslen(SysWow64Directory)) == 0) {
-								// The target path is already within the Wow64 system path. Do nothing.
-							}
-							else if (_wcsnicmp(SystemDirectory, ExpandedTargetPath, wcslen(SystemDirectory)) == 0) {
-								wcscpy_s(pOutputPath, OutputPathLength, SysWow64Directory);
-								wcscat_s(pOutputPath, OutputPathLength, ExpandedTargetPath + wcslen(SystemDirectory));
-							}
-							else if (_wcsnicmp(pProgFilePath64, ExpandedTargetPath, wcslen(pProgFilePath64)) == 0) {
-								wcscpy_s(pOutputPath, OutputPathLength, pProgFilePathWow64);
-								wcscat_s(pOutputPath, OutputPathLength, ExpandedTargetPath + wcslen(pProgFilePath64));
-							}
-						}
-
-						delete[] pProgFilePathWow64;
-					}
-
-					delete[] pProgFilePath64;
-				}
-			}
-		}
-	}
-
-	return bExpandedPath;
-}
-
-/*
-| YourPhone.exe : 4760 : x64
- \ 0x0000000090bb0000:0x00001000 | Mapped | Page File
-  \  0x0000019390BB0000:0x00001000 | RW
- _|
- \ 0x0000000090bc0000:0x00004000 | Mapped | C:\Users\Developer\AppData\Local\Microsoft\Windows\Caches\cversions.3.db
-  \  0x0000019390BC0000:0x00004000 | R
- _|
- \ 0x0000000090bd0000:0x0000d000 | Non-executable image | C:\Windows\System32\Windows.UI.Xaml.Resources.Common.dll | Signed
-  \  0x0000019390BD0000:0x0000d000 | R     | Header   | 0x00000000
-  |  0x0000019390BD0000:0x0000d000 | R     | .rdata   | 0x00000000
-  |  0x0000019390BD0000:0x0000d000 | R     | .rsrc    | 0x00000000
- _|  
- \ 0x0000000061a20000:0x0023a000 | Executable image | C:\Windows\SysWOW64\msmpeg2vdec.dll | Signed
-  \  0x0000000061A20000:0x00001000 | R     | Header   | 0x00000000
-  |  0x0000000061A21000:0x00215000 | RX    | .text    | 0x00003000 | Modified code
-  |  0x0000000061C36000:0x00001000 | RW    | .data    | 0x00001000
-  |  0x0000000061C37000:0x00002000 | WC    | .data    | 0x00000000
-  |  0x0000000061C39000:0x00004000 | RW    | .data    | 0x00004000
-  |  0x0000000061C43000:0x00017000 | R     | .idata   | 0x00002000
-  |  0x0000000061C43000:0x00017000 | R     | .didat   | 0x00002000
-  |  0x0000000061C43000:0x00017000 | R     | .rsrc    | 0x00002000
-  |  0x0000000061C43000:0x00017000 | R     | .reloc   | 0x00002000
-
-| Something.exe : 314 : x64
- \ 0x0000000090be0000:0x00004000 | Mapped | C:\Windows\System32\en-US\windows.ui.xaml.dll.mui
-  \  0x0000019390BE0000:0x00004000 | R
-
-*/
 
 void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 	bool bShownProc = false;
@@ -360,8 +267,8 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		int32_t nSuspiciousObjCount = 0;
-		map<uint8_t*, std::vector<Suspicion>> Suspicions;
-		Suspicion::Generate(this->Entities, Suspicions);
+		map<uint8_t*, vector<Suspicion>> SuspicionsMap;
+		Suspicion::InspectEntity(*this, *Itr->second, SuspicionsMap);
 
 
 		//
@@ -416,7 +323,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 								if (this->IsWow64()) { // This is an edge case in which in Wow64 a module may appear as C:\Windows\System32\kernel32.dll although the true path is C:\Windows\SysWOW64\kernel32.dll due to Wow64 FS redirection.
 									wchar_t ReFormattedPath[MAX_PATH + 1] = { 0 };
 
-									if (ArchWow64PathExpand(PeEntity->GetPebModule().GetPath().c_str(), ReFormattedPath, MAX_PATH + 1)) {
+									if (FileBase::ArchWow64PathExpand(PeEntity->GetPebModule().GetPath().c_str(), ReFormattedPath, MAX_PATH + 1)) {
 										//Interface::Log("* Translated %ws to %ws\r\n", PeEntity->GetPebModule().GetPath().c_str(), ReFormattedPath);
 
 										if (_wcsicmp(ReFormattedPath, PeEntity->GetPath().c_str()) != 0) {
@@ -472,7 +379,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 							// Executable regions within sections that are not marked as executable on disk. For example: data is +rw on disk but has +x sblock
 							//
 
-							if (PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
+							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
 								//Interface::Log("! Sblock in section %s has executable permissions inconsistent with its file on disk at %ws [%ws:%d]\r\n",
 								//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
 								//	this->Name.c_str(), this->Pid);
@@ -486,7 +393,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 							// Executable regions in memory with private pages. Whether their +x is consistent with their section on disk is examined as well.
 							//
 
-							if (PageExecutable((*SbItr)->GetBasic()->Protect) && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
+							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
 								//Interface::Log("! Sblock in section %s is executable and has private pages within %ws - %ws PE on disk [%ws:%d]\r\n",
 								//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
 								//	((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? L"matches" : L"does not match",
@@ -532,7 +439,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
 							Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
 
-						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
+						if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect)) {
 							//Interface::Log("! Phantom image memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 							Interface::Log((WORD)FOREGROUND_RED, " | Phantom +x image memory");
 							bSuspiciousSblock = true;
@@ -573,7 +480,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 					//Interface::Log("  0x%p\r\n", (*SbItr)->GetBasic()->BaseAddress);
 					Interface::Log("    0x%p:0x%08x | %ws", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
-					if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
+					if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect)) {
 						//Interface::Log("! Mapped memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 						Interface::Log((WORD)FOREGROUND_RED, " | Abnormal executable mapped memory");
 						//system("pause");
@@ -613,7 +520,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 						AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
 						Interface::Log("    0x%p:0x%08x | %ws", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
-						if (PageExecutable((*SbItr)->GetBasic()->Protect)) {
+						if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect)) {
 							//Interface::Log("! Private memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
 							Interface::Log((WORD)FOREGROUND_RED, " | Abnormal executable private memory");
 							//system("pause");

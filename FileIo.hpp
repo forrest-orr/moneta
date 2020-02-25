@@ -15,4 +15,5 @@ public:
 	std::wstring GetPath();
 	bool IsPhantom();
 	static bool TranslateDevicePath(const wchar_t* pDevicePath, wchar_t* pTranslatedPath);
+	static bool ArchWow64PathExpand(const wchar_t* pTargetFilePath, wchar_t* pOutputPath, size_t OutputPathLength);
 };
