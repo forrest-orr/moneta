@@ -258,6 +258,13 @@ C:\Windows\system32\notepad.exe -> C:\Windows\syswow64\notepad.exe
 
 */
 
+wstring Process::GetImageFilePath() {
+	return this->ImageFilePath;
+}
+
+wstring Process::GetName() {
+	return this->Name;
+}
 
 void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 	bool bShownProc = false;
@@ -267,7 +274,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		int32_t nSuspiciousObjCount = 0;
-		map<uint8_t*, vector<Suspicion>> SuspicionsMap;
+		map<uint8_t*, vector<Suspicion *>> SuspicionsMap;
 		Suspicion::InspectEntity(*this, *Itr->second, SuspicionsMap);
 
 

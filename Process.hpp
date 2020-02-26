@@ -23,6 +23,8 @@ namespace Moneta {
 	public:
 		HANDLE GetHandle();
 		uint32_t GetPid();
+		std::wstring GetName();
+		std::wstring GetImageFilePath();
 		BOOL IsWow64();
 		Process(uint32_t);
 		void Enumerate(uint64_t qwMemdmpOptFlags);
