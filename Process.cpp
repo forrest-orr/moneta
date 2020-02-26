@@ -266,6 +266,37 @@ wstring Process::GetName() {
 	return this->Name;
 }
 
+void EnumerateThreads(const wstring Indent, vector<Thread*> Threads) {
+	for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
+		Interface::Log("%wsThread 0x%p [TID 0x%08x]\r\n", Indent.c_str(), (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
+	}
+}
+
+void Process::EnumerateSBlocks(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap, vector<SBlock*> SBlocks) {
+	for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+		bool bSuspiciousSblock = false;
+		wchar_t AlignedAttribDesc[6] = { 0 };
+
+		AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
+
+		Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
+			Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+
+		if (SuspicionsMap.count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) {
+			vector<Suspicion*>& SuspicionsList = SuspicionsMap.at((uint8_t*)(*SbItr)->GetBasic()->BaseAddress);
+
+			for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
+				if (!(*SuspItr)->IsFullEntitySuspicion()) {
+					Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
+				}
+			}
+		}
+
+		Interface::Log("\r\n");
+		EnumerateThreads(L"      ", (*SbItr)->GetThreads());
+	}
+}
+
 void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 	bool bShownProc = false;
 	MemDump ProcDmp(this->Handle, this->Pid);
@@ -286,25 +317,88 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 				bShownProc = true;
 			}
 
-			if (Itr->second->GetType() == Entity::Type::PE_FILE) {
-				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
+			switch (Itr->second->GetType()) {
+				case Entity::Type::PE_FILE: {
+					PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
-				if (PeEntity->IsNonExecutableImage()) {
-					Interface::Log("  0x%016x:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
-				}
-				else {
-					Interface::Log("  0x%016x:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
-				}
+					if (PeEntity->IsNonExecutableImage()) {
+						Interface::Log("  0x%016x:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+					}
+					else {
+						Interface::Log("  0x%016x:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+					}
 
-				if (SuspicionsMap.count(PeEntity->GetStartVa())) {
-					vector<Suspicion*>& SuspicionsList = SuspicionsMap.at(PeEntity->GetStartVa());
+					if (SuspicionsMap.count(PeEntity->GetStartVa())) {
+						vector<Suspicion*>& SuspicionsList = SuspicionsMap.at(PeEntity->GetStartVa());
 
-					for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
-						Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
+						for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
+							if ((*SuspItr)->IsFullEntitySuspicion()) {
+								Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
+							}
+						}
+					}
+
+					Interface::Log("\r\n");
+
+					if (!PeEntity->IsPhantom()) {
+						vector<PeVm::Section*> Sections = PeEntity->GetSections();
+						for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
+							vector<SBlock*> SBlocks = (*SectItr)->GetSBlocks();
+							wchar_t AlignedSectName[9] = { 0 };
+							char AnsiSectName[9];
+							strncpy_s(AnsiSectName, 9, (char*)(*SectItr)->GetHeader()->Name, 8);
+							wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
+							AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
+
+							for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+								bool bSuspiciousSblock = false;
+								wchar_t AlignedAttribDesc[6] = { 0 };
+
+								AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
+
+								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
+									Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+
+								if (SuspicionsMap.count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) {
+									vector<Suspicion*>& SuspicionsList = SuspicionsMap.at((uint8_t*)(*SbItr)->GetBasic()->BaseAddress);
+
+									for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
+										if (!(*SuspItr)->IsFullEntitySuspicion()) {
+											Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
+										}
+									}
+								}
+
+								Interface::Log("\r\n");
+								EnumerateThreads(L"      ", (*SbItr)->GetThreads());
+							}
+						}
+					}
+					else {
+						//vector<SBlock*> SBlocks = PeEntity->GetSBlocks();
+						//Interface::Log((WORD)FOREGROUND_RED, "  0x%016x:0x%08x | Image | %ws [Phantom]\r\n", PeEntity->GetStartVa(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+
+						EnumerateSBlocks(SuspicionsMap, PeEntity->GetSBlocks());
 					}
 				}
+				case Entity::Type::MAPPED_FILE: {
+					vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
+					Interface::Log("  0x%016x:0x%08x | Mapped | %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, SBlocks.front()->GetBasic()->RegionSize, dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
+					EnumerateSBlocks(SuspicionsMap, SBlocks);
+					//Interface::Log("\r\n");
+					break;
+				}
+				case Entity::Type::UNKNOWN: {
+					vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 
-				Interface::Log("\r\n");
+					if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
+						Interface::Log("  0x%016x:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->AllocationBase, (uint32_t)((uint8_t*)SBlocks.back()->GetBasic()->BaseAddress - SBlocks.back()->GetBasic()->AllocationBase) + SBlocks.back()->GetBasic()->RegionSize);
+						EnumerateSBlocks(SuspicionsMap, SBlocks);
+						//Interface::Log("\r\n");
+					}
+
+					break;
+				}
 			}
 		}
 	}

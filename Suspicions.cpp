@@ -116,7 +116,7 @@ Generates a list of suspicions for either an ablock or sblock.
 */
 bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_t*, vector<Suspicion *>> &SuspicionsMap) { // Generate suspicions for an entity
 	vector<Suspicion *> AbSuspList;
-
+	// Ensure that all new suspicions are added to the list of the existing map entry even if they share the same base address. This allows the ablock map entry to also hold sblock suspicions such as modified hdr
 	switch (ParentObj.GetType()) {
 		case Entity::Type::PE_FILE: {
 			PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(&ParentObj);
@@ -153,13 +153,14 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_
 
 						for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 							vector<Suspicion*> SbSuspList;
+							vector<Suspicion*>& TargetSuspList = (*SbItr)->GetBasic()->BaseAddress == ParentObj.GetStartVa() ? AbSuspList : SbSuspList;
 
 							//
 							// Headers with private pages
 							//
 
 							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && Moneta::GetPrivateSize(ParentProc.GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
-								SbSuspList.push_back(new ModifiedPeHeader(&ParentProc, &ParentObj, *SbItr));
+								TargetSuspList.push_back(new ModifiedPeHeader(&ParentProc, &ParentObj, *SbItr));
 							}
 
 							//
@@ -167,7 +168,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_
 							//
 
 							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
-								SbSuspList.push_back(new DiskPermissionMismatch(&ParentProc, &ParentObj, *SbItr));
+								TargetSuspList.push_back(new DiskPermissionMismatch(&ParentProc, &ParentObj, *SbItr));
 							}
 
 							//
@@ -175,10 +176,10 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_
 							//
 
 							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && Moneta::GetPrivateSize(ParentProc.GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
-								SbSuspList.push_back(new ModifiedCode(&ParentProc, &ParentObj, *SbItr));
+								TargetSuspList.push_back(new ModifiedCode(&ParentProc, &ParentObj, *SbItr));
 							}
 
-							if (SbSuspList.size()) {
+							if (SbSuspList.size()) { // Do not insert the list to the map if it overlaps with the ablock.
 								SuspicionsMap.insert(make_pair((uint8_t *)(*SbItr)->GetBasic()->BaseAddress, SbSuspList));
 							}
 						}

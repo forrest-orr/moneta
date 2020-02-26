@@ -1,4 +1,6 @@
 namespace Moneta {
+	typedef class Suspicion;
+
 	class Thread {
 	public:
 		uint32_t GetTid();
@@ -28,6 +30,7 @@ namespace Moneta {
 		BOOL IsWow64();
 		Process(uint32_t);
 		void Enumerate(uint64_t qwMemdmpOptFlags);
+		void EnumerateSBlocks(std::map<uint8_t*, std::vector<Suspicion*>>& SuspicionsMap, std::vector<SBlock*> SBlocks);
 		~Process();
 	};
 }

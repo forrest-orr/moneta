@@ -5,12 +5,14 @@ protected:
 	MEMORY_BASIC_INFORMATION* Basic;
 	MEMORY_REGION_INFORMATION* Region;
 	std::vector<Moneta::Thread*> Threads;
+	//uint64_t PrivateSize;
 public:
 	SBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo, std::vector<Moneta::Thread*> Threads1);
 	~SBlock();
 	MEMORY_BASIC_INFORMATION* GetBasic();
 	MEMORY_REGION_INFORMATION* GetRegion();
 	std::vector<Moneta::Thread*> GetThreads();
+	//uint64_t GetPrivateSize();
 	static const wchar_t* ProtectSymbol(uint32_t dwProtect);
 	static const wchar_t* AttribDesc(MEMORY_BASIC_INFORMATION* pMbi);
 	static const wchar_t* TypeSymbol(uint32_t dwType);
