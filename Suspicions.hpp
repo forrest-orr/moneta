@@ -8,6 +8,7 @@ namespace Moneta {
 		virtual Suspicion::Type GetType() = 0;
 		virtual std::wstring GetDescription() = 0;
 		static bool InspectEntity(Process& ParentProc, Entity& ParentObj, std::map<uint8_t*, std::vector<Suspicion *>>& SuspicionsMap);
+		bool IsFullEntitySuspicion();
 		void Enumerate();
 		Suspicion(Process* ParentProc, Entity* Parent, SBlock* Block);
 		Entity* GetParentObject();
@@ -29,21 +30,21 @@ namespace Moneta {
 	class UnsignedModule : public Suspicion {
 	public:
 		Suspicion::Type GetType() { return Suspicion::Type::UNSIGNED_MODULE; }
-		UnsignedModule(Process* ParentProc, Entity* Parent, SBlock* Block);
+		UnsignedModule(Process* ParentProc, Entity* Parent);
 		std::wstring GetDescription();
 	};
 
 	class MissingPebModule : public Suspicion {
 	public:
 		Suspicion::Type GetType() { return Suspicion::Type::MISSING_PEB_MODULE; }
-		MissingPebModule(Process* ParentProc, Entity* Parent, SBlock* Block);
+		MissingPebModule(Process* ParentProc, Entity* Parent);
 		std::wstring GetDescription();
 	};
 
 	class MismatchingPebModule : public Suspicion {
 	public:
 		Suspicion::Type GetType() { return Suspicion::Type::MISMATCHING_PEB_MODULE; }
-		MismatchingPebModule(Process* ParentProc, Entity* Parent, SBlock* Block);
+		MismatchingPebModule(Process* ParentProc, Entity* Parent);
 		std::wstring GetDescription();
 	};
 
@@ -64,7 +65,7 @@ namespace Moneta {
 	class PhantomImage : public Suspicion {
 	public:
 		Suspicion::Type GetType() { return Suspicion::Type::PHANTOM_IMAGE; }
-		PhantomImage(Process* ParentProc, Entity* Parent, SBlock* Block);
+		PhantomImage(Process* ParentProc, Entity* Parent);
 		std::wstring GetDescription();
 	};
 

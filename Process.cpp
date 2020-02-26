@@ -273,19 +273,44 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-		int32_t nSuspiciousObjCount = 0;
-		map<uint8_t*, vector<Suspicion *>> SuspicionsMap;
+		map<uint8_t*, vector<Suspicion*>> SuspicionsMap;
 		Suspicion::InspectEntity(*this, *Itr->second, SuspicionsMap);
-
 
 		//
 		// Retrospectively enumerate the entire entity if a suspicious sblock was found within it, or enumerate it simply based on verbosity level
 		//
 
-		if (Interface::GetVerbosity() >= 3 || (Interface::GetVerbosity() < 3 && nSuspiciousObjCount > 0)) {
-			bool bTotalEntitySuspicion = false; // Indicates a full entity dump rather than an individual sblock regardless of "from-base" dump setting. For example for PEB unlinked modules.
+		if (Interface::GetVerbosity() >= 3 || (Interface::GetVerbosity() < 3 && SuspicionsMap.size() > 0)) {
+			if (!bShownProc) {
+				Interface::Log("\r\n%ws [%ws] : %d : %ws\r\n", this->Name.c_str(), this->ImageFilePath.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
+				bShownProc = true;
+			}
 
-			nSuspiciousObjCount = 0; // Suspicious object count must be re-calculated since it cannot be known if this entity enumeration is occuring due to verbosity level or genuine suspicion
+			if (Itr->second->GetType() == Entity::Type::PE_FILE) {
+				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
+
+				if (PeEntity->IsNonExecutableImage()) {
+					Interface::Log("  0x%016x:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+				}
+				else {
+					Interface::Log("  0x%016x:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+				}
+
+				if (SuspicionsMap.count(PeEntity->GetStartVa())) {
+					vector<Suspicion*>& SuspicionsList = SuspicionsMap.at(PeEntity->GetStartVa());
+
+					for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
+						Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
+					}
+				}
+
+				Interface::Log("\r\n");
+			}
+		}
+	}
+
+			/*
+			bool bTotalEntitySuspicion = false; // Indicates a full entity dump rather than an individual sblock regardless of "from-base" dump setting. For example for PEB unlinked modules.
 
 			if (!bShownProc) {
 				Interface::Log("\r\n%ws [%ws] : %d : %ws\r\n", this->Name.c_str(), this->ImageFilePath.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");

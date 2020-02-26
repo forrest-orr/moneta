@@ -94,19 +94,28 @@ void EnumerateAll(vector<Suspicion *> &SuspicionsList) {
 	//Interface::Log("\r\n");
 }
 
+bool Suspicion::IsFullEntitySuspicion() {
+	return (this->Block == nullptr ? true : false);
+}
+
 Suspicion::Suspicion(Process* ParentProc, Entity* ParentObj, SBlock* Block) : ParentProcess(ParentProc), ParentObject(ParentObj), Block(Block) {}
-UnsignedModule::UnsignedModule(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
-MissingPebModule::MissingPebModule(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
-MismatchingPebModule::MismatchingPebModule(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
+UnsignedModule::UnsignedModule(Process* ParentProc, Entity* ParentObj) : Suspicion(ParentProc, ParentObj, nullptr) {}
+MissingPebModule::MissingPebModule(Process* ParentProc, Entity* ParentObj) : Suspicion(ParentProc, ParentObj, nullptr) {}
+MismatchingPebModule::MismatchingPebModule(Process* ParentProc, Entity* ParentObj) : Suspicion(ParentProc, ParentObj, nullptr) {}
 ModifiedPeHeader::ModifiedPeHeader(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
 DiskPermissionMismatch::DiskPermissionMismatch(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
 ModifiedCode::ModifiedCode(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
-PhantomImage::PhantomImage(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
+PhantomImage::PhantomImage(Process* ParentProc, Entity* ParentObj) : Suspicion(ParentProc, ParentObj, nullptr) {}
 MappedExecPermission::MappedExecPermission(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
 PrivateExecPermission::PrivateExecPermission(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
 
+/*
+
+Generates a list of suspicions for either an ablock or sblock.
+
+*/
 bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_t*, vector<Suspicion *>> &SuspicionsMap) { // Generate suspicions for an entity
-	vector<Suspicion *> SuspicionsList;
+	vector<Suspicion *> AbSuspList;
 
 	switch (ParentObj.GetType()) {
 		case Entity::Type::PE_FILE: {
@@ -114,41 +123,43 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_
 
 			if (!PeEntity->IsNonExecutableImage()) {
 				if (!PeEntity->IsSigned()) {
-					SuspicionsList.push_back(new UnsignedModule(&ParentProc, &ParentObj, nullptr));
+					AbSuspList.push_back(new UnsignedModule(&ParentProc, &ParentObj));
+				}
+
+				if (!PeEntity->GetPebModule().Exists()) {
+					AbSuspList.push_back(new MissingPebModule(&ParentProc, &ParentObj));
+				}
+				else {
+					if (_wcsicmp(PeEntity->GetPebModule().GetPath().c_str(), PeEntity->GetPath().c_str()) != 0) { // Since the PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx, there may be a PEB link with a base address matching this image region but with a misleading name/path
+						if (ParentProc.IsWow64()) { // This is an edge case in which in Wow64 a module may appear as C:\Windows\System32\kernel32.dll although the true path is C:\Windows\SysWOW64\kernel32.dll due to Wow64 FS redirection.
+							wchar_t ReFormattedPath[MAX_PATH + 1] = { 0 };
+
+							if (FileBase::ArchWow64PathExpand(PeEntity->GetPebModule().GetPath().c_str(), ReFormattedPath, MAX_PATH + 1)) {
+								if (_wcsicmp(ReFormattedPath, PeEntity->GetPath().c_str()) != 0) {
+									AbSuspList.push_back(new MismatchingPebModule(&ParentProc, &ParentObj));
+								}
+							}
+						}
+						else {
+							AbSuspList.push_back(new MismatchingPebModule(&ParentProc, &ParentObj));
+						}
+					}
 				}
 
 				if (PeEntity->GetPe() != nullptr) {
-					if (!PeEntity->GetPebModule().Exists()) {
-						SuspicionsList.push_back(new MissingPebModule(&ParentProc, &ParentObj, nullptr));
-					}
-					else {
-						if (_wcsicmp(PeEntity->GetPebModule().GetPath().c_str(), PeEntity->GetPath().c_str()) != 0) { // Since the PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx, there may be a PEB link with a base address matching this image region but with a misleading name/path
-							if (ParentProc.IsWow64()) { // This is an edge case in which in Wow64 a module may appear as C:\Windows\System32\kernel32.dll although the true path is C:\Windows\SysWOW64\kernel32.dll due to Wow64 FS redirection.
-								wchar_t ReFormattedPath[MAX_PATH + 1] = { 0 };
-
-								if (FileBase::ArchWow64PathExpand(PeEntity->GetPebModule().GetPath().c_str(), ReFormattedPath, MAX_PATH + 1)) {
-									if (_wcsicmp(ReFormattedPath, PeEntity->GetPath().c_str()) != 0) {
-										SuspicionsList.push_back(new MismatchingPebModule(&ParentProc, &ParentObj, nullptr));
-									}
-								}
-							}
-							else {
-								SuspicionsList.push_back(new MismatchingPebModule(&ParentProc, &ParentObj, nullptr));
-							}
-						}
-					}
-
 					vector<PeVm::Section*> Sections = PeEntity->GetSections();
 					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
 						vector<SBlock*> SBlocks = (*SectItr)->GetSBlocks();
 
 						for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+							vector<Suspicion*> SbSuspList;
+
 							//
 							// Headers with private pages
 							//
 
 							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && Moneta::GetPrivateSize(ParentProc.GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
-								SuspicionsList.push_back(new ModifiedPeHeader(&ParentProc, &ParentObj, *SbItr));
+								SbSuspList.push_back(new ModifiedPeHeader(&ParentProc, &ParentObj, *SbItr));
 							}
 
 							//
@@ -156,7 +167,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_
 							//
 
 							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
-								SuspicionsList.push_back(new DiskPermissionMismatch(&ParentProc, &ParentObj, *SbItr));
+								SbSuspList.push_back(new DiskPermissionMismatch(&ParentProc, &ParentObj, *SbItr));
 							}
 
 							//
@@ -164,13 +175,17 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_
 							//
 
 							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && Moneta::GetPrivateSize(ParentProc.GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
-								SuspicionsList.push_back(new ModifiedCode(&ParentProc, &ParentObj, *SbItr));
+								SbSuspList.push_back(new ModifiedCode(&ParentProc, &ParentObj, *SbItr));
+							}
+
+							if (SbSuspList.size()) {
+								SuspicionsMap.insert(make_pair((uint8_t *)(*SbItr)->GetBasic()->BaseAddress, SbSuspList));
 							}
 						}
 					}
 				}
 				else {
-					SuspicionsList.push_back(new PhantomImage(&ParentProc, &ParentObj, nullptr));
+					AbSuspList.push_back(new PhantomImage(&ParentProc, &ParentObj));
 				}
 			}
 
@@ -179,8 +194,12 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_
 		case Entity::Type::MAPPED_FILE: {
 			vector<SBlock*> SBlocks = ParentObj.GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 			for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+				vector<Suspicion*> SbSuspList;
 				if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect)) {
-					SuspicionsList.push_back(new MappedExecPermission(&ParentProc, &ParentObj, *SbItr));
+					SbSuspList.push_back(new MappedExecPermission(&ParentProc, &ParentObj, *SbItr));
+				}
+				if (SbSuspList.size()) {
+					SuspicionsMap.insert(make_pair((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, SbSuspList));
 				}
 			}
 
@@ -191,8 +210,13 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_
 
 			if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
 				for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+					vector<Suspicion*> SbSuspList;
 					if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect)) {
-						SuspicionsList.push_back(new PrivateExecPermission(&ParentProc, &ParentObj, *SbItr));
+						SbSuspList.push_back(new PrivateExecPermission(&ParentProc, &ParentObj, *SbItr));
+					}
+
+					if (SbSuspList.size()) {
+						SuspicionsMap.insert(make_pair((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, SbSuspList));
 					}
 				}
 			}
@@ -201,5 +225,9 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_
 		}
 	}
 
-	EnumerateAll(SuspicionsList);
+	if (AbSuspList.size()) {
+		SuspicionsMap.insert(make_pair(ParentObj.GetStartVa(), AbSuspList));
+	}
+
+	//EnumerateAll(SuspicionsList);
 }
