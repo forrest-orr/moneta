@@ -296,7 +296,7 @@ int32_t FilterSuspicions(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap) {
 				}
 				case Suspicion::Type::MISSING_PEB_MODULE: {
 					/* Filter cases for missing PEB modules:
-						 ~ Signed metadata PEs. These appear in the C:\Windows\System32\WinMetadata folder with the .winmd extension.
+						 ~ Signed metadata PEs. These appear in the C:\Windows\System32\WinMetadata folder with the .winmd extension. They've also been noted to appear in WindpwsApps, SystemApps and others.
 
 						   0x000000000F3E0000:0x0009e000 | Executable image | C:\Windows\System32\WinMetadata\Windows.UI.winmd | Missing PEB module
 						   0x000000000F3E0000:0x0009e000 | R        | Header   | 0x00000000
@@ -308,7 +308,8 @@ int32_t FilterSuspicions(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap) {
 					
 					if (PeEntity->IsSigned()) {
 						static const wchar_t* pWinmbExt = L".winmd";
-						if (_wcsnicmp(PeEntity->GetPath().c_str(), Environment::MetadataPath.c_str(), Environment::MetadataPath.length()) == 0 && _wcsicmp(PeEntity->GetPath().c_str() + PeEntity->GetPath().length() - wcslen(pWinmbExt), pWinmbExt) == 0) {
+						//if (_wcsnicmp(PeEntity->GetPath().c_str(), Environment::MetadataPath.c_str(), Environment::MetadataPath.length()) == 0 && _wcsicmp(PeEntity->GetPath().c_str() + PeEntity->GetPath().length() - wcslen(pWinmbExt), pWinmbExt) == 0) {
+						if(_wcsicmp(PeEntity->GetPath().c_str() + PeEntity->GetPath().length() - wcslen(pWinmbExt), pWinmbExt) == 0) {
 							//Interface::Log("* %ws is within metadata path\r\n", PeEntity->GetPath().c_str());
 							//system("pause");
 
