@@ -94,7 +94,7 @@ void Entity::SetSBlocks(vector<SBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
 	this->StartVa = (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress;
 	this->EndVa = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize);
-	this->EntitySize = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize) - (SBlocks.front())->GetBasic()->AllocationBase;
+	this->EntitySize = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize) - (SBlocks.front())->GetBasic()->BaseAddress;
 }
 
 ABlock::ABlock(vector<SBlock*> SBlocks) {
@@ -233,7 +233,7 @@ Entity* Entity::Create(HANDLE hProcess, std::vector<SBlock*> SBlocks) {
 		wchar_t DevFilePath[MAX_PATH + 1] = { 0 };
 		wchar_t MapFilePath[MAX_PATH + 1] = { 0 };
 
-		if (GetMappedFileNameW(hProcess, (HMODULE)SBlocks.front()->GetBasic()->AllocationBase, DevFilePath, MAX_PATH)) {
+		if (GetMappedFileNameW(hProcess, (HMODULE)SBlocks.front()->GetBasic()->BaseAddress, DevFilePath, MAX_PATH)) {
 			if (!FileBase::TranslateDevicePath(DevFilePath, MapFilePath)) {
 				Interface::Log("! Failed to translate device path: %ws\r\n", DevFilePath);
 				wcscpy_s(MapFilePath, MAX_PATH + 1, L"?");

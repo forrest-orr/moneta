@@ -272,12 +272,59 @@ void EnumerateThreads(const wstring Indent, vector<Thread*> Threads) {
 	}
 }
 
+int32_t FilterSuspicions(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap) {
+	//Suspicion::EnumerateMap(SuspicionsMap);
+	for (map<uint8_t*, vector<Suspicion*>>::const_iterator MapItr = SuspicionsMap.begin(); MapItr != SuspicionsMap.end(); ++MapItr) {
+		vector<Suspicion*> SuspListCopy = MapItr->second;
+		vector<Suspicion*>::const_iterator SuspItr = SuspListCopy.begin();
+		vector<Suspicion*> &RefSuspList = SuspicionsMap.at(MapItr->first); // Bug: element removed from list which is still being iterated
+		for (int32_t nSuspIndex = 0; SuspItr != SuspListCopy.end(); ++SuspItr, nSuspIndex++) {
+			switch ((*SuspItr)->GetType()) {
+				case Suspicion::Type::XPRV: {
+					/* Filter cases for private executable memory
+					
+					*/
+
+					//Interface::Log("* Filtered executable private memory at 0x%p\r\n", (*SuspItr)->GetBlock()->GetBasic()->BaseAddress);
+					RefSuspList.erase(RefSuspList.begin() + nSuspIndex);
+
+					if (!RefSuspList.size()) {
+						SuspicionsMap.erase(MapItr);
+					}
+					break;
+				}
+				case Suspicion::Type::MISSING_PEB_MODULE: {
+					/* Filter cases for missing PEB modules:
+						 ~ Signed metadata PEs. These appear in the C:\Windows\System32\WinMetadata folder with the .winmd extension.
+
+						   0x000000000F3E0000:0x0009e000 | Executable image | C:\Windows\System32\WinMetadata\Windows.UI.winmd | Missing PEB module
+						   0x000000000F3E0000:0x0009e000 | R        | Header   | 0x00000000
+						   0x000000000F3E0000:0x0009e000 | R        | .text    | 0x00000000
+						   0x000000000F3E0000:0x0009e000 | R        | .rsrc    | 0x00000000
+					*/
+
+					PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>((*SuspItr)->GetParentObject());
+					
+					if (PeEntity->IsSigned()) {
+						//
+					}
+
+					break;
+				}
+			}
+		}
+	}
+	//Suspicion::EnumerateMap(SuspicionsMap);
+	//printf("enum done\r\n");
+	return 0;
+}
+
 void Process::EnumerateSBlocks(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap, vector<SBlock*> SBlocks) {
 	for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 		bool bSuspiciousSblock = false;
-		wchar_t AlignedAttribDesc[6] = { 0 };
+		wchar_t AlignedAttribDesc[9] = { 0 };
 
-		AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
+		AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
 
 		Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
 			Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
@@ -306,7 +353,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		map<uint8_t*, vector<Suspicion*>> SuspicionsMap;
 		Suspicion::InspectEntity(*this, *Itr->second, SuspicionsMap);
-
+		FilterSuspicions(SuspicionsMap);
 		//
 		// Retrospectively enumerate the entire entity if a suspicious sblock was found within it, or enumerate it simply based on verbosity level
 		//
@@ -322,10 +369,10 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
 					if (PeEntity->IsNonExecutableImage()) {
-						Interface::Log("  0x%016x:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+						Interface::Log("  0x%p:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
 					}
 					else {
-						Interface::Log("  0x%016x:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+						Interface::Log("  0x%p:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
 					}
 
 					if (SuspicionsMap.count(PeEntity->GetStartVa())) {
@@ -352,9 +399,9 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 							for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 								bool bSuspiciousSblock = false;
-								wchar_t AlignedAttribDesc[6] = { 0 };
+								wchar_t AlignedAttribDesc[9] = { 0 };
 
-								AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
+								AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
 
 								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
 									Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
@@ -380,10 +427,12 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 
 						EnumerateSBlocks(SuspicionsMap, PeEntity->GetSBlocks());
 					}
+
+					break;
 				}
 				case Entity::Type::MAPPED_FILE: {
 					vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
-					Interface::Log("  0x%016x:0x%08x | Mapped | %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, SBlocks.front()->GetBasic()->RegionSize, dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
+					Interface::Log("  0x%p:0x%08x | Mapped | %ws\r\n", SBlocks.front()->GetBasic()->BaseAddress, SBlocks.front()->GetBasic()->RegionSize, dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
 					EnumerateSBlocks(SuspicionsMap, SBlocks);
 					//Interface::Log("\r\n");
 					break;
@@ -392,7 +441,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 					vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 
 					if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
-						Interface::Log("  0x%016x:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->AllocationBase, (uint32_t)((uint8_t*)SBlocks.back()->GetBasic()->BaseAddress - SBlocks.back()->GetBasic()->AllocationBase) + SBlocks.back()->GetBasic()->RegionSize);
+						Interface::Log("  0x%p:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->BaseAddress, (uint32_t)((uint8_t*)SBlocks.back()->GetBasic()->BaseAddress - SBlocks.front()->GetBasic()->BaseAddress) + SBlocks.back()->GetBasic()->RegionSize);
 						EnumerateSBlocks(SuspicionsMap, SBlocks);
 						//Interface::Log("\r\n");
 					}

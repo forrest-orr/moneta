@@ -109,6 +109,14 @@ PhantomImage::PhantomImage(Process* ParentProc, Entity* ParentObj) : Suspicion(P
 MappedExecPermission::MappedExecPermission(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
 PrivateExecPermission::PrivateExecPermission(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
 
+void Suspicion::EnumerateMap(map<uint8_t*, vector<Suspicion*>>& SuspicionsMap) {
+	for (map<uint8_t*, vector<Suspicion*>>::const_iterator MapItr = SuspicionsMap.begin(); MapItr != SuspicionsMap.end(); ++MapItr) {
+		printf("0x%p\r\n", MapItr->first);
+		for (vector<Suspicion*>::const_iterator ListItr = MapItr->second.begin(); ListItr != MapItr->second.end(); ++ListItr) {
+			printf("  0x%p : %d\r\n", (*ListItr)->GetBlock()->GetBasic()->BaseAddress, (*ListItr)->GetType());
+		}
+	}
+}
 /*
 
 Generates a list of suspicions for either an ablock or sblock.

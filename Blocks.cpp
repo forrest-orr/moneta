@@ -82,10 +82,10 @@ const wchar_t* SBlock::AttribDesc(MEMORY_BASIC_INFORMATION *pMbi) {
 		return ProtectSymbol(pMbi->Protect);
 	}
 	else if (pMbi->State == MEM_FREE) {
-		return L"FREE";
+		return L"Free";
 	}
 	else if (pMbi->State == MEM_RESERVE) {
-		return L"RSRV";
+		return L"Reserve";
 	}
 		
 	return L"?";
