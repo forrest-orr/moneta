@@ -130,6 +130,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Blocks.cpp" />
+    <ClCompile Include="Environment.cpp" />
     <ClCompile Include="FileIo.cpp" />
     <ClCompile Include="Console.cpp" />
     <ClCompile Include="Entity.cpp" />
@@ -142,6 +143,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Blocks.hpp" />
+    <ClInclude Include="Environment.hpp" />
     <ClInclude Include="FileIo.hpp" />
     <ClInclude Include="Interface.hpp" />
     <ClInclude Include="MemDump.hpp" />

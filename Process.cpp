@@ -7,6 +7,7 @@
 #include "Interface.hpp"
 #include "MemDump.hpp"
 #include "Suspicions.hpp"
+#include "Environment.hpp"
 
 using namespace std;
 using namespace PeFile;
@@ -289,7 +290,7 @@ int32_t FilterSuspicions(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap) {
 					RefSuspList.erase(RefSuspList.begin() + nSuspIndex);
 
 					if (!RefSuspList.size()) {
-						SuspicionsMap.erase(MapItr);
+						SuspicionsMap.erase(MapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
 					}
 					break;
 				}
@@ -306,7 +307,17 @@ int32_t FilterSuspicions(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap) {
 					PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>((*SuspItr)->GetParentObject());
 					
 					if (PeEntity->IsSigned()) {
-						//
+						static const wchar_t* pWinmbExt = L".winmd";
+						if (_wcsnicmp(PeEntity->GetPath().c_str(), Environment::MetadataPath.c_str(), Environment::MetadataPath.length()) == 0 && _wcsicmp(PeEntity->GetPath().c_str() + PeEntity->GetPath().length() - wcslen(pWinmbExt), pWinmbExt) == 0) {
+							//Interface::Log("* %ws is within metadata path\r\n", PeEntity->GetPath().c_str());
+							//system("pause");
+
+							RefSuspList.erase(RefSuspList.begin() + nSuspIndex);
+
+							if (!RefSuspList.size()) {
+								SuspicionsMap.erase(MapItr);
+							}
+						}
 					}
 
 					break;

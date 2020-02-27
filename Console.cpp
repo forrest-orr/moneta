@@ -34,6 +34,7 @@ ________________________________________________________________________________
 #include "Blocks.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
+#include "Environment.hpp"
 
 using namespace std;
 using namespace Moneta;
@@ -244,6 +245,10 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			}
 		}
 
+		//
+		// Validate user input
+		//
+
 		if (ProcType == SelectedProcessType::InvalidPid) {
 			Interface::Log("- Invalid target process type selected\r\n");
 			return 0;
@@ -254,6 +259,10 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			return 0;
 		}
 
+		//
+		// Initialization
+		//
+
 		if (GrantSelfSeDebug()) {
 			Interface::Log("+ Successfully granted SeDebug privilege to self\r\n");
 		}
@@ -261,9 +270,15 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			Interface::Log("- Failed to grant SeDebug privilege to self.\r\n");
 		}
 
+		Environment::Initialize();
+
 		if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS)) {
 			MemDump::Initialize();
 		}
+
+		//
+		// Analyze processes and generate memory maps/suspicions
+		//
 
 		if (ProcType == SelectedProcessType::SelfPid || ProcType == SelectedProcessType::SpecificPid) {
 			Process TargetProc(dwSelectedPid);
