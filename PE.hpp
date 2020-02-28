@@ -23,6 +23,7 @@ namespace PeFile
 		virtual void SetCrc32(uint32_t dwCrc32) = 0;
 		virtual void SetDataDir(int8_t nIndex, uint32_t dwRva, uint32_t dwSize) = 0;
 		virtual uint32_t GetSubsystem() = 0;
+		virtual uint8_t* GetEntryPoint() = 0;
 		virtual void SetSubsystem(uint32_t dwSubSystem) = 0;
 		virtual void* GetImageBase() = 0;
 		virtual void SetImageBase(void* pNewImageBase) = 0;
@@ -65,6 +66,7 @@ namespace PeFile
 		void SetSubsystem(uint32_t dwSubSystem);
 		void* GetImageBase();
 		void SetImageBase(void* pNewImageBase);
+		uint8_t* GetEntryPoint();
 		uint16_t GetDllCharacteristics();
 		void SetDllCharacteristics(uint16_t wDllCharacteristics);
 		uint32_t GetImageSize();

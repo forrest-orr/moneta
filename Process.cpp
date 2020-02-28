@@ -273,24 +273,26 @@ void EnumerateThreads(const wstring Indent, vector<Thread*> Threads) {
 	}
 }
 
-int32_t FilterSuspicions(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap) {
-	//Suspicion::EnumerateMap(SuspicionsMap);
-	for (map<uint8_t*, vector<Suspicion*>>::const_iterator MapItr = SuspicionsMap.begin(); MapItr != SuspicionsMap.end(); ++MapItr) {
-		vector<Suspicion*> SuspListCopy = MapItr->second;
-		vector<Suspicion*>::const_iterator SuspItr = SuspListCopy.begin();
-		vector<Suspicion*> &RefSuspList = SuspicionsMap.at(MapItr->first); // Bug: element removed from list which is still being iterated
-		for (int32_t nSuspIndex = 0; SuspItr != SuspListCopy.end(); ++SuspItr, nSuspIndex++) {
-			switch ((*SuspItr)->GetType()) {
+int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>&SuspicionsMap) {
+	Suspicion::EnumerateMap(SuspicionsMap);
+	for (map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>::const_iterator AbMapItr = SuspicionsMap.begin(); AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
+		for (map<uint8_t*, vector<Suspicion*>>::const_iterator SbMapItr = AbMapItr->second.begin(); SbMapItr != AbMapItr->second.end(); ++SbMapItr) {
+			vector<Suspicion*> SuspListCopy = SbMapItr->second;
+			vector<Suspicion*>::const_iterator SuspItr = SuspListCopy.begin();
+			vector<Suspicion*>& RefSuspList = AbMapItr->second.at(SbMapItr->first); // Bug: element removed from list which is still being iterated
+
+			for (int32_t nSuspIndex = 0; SuspItr != SuspListCopy.end(); ++SuspItr, nSuspIndex++) {
+				switch ((*SuspItr)->GetType()) {
 				case Suspicion::Type::XPRV: {
 					/* Filter cases for private executable memory
-					
+
 					*/
 
 					//Interface::Log("* Filtered executable private memory at 0x%p\r\n", (*SuspItr)->GetBlock()->GetBasic()->BaseAddress);
 					RefSuspList.erase(RefSuspList.begin() + nSuspIndex);
 
 					if (!RefSuspList.size()) {
-						SuspicionsMap.erase(MapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
+						SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
 					}
 					break;
 				}
@@ -305,29 +307,32 @@ int32_t FilterSuspicions(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap) {
 					*/
 
 					PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>((*SuspItr)->GetParentObject());
-					
+
 					if (PeEntity->IsSigned()) {
 						static const wchar_t* pWinmbExt = L".winmd";
 						//if (_wcsnicmp(PeEntity->GetPath().c_str(), Environment::MetadataPath.c_str(), Environment::MetadataPath.length()) == 0 && _wcsicmp(PeEntity->GetPath().c_str() + PeEntity->GetPath().length() - wcslen(pWinmbExt), pWinmbExt) == 0) {
-						if(_wcsicmp(PeEntity->GetPath().c_str() + PeEntity->GetPath().length() - wcslen(pWinmbExt), pWinmbExt) == 0) {
-							//Interface::Log("* %ws is within metadata path\r\n", PeEntity->GetPath().c_str());
-							//system("pause");
+						if (_wcsicmp(PeEntity->GetPath().c_str() + PeEntity->GetPath().length() - wcslen(pWinmbExt), pWinmbExt) == 0) {
+							if (PeEntity->GetPe() != nullptr && PeEntity->GetPe()->GetEntryPoint() == 0) {
+								//Interface::Log("* %ws is within metadata path\r\n", PeEntity->GetPath().c_str());
+								//system("pause");
 
-							RefSuspList.erase(RefSuspList.begin() + nSuspIndex);
+								RefSuspList.erase(RefSuspList.begin() + nSuspIndex);
 
-							if (!RefSuspList.size()) {
-								SuspicionsMap.erase(MapItr);
+								if (!RefSuspList.size()) {
+									SuspicionsMap.erase(AbMapItr);
+								}
 							}
 						}
 					}
 
 					break;
 				}
+				}
 			}
 		}
 	}
-	//Suspicion::EnumerateMap(SuspicionsMap);
-	//printf("enum done\r\n");
+	Suspicion::EnumerateMap(SuspicionsMap);
+	printf("enum done\r\n");
 	return 0;
 }
 
@@ -363,7 +368,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-		map<uint8_t*, vector<Suspicion*>> SuspicionsMap;
+		map <uint8_t*, map<uint8_t*, vector<Suspicion*>>> SuspicionsMap;
 		Suspicion::InspectEntity(*this, *Itr->second, SuspicionsMap);
 		FilterSuspicions(SuspicionsMap);
 		//

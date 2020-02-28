@@ -109,11 +109,14 @@ PhantomImage::PhantomImage(Process* ParentProc, Entity* ParentObj) : Suspicion(P
 MappedExecPermission::MappedExecPermission(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
 PrivateExecPermission::PrivateExecPermission(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
 
-void Suspicion::EnumerateMap(map<uint8_t*, vector<Suspicion*>>& SuspicionsMap) {
-	for (map<uint8_t*, vector<Suspicion*>>::const_iterator MapItr = SuspicionsMap.begin(); MapItr != SuspicionsMap.end(); ++MapItr) {
-		printf("0x%p\r\n", MapItr->first);
-		for (vector<Suspicion*>::const_iterator ListItr = MapItr->second.begin(); ListItr != MapItr->second.end(); ++ListItr) {
-			printf("  0x%p : %d\r\n", (*ListItr)->GetBlock()->GetBasic()->BaseAddress, (*ListItr)->GetType());
+void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>& SuspicionsMap) {
+	for (map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>::const_iterator AbMapItr = SuspicionsMap.begin(); AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
+		printf("0x%p\r\n", AbMapItr->first);
+		for (map<uint8_t*, vector<Suspicion*>>::const_iterator SbMapItr = AbMapItr->second.begin(); SbMapItr != AbMapItr->second.end(); SbMapItr++) {
+			printf("  0x%p\r\n", SbMapItr->first);
+			for (vector<Suspicion*>::const_iterator ListItr = SbMapItr->second.begin(); ListItr != SbMapItr->second.end(); ++ListItr) {
+				printf("    0x%p : %d\r\n", (*ListItr)->GetBlock()->GetBasic()->BaseAddress, (*ListItr)->GetType());
+			}
 		}
 	}
 }
@@ -121,10 +124,22 @@ void Suspicion::EnumerateMap(map<uint8_t*, vector<Suspicion*>>& SuspicionsMap) {
 
 Generates a list of suspicions for either an ablock or sblock.
 
+Region map -> Key [Allocation base]
+                -> Suspicions map -> Key [SBlock address]
+				                       -> Suspicions list
+
+It is important to ensure that all new suspicions are added to the list of the existing map entry even if they share the same base address. This allows the ablock map entry to also hold sblock suspicions such as modified hdr.
+
+~ Create an entry in the primary map with the allocation base as a key and save a reference to the secondary map.
+~ Create a suspicion list for the ablock and every sblock, ensuring that sblocks with suspicions which share the ablock address (for example modified headers) are adding their suspicions to the same list so there are not 2 map entries for the ablock address.
+~ In the event that no new lists were added to the secondary map, erase the primary map entry. Otherwise, preserve both the primary and secondary map entries.
+
 */
-bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_t*, vector<Suspicion *>> &SuspicionsMap) { // Generate suspicions for an entity
+bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, map<uint8_t*, vector<Suspicion *>>> &SuspicionsMap) { // Generate suspicions for an entity
 	vector<Suspicion *> AbSuspList;
-	// Ensure that all new suspicions are added to the list of the existing map entry even if they share the same base address. This allows the ablock map entry to also hold sblock suspicions such as modified hdr
+	SuspicionsMap.insert(make_pair(ParentObj.GetStartVa(), map<uint8_t*, vector<Suspicion*>>()));
+	map<uint8_t*, vector<Suspicion*>>& RefSbMap = SuspicionsMap.at(ParentObj.GetStartVa());
+
 	switch (ParentObj.GetType()) {
 		case Entity::Type::PE_FILE: {
 			PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(&ParentObj);
@@ -188,7 +203,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_
 							}
 
 							if (SbSuspList.size()) { // Do not insert the list to the map if it overlaps with the ablock.
-								SuspicionsMap.insert(make_pair((uint8_t *)(*SbItr)->GetBasic()->BaseAddress, SbSuspList));
+								RefSbMap.insert(make_pair((uint8_t *)(*SbItr)->GetBasic()->BaseAddress, SbSuspList));
 							}
 						}
 					}
@@ -208,7 +223,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_
 					SbSuspList.push_back(new MappedExecPermission(&ParentProc, &ParentObj, *SbItr));
 				}
 				if (SbSuspList.size()) {
-					SuspicionsMap.insert(make_pair((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, SbSuspList));
+					RefSbMap.insert(make_pair((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, SbSuspList));
 				}
 			}
 
@@ -225,7 +240,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_
 					}
 
 					if (SbSuspList.size()) {
-						SuspicionsMap.insert(make_pair((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, SbSuspList));
+						RefSbMap.insert(make_pair((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, SbSuspList));
 					}
 				}
 			}
@@ -235,7 +250,11 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map<uint8_
 	}
 
 	if (AbSuspList.size()) {
-		SuspicionsMap.insert(make_pair(ParentObj.GetStartVa(), AbSuspList));
+		RefSbMap.insert(make_pair(ParentObj.GetStartVa(), AbSuspList));
+	}
+
+	if (!RefSbMap.size()) {
+		SuspicionsMap.erase(ParentObj.GetStartVa());
 	}
 
 	//EnumerateAll(SuspicionsList);

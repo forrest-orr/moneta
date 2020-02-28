@@ -167,6 +167,10 @@ template<typename NtHdrType> uint32_t PeArch<NtHdrType>::GetImageSize() {
 	return GetNtHdrs()->OptionalHeader.SizeOfImage;
 }
 
+template<typename NtHdrType> uint8_t* PeArch<NtHdrType>::GetEntryPoint() {
+	return GetNtHdrs()->OptionalHeader.AddressOfEntryPoint;
+}
+
 //
 // Derived 32-bit
 //

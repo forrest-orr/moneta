@@ -7,8 +7,8 @@ namespace Moneta {
 		enum Type { MODIFIED_CODE, MODIFIED_HEADER, XMAP, XPRV, UNSIGNED_MODULE, MISSING_PEB_MODULE, MISMATCHING_PEB_MODULE, DISK_PERMISSION_MISMATCH, PHANTOM_IMAGE };
 		virtual Suspicion::Type GetType() = 0;
 		virtual std::wstring GetDescription() = 0;
-		static bool InspectEntity(Process& ParentProc, Entity& ParentObj, std::map<uint8_t*, std::vector<Suspicion *>>& SuspicionsMap);
-		static void EnumerateMap(std::map<uint8_t*, std::vector<Suspicion*>>& SuspicionsMap);
+		static bool InspectEntity(Process& ParentProc, Entity& ParentObj, std::map <uint8_t*, std::map<uint8_t*, std::vector<Suspicion*>>>& SuspicionsMap);
+		static void EnumerateMap(std::map <uint8_t*, std::map<uint8_t*, std::vector<Suspicion*>>>& SuspicionsMap);
 		bool IsFullEntitySuspicion();
 		void Enumerate();
 		Suspicion(Process* ParentProc, Entity* Parent, SBlock* Block);
