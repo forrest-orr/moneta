@@ -279,7 +279,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>&Suspi
 		for (map<uint8_t*, vector<Suspicion*>>::const_iterator SbMapItr = AbMapItr->second.begin(); SbMapItr != AbMapItr->second.end(); ++SbMapItr) {
 			vector<Suspicion*> SuspListCopy = SbMapItr->second;
 			vector<Suspicion*>::const_iterator SuspItr = SuspListCopy.begin();
-			vector<Suspicion*>& RefSuspList = AbMapItr->second.at(SbMapItr->first); // Bug: element removed from list which is still being iterated
+			//vector<Suspicion*>& RefSuspList = reinterpret_cast<vector<Suspicion*>>(SbMapItr->second); // Bug: element removed from list which is still being iterated
 
 			for (int32_t nSuspIndex = 0; SuspItr != SuspListCopy.end(); ++SuspItr, nSuspIndex++) {
 				switch ((*SuspItr)->GetType()) {
@@ -289,9 +289,9 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>&Suspi
 					*/
 
 					//Interface::Log("* Filtered executable private memory at 0x%p\r\n", (*SuspItr)->GetBlock()->GetBasic()->BaseAddress);
-					RefSuspList.erase(RefSuspList.begin() + nSuspIndex);
+					SbMapItr->second.erase(SbMapItr->second.begin() + nSuspIndex);
 
-					if (!RefSuspList.size()) {
+					if (!SbMapItr->second.size()) {
 						SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
 					}
 					break;
@@ -316,9 +316,9 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>&Suspi
 								//Interface::Log("* %ws is within metadata path\r\n", PeEntity->GetPath().c_str());
 								//system("pause");
 
-								RefSuspList.erase(RefSuspList.begin() + nSuspIndex);
+								SbMapItr->second.erase(SbMapItr->second.begin() + nSuspIndex);
 
-								if (!RefSuspList.size()) {
+								if (!SbMapItr->second.size()) {
 									SuspicionsMap.erase(AbMapItr);
 								}
 							}
