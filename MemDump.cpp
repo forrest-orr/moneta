@@ -30,7 +30,7 @@ bool MemDump::Create(wstring Folder, MEMORY_BASIC_INFORMATION *pMbi, wchar_t* pD
 			TargetDmpFolder = MemDump::Folder;
 		}
 
-		swprintf_s(pDumpFilePath, ccDumpFilePathLen, L"%ws\\%d_%p_%ws.dat", TargetDmpFolder.c_str(), this->Pid, pMbi->BaseAddress, SBlock::AttribDesc(pMbi));
+		swprintf_s(pDumpFilePath, ccDumpFilePathLen, L"%ws\\%d_%p_%ws_%ws.dat", TargetDmpFolder.c_str(), this->Pid, pMbi->BaseAddress, SBlock::AttribDesc(pMbi), SBlock::TypeSymbol(pMbi->Type));
 		FileBase DumpFile(pDumpFilePath, pBuf, cbBytesRead);
 		return DumpFile.ToDisk();
 	}

@@ -11,10 +11,6 @@
 using namespace std;
 using namespace Moneta;
 
-void Suspicion::Enumerate() {
-	//
-}
-
 wstring UnsignedModule::GetDescription() {
 	return L"Unsigned module";
 }

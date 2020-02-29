@@ -526,6 +526,53 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 		}
 	}
 
+	//
+	// Generate memory dump for suspicions
+	//
+
+	if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS)) {
+		bool bDmpFin;
+		for (map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>::const_iterator AbMapItr = SuspicionsMap.begin(); AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
+			bDmpFin = false;
+			//printf("0x%p [%d sblocks]\r\n", AbMapItr->first, AbMapItr->second.size());
+
+			for (map<uint8_t*, vector<Suspicion*>>::const_iterator SbMapItr = AbMapItr->second.begin(); !bDmpFin && SbMapItr != AbMapItr->second.end(); SbMapItr++) {
+				//printf("  0x%p [%d list elements]\r\n", SbMapItr->first, SbMapItr->second.size());
+				for (vector<Suspicion*>::const_iterator ListItr = SbMapItr->second.begin(); !bDmpFin && ListItr != SbMapItr->second.end(); ++ListItr) {
+
+					if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) || (*ListItr)->IsFullEntitySuspicion()) {
+						if (Entity::Dump(ProcDmp, *(*ListItr)->GetParentObject())) {
+							Interface::Log("      ~ Generated full region dump at 0x%p\r\n", (*ListItr)->GetParentObject()->GetStartVa());
+						}
+						else {
+							Interface::Log("      ~ Failed to generate full region dump at 0x%p\r\n", (*ListItr)->GetParentObject()->GetStartVa());
+						}
+
+						bDmpFin = true;
+					}
+					else {
+						if (ProcDmp.Create((*ListItr)->GetBlock()->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
+							Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
+						}
+						else {
+							Interface::Log("      ~ Memory dump failed.\r\n");
+						}
+					}
+					/*
+					if (!(*ListItr)->IsFullEntitySuspicion()) {
+						printf("    0x%p : %d : %ws\r\n", (*ListItr)->GetBlock()->GetBasic()->BaseAddress, (*ListItr)->GetType(), (*ListItr)->GetDescription().c_str());
+					}
+					else {
+						printf("    0x%p : %d : %ws : Full entity\r\n", (*ListItr)->GetParentObject()->GetStartVa(), (*ListItr)->GetType(), (*ListItr)->GetDescription().c_str());
+					}*/
+				}
+			}
+		}
+	}
+
+	
+	
+
 			/*
 			bool bTotalEntitySuspicion = false; // Indicates a full entity dump rather than an individual sblock regardless of "from-base" dump setting. For example for PEB unlinked modules.
 

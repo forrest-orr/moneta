@@ -281,15 +281,20 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		//
 
 		if (ProcType == SelectedProcessType::SelfPid || ProcType == SelectedProcessType::SpecificPid) {
-			Process TargetProc(dwSelectedPid);
-			//list<SBlock*> ProcessMem = QueryProcessMem(dwSelectedPid);
+			try {
+				Process TargetProc(dwSelectedPid);
+				//list<SBlock*> ProcessMem = QueryProcessMem(dwSelectedPid);
 
-			if (OutputType == SelectedOutputType::Raw) {
-				TargetProc.Enumerate(qwMemdmpOptFlags);
+				if (OutputType == SelectedOutputType::Raw) {
+					TargetProc.Enumerate(qwMemdmpOptFlags);
+				}
+				else if (OutputType == SelectedOutputType::Statistics) {
+					//MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(TargetProc.GetBlocks());
+					//MemPermRec->ShowRecords();
+				}
 			}
-			else if (OutputType == SelectedOutputType::Statistics) {
-				//MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(TargetProc.GetBlocks());
-				//MemPermRec->ShowRecords();
+			catch (int32_t nError) {
+				Interface::Log("- Failed to map address space of %d (error %d)\r\n", dwSelectedPid, nError);
 			}
 		}
 		else {

@@ -10,7 +10,6 @@ namespace Moneta {
 		static bool InspectEntity(Process& ParentProc, Entity& ParentObj, std::map <uint8_t*, std::map<uint8_t*, std::vector<Suspicion*>>>& SuspicionsMap);
 		static void EnumerateMap(std::map <uint8_t*, std::map<uint8_t*, std::vector<Suspicion*>>>& SuspicionsMap);
 		bool IsFullEntitySuspicion();
-		void Enumerate();
 		Suspicion(Process* ParentProc, Entity* Parent, SBlock* Block);
 		Entity* GetParentObject();
 		SBlock* GetBlock();
