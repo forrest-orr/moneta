@@ -280,6 +280,7 @@ Region map -> Key [Allocation base]
 */
 
 int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>&SuspicionsMap) {
+	//printf("before:\r\n");
 	//Suspicion::EnumerateMap(SuspicionsMap);
 	bool bReWalkMap = false;
 
@@ -421,7 +422,9 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 		//printf("2\r\n");
 		if (SuspicionsMap.size()) {
 			//printf("3\r\n");
+			//Interface::Log("\r\n%ws [%ws] : %d : %ws\r\n", this->Name.c_str(), this->ImageFilePath.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
 			FilterSuspicions(SuspicionsMap);
+			//printf("filter done\r\n");
 			auto AbMapItr = SuspicionsMap.find(Itr->second->GetStartVa()); // An iterator into the main ablock map which points to the entry for the sb map.
 
 			//

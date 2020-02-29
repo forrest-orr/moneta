@@ -111,11 +111,16 @@ PrivateExecPermission::PrivateExecPermission(Process* ParentProc, Entity* Parent
 
 void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>& SuspicionsMap) {
 	for (map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>::const_iterator AbMapItr = SuspicionsMap.begin(); AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
-		printf("0x%p\r\n", AbMapItr->first);
+		printf("0x%p [%d sblocks]\r\n", AbMapItr->first, AbMapItr->second.size());
 		for (map<uint8_t*, vector<Suspicion*>>::const_iterator SbMapItr = AbMapItr->second.begin(); SbMapItr != AbMapItr->second.end(); SbMapItr++) {
-			printf("  0x%p\r\n", SbMapItr->first);
+			printf("  0x%p [%d list elements]\r\n", SbMapItr->first, SbMapItr->second.size());
 			for (vector<Suspicion*>::const_iterator ListItr = SbMapItr->second.begin(); ListItr != SbMapItr->second.end(); ++ListItr) {
-				printf("    0x%p : %d\r\n", (*ListItr)->GetBlock()->GetBasic()->BaseAddress, (*ListItr)->GetType());
+				if (!(*ListItr)->IsFullEntitySuspicion()) {
+					printf("    0x%p : %d : %ws\r\n", (*ListItr)->GetBlock()->GetBasic()->BaseAddress, (*ListItr)->GetType(), (*ListItr)->GetDescription().c_str());
+				}
+				else {
+					printf("    0x%p : %d : %ws : Full entity\r\n", (*ListItr)->GetParentObject()->GetStartVa(), (*ListItr)->GetType(), (*ListItr)->GetDescription().c_str());
+				}
 			}
 		}
 	}
@@ -257,6 +262,8 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 		SuspicionsMap.erase(ParentObj.GetStartVa());
 	}
 
+	//Suspicion::EnumerateMap(SuspicionsMap);
 	//EnumerateAll(SuspicionsList);
+
 	return true;
 }
