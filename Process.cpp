@@ -413,10 +413,9 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 	MemDump ProcDmp(this->Handle, this->Pid);
 	wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
-	//map <uint8_t*, map<uint8_t*, vector<Suspicion*>>> SuspicionsMap;
+	map <uint8_t*, map<uint8_t*, vector<Suspicion*>>> SuspicionsMap; // More efficient to only filter this map once. Currently filtering it for every single entity
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-		map <uint8_t*, map<uint8_t*, vector<Suspicion*>>> SuspicionsMap;
 		//printf("1\r\n");
 		Suspicion::InspectEntity(*this, *Itr->second, SuspicionsMap);
 		//printf("2\r\n");
