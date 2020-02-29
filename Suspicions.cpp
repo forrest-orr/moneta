@@ -258,4 +258,5 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 	}
 
 	//EnumerateAll(SuspicionsList);
+	return true;
 }

@@ -143,7 +143,7 @@ bool GrantSelfSeDebug() {
 	return true;
 }
 
-//#define DEBUG
+#define DEBUG
 
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	/*

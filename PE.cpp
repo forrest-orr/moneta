@@ -168,7 +168,7 @@ template<typename NtHdrType> uint32_t PeArch<NtHdrType>::GetImageSize() {
 }
 
 template<typename NtHdrType> uint8_t* PeArch<NtHdrType>::GetEntryPoint() {
-	return GetNtHdrs()->OptionalHeader.AddressOfEntryPoint;
+	return reinterpret_cast<uint8_t *>(GetNtHdrs()->OptionalHeader.AddressOfEntryPoint);
 }
 
 //
