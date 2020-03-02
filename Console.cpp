@@ -45,12 +45,12 @@ enum class SelectedProcessType {
 	AllPids,
 	SelfPid
 };
-
+/*
 enum class SelectedOutputType {
 	InvalidOutput = 0,
 	Raw,
 	Statistics
-};
+};*/
 
 BOOL SetPrivilege(
 	HANDLE hToken,          // token handle
@@ -143,6 +143,13 @@ bool GrantSelfSeDebug() {
 	return true;
 }
 
+enum class MemorySelectionType {
+	Invalid,
+	Block,
+	Process,
+	Suspicious
+};
+
 #define DEBUG
 
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
@@ -151,7 +158,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	SYSTEM_INFO SystemInfo = { 0 };
 	typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
 	static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
-	uint64_t qwMemdmpOptFlags = 0;
+	uint64_t qwOptFlags = 0;
 	
 	if (IsWow64Process != nullptr) {
 		BOOL bSelfWow64 = FALSE;
@@ -167,24 +174,18 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	}
 
 	if (nArgc < 5) {
-		Interface::Log("* Usage: %ws --target (PID) --output-type (see remarks) --dump-options (ree remarks)\r\n\r\n"
-			"  Remarks:\r\n"
-			"  ~ Dump options:\r\n"
-			"    suspicious - dump sblocks with suspicious attributes\r\n"
-			"    from-base - dump the entire allocated region associated with a suspicious sblock\r\n"
-			"  ~ PID field may be \"self\" to target the current process, an arbitrart PID, or \"*\" to target all accessible processes.\r\n"
-			"  ~ Output type field may be \"raw\" to display all queried memory info for each region, or may be \"stats\" to gather statistically common memory characteristics among the target(s)\r\n", pArgv[0]);
+		Interface::Log("* Usage: %ws see README.md\r\n", pArgv[0]);
 	}
 	else {
 		SelectedProcessType ProcType = SelectedProcessType::InvalidPid;
-		SelectedOutputType OutputType = SelectedOutputType::InvalidOutput;
+		MemorySelectionType MemSelectType = MemorySelectionType::Invalid;
 		uint32_t dwSelectedPid = 0;
 
 		for (vector<wstring>::const_iterator i = Args.begin(); i != Args.end(); ++i) {
 			wstring Arg = *i;
 			transform(Arg.begin(), Arg.end(), Arg.begin(), ::tolower);
 
-			if (Arg == L"--target") {
+			if (Arg == L"-p") {
 				if (*(i + 1) == L"self") {
 					ProcType = SelectedProcessType::SelfPid;
 					dwSelectedPid = GetCurrentProcessId();
@@ -197,26 +198,19 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 					dwSelectedPid = _wtoi((*(i + 1)).c_str());
 				}
 			}
-			else if (Arg == L"--output-type") {
-				if (*(i + 1) == L"raw") {
-					OutputType = SelectedOutputType::Raw;
+			else if (Arg == L"-m") {
+				if (*(i + 1) == L"block") {
+					MemSelectType = MemorySelectionType::Block;
 				}
-				else if (*(i + 1) == L"stats") {
-					OutputType = SelectedOutputType::Statistics;
+				else if (*(i + 1) == L"process") {
+					MemSelectType = MemorySelectionType::Process;
+				}
+				else if (*(i + 1) == L"suspicious") {
+					MemSelectType = MemorySelectionType::Suspicious;
 				}
 			}
-			else if (Arg == L"--dump-options") {
-				for (vector<wstring>::const_iterator DmpOptItr = i; DmpOptItr != Args.end(); ++DmpOptItr) {
-					wstring DmpOpt = *DmpOptItr;
-					transform(DmpOpt.begin(), DmpOpt.end(), DmpOpt.begin(), ::tolower);
-
-					if (DmpOpt == L"from-base") {
-						qwMemdmpOptFlags |= MEMDMP_OPT_FLAG_FROM_BASE;
-					}
-					else if (DmpOpt == L"suspicious") {
-						qwMemdmpOptFlags |= MEMDMP_OPT_FLAG_SUSPICIOUS;
-					}
-				}
+			else if (Arg == L"-d") {
+				qwOptFlags |= MONETA_FLAG_MEMDUMP;
 			}
 		}
 

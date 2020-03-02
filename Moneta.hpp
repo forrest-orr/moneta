@@ -82,5 +82,8 @@ namespace Moneta {
 		};
 	}
 
-	uint32_t GetPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t dwSize);
+	//uint32_t GetPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t dwSize);
 }
+
+#define MONETA_FLAG_MEMDUMP 0x1
+#define MONETA_FLAG_FROM_BASE 0x2
