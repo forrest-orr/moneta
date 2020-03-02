@@ -45,4 +45,5 @@ Memory selection options: --m-opt ["from-base"]
 Examples:
 
 Moneta64.exe -p self -m block --address 0x00007FF662470000 -v detail --m-opt from-base
-Moneta64.exe 
+Moneta64.exe -p * -m process -v surface
+Moneta64.exe -p 400 -m suspicious -v surface --m-opt from-base
