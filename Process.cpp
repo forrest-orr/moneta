@@ -59,11 +59,6 @@ BOOL Process::IsWow64() {
 
 #define ThreadQuerySetWin32StartAddress 9
 
-// 1 = suspicious memory
-// 2 = process info regardless of whether it contains suspicious memory
-// 3 = all artifacts from enumerated processes
-// 4 - status output while parsing memory for processes
-
 Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	//
 	// Initialize a new entity for each allocation base and add it to this process address space map
@@ -408,6 +403,63 @@ void Process::EnumerateSBlocks(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap,
 	}
 }
 
+/*
+1. Loop entities to build suspicions list
+2. Filter suspicions
+3. Loop entities for enumeration if:
+   mselect == process
+   mselect == sblock and this eneity contains the sblock
+   mselect == suspicious and there is 1 or more suspicions
+4. Show the process if it has not been shown before
+5. Display entity info (exe image, private, mapped + total size) ALWAYS (criteria already applied going into loop)
+5. For PEs, loop sblocks/sections. Enum if:
+	mselect == process
+	mselect == sblock && sblock == current, or the  "from base" option is set
+	or mselect == suspicious and the current sblock has a suspicion or the  "from base" option is set
+6. Dump the current sblock based on the same criteria as above but ONLY if the "from base" option is not set.
+7. Dump the entire PE entity if it met the initial enum criteria and "from base" option is set
+
+8. For private/mapped loop sblocks and enum if:
+	mselect == process
+	mselect == sblock && sblock == current, or the  "from base" option is set
+	or mselect == suspicious and the current sblock has a suspicion or the  "from base" option is set
+9. Dump the current sblock based on the same criteria as above but ONLY if the "from base" option is not set.
+10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
+*/
+
+void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl, uint8_t *pSelectSblock) {
+	bool bShownProc = false;
+	MemDump ProcDmp(this->Handle, this->Pid);
+	wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
+	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
+	map <uint8_t*, map<uint8_t*, vector<Suspicion*>>> SuspicionsMap; // More efficient to only filter this map once. Currently filtering it for every single entity
+
+	//
+	// Build suspicions list for following memory selection and apply filters to it.
+	//
+
+	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
+		Suspicion::InspectEntity(*this, *Itr->second, SuspicionsMap);
+	}
+
+	if (SuspicionsMap.size()) {
+		FilterSuspicions(SuspicionsMap);
+	}
+
+	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
+		auto AbMapItr = SuspicionsMap.find(Itr->second->GetStartVa()); // An iterator into the main ablock map which points to the entry for the sb map.
+
+		if (MemSelectType == MemorySelectionType::Process ||
+			(MemSelectType == MemorySelectionType::Block && ((pSelectSblock >= Itr->second->GetStartVa()) && (pSelectSblock < Itr->second->GetEndVa()))) ||
+			(MemSelectType == MemorySelectionType::Suspicious && AbMapItr != SuspicionsMap.end())) {
+			if (!bShownProc) {
+				Interface::Log("\r\n%ws [%ws] : %d : %ws\r\n", this->Name.c_str(), this->ImageFilePath.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
+				bShownProc = true;
+			}
+		}
+	}
+}
+
 void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl) {
 	bool bShownProc = false;
 	MemDump ProcDmp(this->Handle, this->Pid);
@@ -524,40 +576,6 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 			}
 		}
 	}
-	else if (MemSelectType == MemorySelectionType::Process) {
-		//
-		// Enumerate entities and their sblocks, outputting them only if they correspond with suspicions
-		//
-
-		Interface::Log("\r\n%ws [%ws] : %d : %ws\r\n", this->Name.c_str(), this->ImageFilePath.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
-
-		for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-			switch (Itr->second->GetType()) {
-			case Entity::Type::PE_FILE: {
-				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
-
-				if (PeEntity->IsNonExecutableImage()) {
-					Interface::Log("  0x%p:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
-				}
-				else {
-					Interface::Log("  0x%p:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
-				}
-
-				if (RefSbMap.count((uint8_t*)PeEntity->GetStartVa())) {
-					vector<Suspicion*>& SuspicionsList = AbMapItr->second.at(AbMapItr->first);
-
-					for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
-						if ((*SuspItr)->IsFullEntitySuspicion()) {
-							Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
-						}
-					}
-				}
-
-				Interface::Log("\r\n");
-				break;
-			}
-		}
-	}
 
 
 
@@ -606,300 +624,6 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 	}
 
 	
-	
-
-			/*
-			bool bTotalEntitySuspicion = false; // Indicates a full entity dump rather than an individual sblock regardless of "from-base" dump setting. For example for PEB unlinked modules.
-
-			if (!bShownProc) {
-				Interface::Log("\r\n%ws [%ws] : %d : %ws\r\n", this->Name.c_str(), this->ImageFilePath.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
-				bShownProc = true;
-			}
-
-			if (Itr->second->GetType() == Entity::Type::PE_FILE) {
-				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
-
-				if (!PeEntity->IsSigned()) {
-					nSuspiciousObjCount++;
-					bTotalEntitySuspicion = true;
-				}
-
-				if (PeEntity->GetPe() != nullptr) {
-					if (PeEntity->IsNonExecutableImage()) {
-						Interface::Log("  0x%016x:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetPath().c_str());
-					}
-					else {
-						Interface::Log("  0x%016x:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetPe()->GetImageSize(), PeEntity->GetPath().c_str());
-					}
-
-					if (!PeEntity->IsSigned()) {
-						Interface::Log((WORD)FOREGROUND_RED, " | Unsigned");
-					}
-					else {
-						Interface::Log(" | Signed");
-					}
-
-					//
-					// Determine whether this image has a corresponding entry in the PEB, and whether or not this entry accurately reflects the mapped file it is associated with.
-					//
-
-					if (!PeEntity->IsNonExecutableImage()) {
-						if (!PeEntity->GetPebModule().Exists()) { // The PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx
-							Interface::Log((WORD)FOREGROUND_RED, " | Missing PEB module");
-							nSuspiciousObjCount++;
-							bTotalEntitySuspicion = true;
-						}
-						else {
-							if (_wcsicmp(PeEntity->GetPebModule().GetPath().c_str(), PeEntity->GetPath().c_str()) != 0) { // Since the PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx, there may be a PEB link with a base address matching this image region but with a misleading name/path
-								if (this->IsWow64()) { // This is an edge case in which in Wow64 a module may appear as C:\Windows\System32\kernel32.dll although the true path is C:\Windows\SysWOW64\kernel32.dll due to Wow64 FS redirection.
-									wchar_t ReFormattedPath[MAX_PATH + 1] = { 0 };
-
-									if (FileBase::ArchWow64PathExpand(PeEntity->GetPebModule().GetPath().c_str(), ReFormattedPath, MAX_PATH + 1)) {
-										//Interface::Log("* Translated %ws to %ws\r\n", PeEntity->GetPebModule().GetPath().c_str(), ReFormattedPath);
-
-										if (_wcsicmp(ReFormattedPath, PeEntity->GetPath().c_str()) != 0) {
-											Interface::Log((WORD)FOREGROUND_RED, " | Mismatching PEB module");
-											nSuspiciousObjCount++;
-											bTotalEntitySuspicion = true;
-										}
-									}
-								}
-								else {
-									Interface::Log((WORD)FOREGROUND_RED, " | Mismatching PEB module");
-									nSuspiciousObjCount++;
-									bTotalEntitySuspicion = true;
-								}
-							}
-						}
-					}
-
-					Interface::Log("\r\n");
-
-					vector<PeVm::Section*> Sections = PeEntity->GetSections();
-					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
-						vector<SBlock*> SBlocks = (*SectItr)->GetSBlocks();
-						wchar_t AlignedSectName[9] = { 0 };
-						char AnsiSectName[9];
-						strncpy_s(AnsiSectName, 9, (char*)(*SectItr)->GetHeader()->Name, 8);
-						wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
-						AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
-
-						for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-							bool bSuspiciousSblock = false;
-							wchar_t AlignedAttribDesc[6] = { 0 };
-
-							AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
-
-							Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
-								SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize)
-							);
-
-							//
-							// Headers with private pages
-							//
-
-							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && SBlock::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
-								//Interface::Log("! PE headers have private pages within %ws [%ws:%d]\r\n", PeEntity->GetPath().c_str(), this->Name.c_str(), this->Pid);
-								Interface::Log((WORD)FOREGROUND_RED, " | Modified header");
-								bSuspiciousSblock = true;
-								nSuspiciousObjCount++;
-								//system("pause");
-							}
-
-							//
-							// Executable regions within sections that are not marked as executable on disk. For example: data is +rw on disk but has +x sblock
-							//
-
-							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
-								//Interface::Log("! Sblock in section %s has executable permissions inconsistent with its file on disk at %ws [%ws:%d]\r\n",
-								//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
-								//	this->Name.c_str(), this->Pid);
-								Interface::Log((WORD)FOREGROUND_RED, " | Inconsistent +x between disk and memory");
-								bSuspiciousSblock = true;
-								nSuspiciousObjCount++;
-								//system("pause");
-							}
-
-							//
-							// Executable regions in memory with private pages. Whether their +x is consistent with their section on disk is examined as well.
-							//
-
-							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && SBlock::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
-								//Interface::Log("! Sblock in section %s is executable and has private pages within %ws - %ws PE on disk [%ws:%d]\r\n",
-								//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
-								//	((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? L"matches" : L"does not match",
-								//	this->Name.c_str(), this->Pid);
-								Interface::Log((WORD)FOREGROUND_RED, " | Modified code");
-								bSuspiciousSblock = true;
-								nSuspiciousObjCount++;
-								//system("pause");
-							}
-
-							Interface::Log("\r\n");
-							vector<Thread*> Threads = (*SbItr)->GetThreads();
-
-							for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
-								Interface::Log("      Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
-								if (PeEntity->IsNonExecutableImage()) {
-									Interface::Log("    !! Thread in non-executable image!\r\n");
-									system("pause");
-								}
-							}
-
-							if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
-								if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
-									Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
-								}
-								else {
-									Interface::Log("      ~ Memory dump failed.\r\n");
-								}
-							}
-						}
-					}
-				}
-				else {
-					vector<SBlock*> SBlocks = PeEntity->GetSBlocks();
-					Interface::Log((WORD)FOREGROUND_RED, "  0x%016x:0x%08x | Image | %ws [Phantom]\r\n", PeEntity->GetStartVa(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
-
-					for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-						bool bSuspiciousSblock = false;
-						wchar_t AlignedAttribDesc[6] = { 0 };
-
-						AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
-
-						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
-							SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
-
-						if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect)) {
-							//Interface::Log("! Phantom image memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
-							Interface::Log((WORD)FOREGROUND_RED, " | Phantom +x image memory");
-							bSuspiciousSblock = true;
-							nSuspiciousObjCount++;
-							//system("pause");
-						}
-
-						Interface::Log("\r\n");
-						vector<Thread*> Threads = (*SbItr)->GetThreads();
-
-						for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
-							Interface::Log("      Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
-							system("pause");
-						}
-
-						if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
-							if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
-								Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
-							}
-							else {
-								Interface::Log("      ~ Memory dump failed.\r\n");
-							}
-						}
-					}
-				}
-			}
-			else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
-				vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
-
-				Interface::Log("  0x%016x:0x%08x | Mapped | %ws\r\n", SBlocks.front()->GetBasic()->AllocationBase, SBlocks.front()->GetBasic()->RegionSize, dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
-				//Interface::Log("S-Blocks:\r\n");
-
-				for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-					bool bSuspiciousSblock = false;
-					wchar_t AlignedAttribDesc[6] = { 0 };
-
-					AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
-
-					//Interface::Log("  0x%p\r\n", (*SbItr)->GetBasic()->BaseAddress);
-					Interface::Log("    0x%p:0x%08x | %ws", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
-					if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect)) {
-						//Interface::Log("! Mapped memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
-						Interface::Log((WORD)FOREGROUND_RED, " | Abnormal executable mapped memory");
-						//system("pause");
-						bSuspiciousSblock = true;
-						nSuspiciousObjCount++;
-					}
-
-					Interface::Log("\r\n");
-					vector<Thread*> Threads = (*SbItr)->GetThreads();
-
-					for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
-						Interface::Log("      Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
-						system("pause");
-					}
-
-					if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
-						if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
-							Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
-						}
-						else {
-							Interface::Log("      ~ Memory dump failed.\r\n");
-						}
-					}
-				}
-			}
-			else {
-				//Interface::Log("S-Blocks:\r\n");
-
-				vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
-
-				if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
-					Interface::Log("  0x%016x:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->AllocationBase, (uint32_t)((uint8_t*)SBlocks.back()->GetBasic()->BaseAddress - SBlocks.back()->GetBasic()->AllocationBase) + SBlocks.back()->GetBasic()->RegionSize);
-					for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-						bool bSuspiciousSblock = false;
-						wchar_t AlignedAttribDesc[6] = { 0 };
-
-						AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
-
-						Interface::Log("    0x%p:0x%08x | %ws", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc);
-						if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect)) {
-							//Interface::Log("! Private memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);
-							Interface::Log((WORD)FOREGROUND_RED, " | Abnormal executable private memory");
-							//system("pause");
-							bSuspiciousSblock = true;
-							nSuspiciousObjCount++;
-						}
-
-						Interface::Log("\r\n");
-
-						vector<Thread*> Threads = (*SbItr)->GetThreads();
-
-						for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
-							Interface::Log("      Thread 0x%p [TID 0x%08x]\r\n", (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
-							system("pause");
-						}
-
-						if (!(qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) && (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS) && bSuspiciousSblock) {
-							//printf("start va: 0x%p, size: 0x%08x\r\n", Itr->second->GetStartVa(), Itr->second->GetEntitySize());
-							if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
-								Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
-							}
-							else {
-								Interface::Log("      ~ Memory dump failed.\r\n");
-							}
-						}
-					}
-				}
-				else {
-					//Interface::Log("! Unknown memory type at 0x%p\r\n", Itr->first);
-				}
-			}
-
-			if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS)) {
-				if (nSuspiciousObjCount > 0 && (bTotalEntitySuspicion || (qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE))) { // Suspicious object count must be re-calculated since it cannot be known if this entity enumeration is occuring due to verbosity level or genuine suspicion
-					if (Entity::Dump(ProcDmp, *(Itr->second))) {
-						Interface::Log("      ~ Generated full region dump\r\n");
-					}
-					else {
-						Interface::Log("      ~ Failed to generate full region dump\r\n");
-					}
-				}
-			}
-
-		}
-
-		//Interface::Log(3, "\r\n");
-	}
-
 	Interface::Log(2, "\r\n");
 	/*
 	bool bFileRange = false, bImageRange = false;
