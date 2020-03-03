@@ -415,120 +415,155 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
 	map <uint8_t*, map<uint8_t*, vector<Suspicion*>>> SuspicionsMap; // More efficient to only filter this map once. Currently filtering it for every single entity
 
-	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-		//printf("1\r\n");
-		Suspicion::InspectEntity(*this, *Itr->second, SuspicionsMap);
-		//printf("2\r\n");
-		if (SuspicionsMap.size()) {
-			//printf("3\r\n");
-			//Interface::Log("\r\n%ws [%ws] : %d : %ws\r\n", this->Name.c_str(), this->ImageFilePath.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
-			FilterSuspicions(SuspicionsMap);
-			//printf("filter done\r\n");
-			auto AbMapItr = SuspicionsMap.find(Itr->second->GetStartVa()); // An iterator into the main ablock map which points to the entry for the sb map.
+	if (MemSelectType == MemorySelectionType::Suspicious) {
+		//
+		// Build suspicions list for following memory selection and apply filters to it.
+		//
 
-			//
-			// Retrospectively enumerate the entire entity if a suspicious sblock was found within it, or enumerate it simply based on verbosity level
-			//
-			//printf("4\r\n");
-			if (Interface::GetVerbosity() >= 3 || (Interface::GetVerbosity() < 3 && AbMapItr != SuspicionsMap.end())) {
-				map<uint8_t*, vector<Suspicion*>>& RefSbMap = SuspicionsMap.at(Itr->second->GetStartVa());
-				//printf("5\r\n");
-				if (!bShownProc) {
-					Interface::Log("\r\n%ws [%ws] : %d : %ws\r\n", this->Name.c_str(), this->ImageFilePath.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
-					bShownProc = true;
-				}
+		for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
+			Suspicion::InspectEntity(*this, *Itr->second, SuspicionsMap);
 
-				switch (Itr->second->GetType()) {
-				case Entity::Type::PE_FILE: {
-					PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
+			if (SuspicionsMap.size()) {
+				FilterSuspicions(SuspicionsMap);
 
-					if (PeEntity->IsNonExecutableImage()) {
-						Interface::Log("  0x%p:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
-					}
-					else {
-						Interface::Log("  0x%p:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+				//
+				// Enumerate entities and their sblocks, outputting them only if they correspond with suspicions
+				//
+
+				auto AbMapItr = SuspicionsMap.find(Itr->second->GetStartVa()); // An iterator into the main ablock map which points to the entry for the sb map.
+
+				if (AbMapItr != SuspicionsMap.end()) {
+					map<uint8_t*, vector<Suspicion*>>& RefSbMap = SuspicionsMap.at(Itr->second->GetStartVa());
+
+					if (!bShownProc) {
+						Interface::Log("\r\n%ws [%ws] : %d : %ws\r\n", this->Name.c_str(), this->ImageFilePath.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
+						bShownProc = true;
 					}
 
-					if (RefSbMap.count((uint8_t*)PeEntity->GetStartVa())) {
-						vector<Suspicion*>& SuspicionsList = AbMapItr->second.at(AbMapItr->first);
+					switch (Itr->second->GetType()) {
+					case Entity::Type::PE_FILE: {
+						PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
-						for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
-							if ((*SuspItr)->IsFullEntitySuspicion()) {
-								Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
+						if (PeEntity->IsNonExecutableImage()) {
+							Interface::Log("  0x%p:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+						}
+						else {
+							Interface::Log("  0x%p:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+						}
+
+						if (RefSbMap.count((uint8_t*)PeEntity->GetStartVa())) {
+							vector<Suspicion*>& SuspicionsList = AbMapItr->second.at(AbMapItr->first);
+
+							for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
+								if ((*SuspItr)->IsFullEntitySuspicion()) {
+									Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
+								}
 							}
 						}
-					}
 
-					Interface::Log("\r\n");
+						Interface::Log("\r\n");
 
-					if (!PeEntity->IsPhantom()) {
-						vector<PeVm::Section*> Sections = PeEntity->GetSections();
-						for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
-							vector<SBlock*> SBlocks = (*SectItr)->GetSBlocks();
-							wchar_t AlignedSectName[9] = { 0 };
-							char AnsiSectName[9];
-							strncpy_s(AnsiSectName, 9, (char*)(*SectItr)->GetHeader()->Name, 8);
-							wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
-							AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
+						if (!PeEntity->IsPhantom()) {
+							vector<PeVm::Section*> Sections = PeEntity->GetSections();
+							for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
+								vector<SBlock*> SBlocks = (*SectItr)->GetSBlocks();
+								wchar_t AlignedSectName[9] = { 0 };
+								char AnsiSectName[9];
+								strncpy_s(AnsiSectName, 9, (char*)(*SectItr)->GetHeader()->Name, 8);
+								wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
+								AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
 
-							for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-								bool bSuspiciousSblock = false;
-								wchar_t AlignedAttribDesc[9] = { 0 };
+								for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+									bool bSuspiciousSblock = false;
+									wchar_t AlignedAttribDesc[9] = { 0 };
 
-								AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
+									AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
 
-								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
-									SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+									Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
+										SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
 
-								if (RefSbMap.count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) {
-									vector<Suspicion*>& SuspicionsList = AbMapItr->second.at((uint8_t*)(*SbItr)->GetBasic()->BaseAddress);
+									if (RefSbMap.count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) {
+										vector<Suspicion*>& SuspicionsList = AbMapItr->second.at((uint8_t*)(*SbItr)->GetBasic()->BaseAddress);
 
-									for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
-										if (!(*SuspItr)->IsFullEntitySuspicion()) {
-											Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
+										for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
+											if (!(*SuspItr)->IsFullEntitySuspicion()) {
+												Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
+											}
 										}
 									}
-								}
 
-								Interface::Log("\r\n");
-								EnumerateThreads(L"      ", (*SbItr)->GetThreads());
+									Interface::Log("\r\n");
+									EnumerateThreads(L"      ", (*SbItr)->GetThreads());
+								}
 							}
 						}
-					}
-					else {
-						//vector<SBlock*> SBlocks = PeEntity->GetSBlocks();
-						//Interface::Log((WORD)FOREGROUND_RED, "  0x%016x:0x%08x | Image | %ws [Phantom]\r\n", PeEntity->GetStartVa(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
-						EnumerateSBlocks(RefSbMap, PeEntity->GetSBlocks());
-					}
+						else {
+							EnumerateSBlocks(RefSbMap, PeEntity->GetSBlocks());
+						}
 
-					break;
-				}
-				case Entity::Type::MAPPED_FILE: {
-					vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
-					Interface::Log("  0x%p:0x%08x | Mapped | %ws\r\n", SBlocks.front()->GetBasic()->BaseAddress, SBlocks.front()->GetBasic()->RegionSize, dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
-					EnumerateSBlocks(RefSbMap, SBlocks);
-					//Interface::Log("\r\n");
-					break;
-				}
-				case Entity::Type::UNKNOWN: {
-					vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
-
-					if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
-						Interface::Log("  0x%p:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->BaseAddress, (uint32_t)((uint8_t*)SBlocks.back()->GetBasic()->BaseAddress - SBlocks.front()->GetBasic()->BaseAddress) + SBlocks.back()->GetBasic()->RegionSize);
+						break;
+					}
+					case Entity::Type::MAPPED_FILE: {
+						vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
+						Interface::Log("  0x%p:0x%08x | Mapped | %ws\r\n", SBlocks.front()->GetBasic()->BaseAddress, SBlocks.front()->GetBasic()->RegionSize, dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
 						EnumerateSBlocks(RefSbMap, SBlocks);
-						//Interface::Log("\r\n");
+						break;
 					}
+					case Entity::Type::UNKNOWN: {
+						vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 
-					break;
-				}
+						if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
+							Interface::Log("  0x%p:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->BaseAddress, (uint32_t)((uint8_t*)SBlocks.back()->GetBasic()->BaseAddress - SBlocks.front()->GetBasic()->BaseAddress) + SBlocks.back()->GetBasic()->RegionSize);
+							EnumerateSBlocks(RefSbMap, SBlocks);
+						}
+
+						break;
+					}
+					}
 				}
 			}
 		}
 	}
+	else if (MemSelectType == MemorySelectionType::Process) {
+		//
+		// Enumerate entities and their sblocks, outputting them only if they correspond with suspicions
+		//
 
-	//
-	// Generate memory dump for suspicions
-	//
+		Interface::Log("\r\n%ws [%ws] : %d : %ws\r\n", this->Name.c_str(), this->ImageFilePath.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
+
+		for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
+			switch (Itr->second->GetType()) {
+			case Entity::Type::PE_FILE: {
+				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
+
+				if (PeEntity->IsNonExecutableImage()) {
+					Interface::Log("  0x%p:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+				}
+				else {
+					Interface::Log("  0x%p:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+				}
+
+				if (RefSbMap.count((uint8_t*)PeEntity->GetStartVa())) {
+					vector<Suspicion*>& SuspicionsList = AbMapItr->second.at(AbMapItr->first);
+
+					for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
+						if ((*SuspItr)->IsFullEntitySuspicion()) {
+							Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
+						}
+					}
+				}
+
+				Interface::Log("\r\n");
+				break;
+			}
+		}
+	}
+
+
+
+//
+// Generate memory dump for suspicions
+//
 
 	if ((qwOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS)) {
 		bool bDmpFin;
