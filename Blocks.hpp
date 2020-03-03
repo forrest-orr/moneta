@@ -12,7 +12,7 @@ public:
 	MEMORY_BASIC_INFORMATION* GetBasic();
 	MEMORY_REGION_INFORMATION* GetRegion();
 	std::vector<Moneta::Thread*> GetThreads();
-	//uint64_t GetPrivateSize();
+	static uint32_t GetPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t dwSize);
 	static const wchar_t* ProtectSymbol(uint32_t dwProtect);
 	static const wchar_t* AttribDesc(MEMORY_BASIC_INFORMATION* pMbi);
 	static const wchar_t* TypeSymbol(uint32_t dwType);

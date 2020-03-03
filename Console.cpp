@@ -143,13 +143,6 @@ bool GrantSelfSeDebug() {
 	return true;
 }
 
-enum class MemorySelectionType {
-	Invalid,
-	Block,
-	Process,
-	Suspicious
-};
-
 #define DEBUG
 
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
@@ -179,6 +172,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	else {
 		SelectedProcessType ProcType = SelectedProcessType::InvalidPid;
 		MemorySelectionType MemSelectType = MemorySelectionType::Invalid;
+		VerbosityLevel VLvl = VerbosityLevel::Surface;
 		uint32_t dwSelectedPid = 0;
 
 		for (vector<wstring>::const_iterator i = Args.begin(); i != Args.end(); ++i) {
@@ -209,8 +203,26 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 					MemSelectType = MemorySelectionType::Suspicious;
 				}
 			}
+			else if (Arg == L"-v") {
+				if (*(i + 1) == L"surface") {
+					VLvl = VerbosityLevel::Surface;
+				}
+				else if (*(i + 1) == L"detail") {
+					VLvl = VerbosityLevel::Detail;
+				}
+			}
 			else if (Arg == L"-d") {
 				qwOptFlags |= MONETA_FLAG_MEMDUMP;
+			}
+			else if (Arg == L"--option") {
+				for (vector<wstring>::const_iterator OptZtr = i; OptZtr != Args.end(); ++OptZtr) {
+					wstring OptArg = *OptZtr;
+					transform(OptArg.begin(), OptArg.end(), OptArg.begin(), ::tolower);
+
+					if (OptArg == L"from-base") {
+						qwOptFlags |= MONETA_FLAG_FROM_BASE;
+					}
+				}
 			}
 		}
 
@@ -218,13 +230,15 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		// Validate user input
 		//
 
+		//Interface::Log("* Scanning process \"%d\" 
+
 		if (ProcType == SelectedProcessType::InvalidPid) {
 			Interface::Log("- Invalid target process type selected\r\n");
 			return 0;
 		}
 
-		if (OutputType == SelectedOutputType::InvalidOutput) {
-			Interface::Log("- Invalid scan output type selected\r\n");
+		if (MemSelectType == MemorySelectionType::Invalid) {
+			Interface::Log("- Invalid memory selection type\r\n");
 			return 0;
 		}
 
@@ -241,7 +255,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 
 		Environment::Initialize();
 
-		if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS)) {
+		if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {
 			MemDump::Initialize();
 		}
 
@@ -252,15 +266,10 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		if (ProcType == SelectedProcessType::SelfPid || ProcType == SelectedProcessType::SpecificPid) {
 			try {
 				Process TargetProc(dwSelectedPid);
-				//list<SBlock*> ProcessMem = QueryProcessMem(dwSelectedPid);
+				TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl);
 
-				if (OutputType == SelectedOutputType::Raw) {
-					TargetProc.Enumerate(qwMemdmpOptFlags);
-				}
-				else if (OutputType == SelectedOutputType::Statistics) {
-					//MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(TargetProc.GetBlocks());
-					//MemPermRec->ShowRecords();
-				}
+				//MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(TargetProc.GetBlocks());
+				//MemPermRec->ShowRecords();
 			}
 			catch (int32_t nError) {
 				Interface::Log("- Failed to map address space of %d (error %d)\r\n", dwSelectedPid, nError);
@@ -286,10 +295,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 						try {
 							//TargetProc = new Process(ProcEntry.th32ProcessID);
 							Process TargetProc(ProcEntry.th32ProcessID);
-							if (OutputType == SelectedOutputType::Raw) {
-								TargetProc.Enumerate(qwMemdmpOptFlags);
-							}
-
+							TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl);
 						}
 						catch (int32_t nError) {
 							Interface::Log(3, "- Failed to map address space of %d:%ws (error %d)\r\n", ProcEntry.th32ProcessID, ProcEntry.szExeFile, nError);

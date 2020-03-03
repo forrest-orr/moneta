@@ -106,7 +106,7 @@ const wchar_t* SBlock::TypeSymbol(uint32_t dwType) {
 	}
 }
 
-uint32_t Moneta::GetPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t dwSize) {
+uint32_t SBlock::GetPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t dwSize) {
 	PSAPI_WORKING_SET_EX_INFORMATION* pWorkingSets = new PSAPI_WORKING_SET_EX_INFORMATION;
 	uint32_t dwWorkingSetsSize = sizeof(PSAPI_WORKING_SET_EX_INFORMATION);
 	uint32_t dwPrivateSize = 0;

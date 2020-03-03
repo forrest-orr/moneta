@@ -391,7 +391,7 @@ void Process::EnumerateSBlocks(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap,
 		AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
 
 		Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
-			Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+			SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
 
 		if (SuspicionsMap.count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) {
 			vector<Suspicion*>& SuspicionsList = SuspicionsMap.at((uint8_t*)(*SbItr)->GetBasic()->BaseAddress);
@@ -408,7 +408,7 @@ void Process::EnumerateSBlocks(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap,
 	}
 }
 
-void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
+void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl) {
 	bool bShownProc = false;
 	MemDump ProcDmp(this->Handle, this->Pid);
 	wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
@@ -478,7 +478,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 								AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
 
 								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
-									Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+									SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
 
 								if (RefSbMap.count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) {
 									vector<Suspicion*>& SuspicionsList = AbMapItr->second.at((uint8_t*)(*SbItr)->GetBasic()->BaseAddress);
@@ -530,7 +530,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 	// Generate memory dump for suspicions
 	//
 
-	if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS)) {
+	if ((qwOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS)) {
 		bool bDmpFin;
 		for (map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>::const_iterator AbMapItr = SuspicionsMap.begin(); AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
 			bDmpFin = false;
@@ -540,7 +540,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 				//printf("  0x%p [%d list elements]\r\n", SbMapItr->first, SbMapItr->second.size());
 				for (vector<Suspicion*>::const_iterator ListItr = SbMapItr->second.begin(); !bDmpFin && ListItr != SbMapItr->second.end(); ++ListItr) {
 
-					if ((qwMemdmpOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) || (*ListItr)->IsFullEntitySuspicion()) {
+					if ((qwOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) || (*ListItr)->IsFullEntitySuspicion()) {
 						if (Entity::Dump(ProcDmp, *(*ListItr)->GetParentObject())) {
 							Interface::Log("      ~ Generated full region dump at 0x%p\r\n", (*ListItr)->GetParentObject()->GetStartVa());
 						}
@@ -656,14 +656,14 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 							AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
 							Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
-								Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize)
+								SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize)
 							);
 
 							//
 							// Headers with private pages
 							//
 
-							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
+							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && SBlock::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
 								//Interface::Log("! PE headers have private pages within %ws [%ws:%d]\r\n", PeEntity->GetPath().c_str(), this->Name.c_str(), this->Pid);
 								Interface::Log((WORD)FOREGROUND_RED, " | Modified header");
 								bSuspiciousSblock = true;
@@ -689,7 +689,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 							// Executable regions in memory with private pages. Whether their +x is consistent with their section on disk is examined as well.
 							//
 
-							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && Moneta::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
+							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && SBlock::GetPrivateSize(this->GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
 								//Interface::Log("! Sblock in section %s is executable and has private pages within %ws - %ws PE on disk [%ws:%d]\r\n",
 								//	(*SectItr)->GetHeader()->Name, PeEntity->GetPath().c_str(),
 								//	((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? L"matches" : L"does not match",
@@ -733,7 +733,7 @@ void Process::Enumerate(uint64_t qwMemdmpOptFlags) {
 						AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 5);
 
 						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
-							Moneta::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+							SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
 
 						if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect)) {
 							//Interface::Log("! Phantom image memory at sblock 0x%p is executable [%ws:%d]\r\n", (*SbItr)->GetBasic()->BaseAddress, this->Name.c_str(), this->Pid);

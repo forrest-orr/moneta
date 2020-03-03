@@ -1,4 +1,16 @@
 namespace Moneta {
+	enum class MemorySelectionType {
+		Invalid,
+		Block,
+		Process,
+		Suspicious
+	};
+
+	enum class VerbosityLevel {
+		Surface,
+		Detail
+	};
+
 	typedef class Suspicion;
 
 	class Thread {
@@ -29,7 +41,7 @@ namespace Moneta {
 		std::wstring GetImageFilePath();
 		BOOL IsWow64();
 		Process(uint32_t);
-		void Enumerate(uint64_t qwMemdmpOptFlags);
+		void Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl);
 		void EnumerateSBlocks(std::map<uint8_t*, std::vector<Suspicion*>>& SuspicionsMap, std::vector<SBlock*> SBlocks);
 		~Process();
 	};

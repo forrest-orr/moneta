@@ -35,7 +35,7 @@ Dump selected memory: -d
   All memory blocks/regions selected via the "-m" parameter will
   be dumped to a physical file on disk.
 
-Memory selection options: --m-opt ["from-base"]
+Memory selection options: --option ["from-base"]
   + Optionally select memory "from base"
 	All selected blocks will implicitly also select all other
 	blocks which share their allocation base. For example, a
