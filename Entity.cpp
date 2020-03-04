@@ -285,3 +285,15 @@ bool Entity::Dump(MemDump & ProcDmp, Entity& Target) {
 
 	return nDumpCount ? true : false;
 }
+
+PeVm::Section* PeVm::Body::FindOverlapSect(SBlock& Address) {
+	for (vector<Section*>::const_iterator SectItr = this->Sections.begin(); SectItr != this->Sections.end(); ++SectItr) {
+		for (vector<SBlock*>::const_iterator SbItr = (*SectItr)->GetSBlocks().begin(); SbItr != (*SectItr)->GetSBlocks().end(); ++SbItr) {
+			if ((*SbItr)->GetBasic()->BaseAddress == Address.GetBasic()->BaseAddress) {
+				return *SectItr;
+			}
+		}
+	}
+
+	return nullptr;
+}

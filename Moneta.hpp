@@ -68,6 +68,7 @@ namespace Moneta {
 			bool IsNonExecutableImage();
 			std::vector<Section*> GetSections();
 			PebModule &GetPebModule();
+			Section* FindOverlapSect(SBlock& Address);
 			Body(HANDLE hProcess, std::vector<SBlock*> SBlocks, const wchar_t* pFilePath);
 			~Body();
 		};

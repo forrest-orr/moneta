@@ -378,6 +378,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>&Suspi
 	return 0;
 }
 
+/*
 void Process::EnumerateSBlocks(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap, vector<SBlock*> SBlocks) {
 	for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 		bool bSuspiciousSblock = false;
@@ -401,7 +402,7 @@ void Process::EnumerateSBlocks(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap,
 		Interface::Log("\r\n");
 		EnumerateThreads(L"      ", (*SbItr)->GetThreads());
 	}
-}
+}*/
 
 /*
 1. Loop entities to build suspicions list
@@ -452,11 +453,11 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		auto AbMapItr = SuspicionsMap.find(Itr->second->GetStartVa()); // An iterator into the main ablock map which points to the entry for the sb map.
+		map<uint8_t*, vector<Suspicion*>>& RefSbMap = SuspicionsMap.at(Itr->second->GetStartVa());
 
 		if (MemSelectType == MemorySelectionType::Process ||
 			(MemSelectType == MemorySelectionType::Block && ((pSelectSblock >= Itr->second->GetStartVa()) && (pSelectSblock < Itr->second->GetEndVa()))) ||
 			(MemSelectType == MemorySelectionType::Suspicious && AbMapItr != SuspicionsMap.end())) {
-			map<uint8_t*, vector<Suspicion*>>& RefSbMap = SuspicionsMap.at(Itr->second->GetStartVa());
 
 			//
 			// Display process and/or entity information: the criteria has already been met for this to be done without further checks
@@ -467,8 +468,7 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 				bShownProc = true;
 			}
 
-			switch (Itr->second->GetType()) {
-			case Entity::Type::PE_FILE: {
+			if (Itr->second->GetType() == Entity::Type::PE_FILE) {
 				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
 				if (PeEntity->IsNonExecutableImage()) {
@@ -477,263 +477,106 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 				else {
 					Interface::Log("  0x%p:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
 				}
-
+			}
+			else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
 				//
-				// Display suspicions associated with the entity, if the current entity has any suspicions associated with it
-				//
+			}
 
-				if (AbMapItr != SuspicionsMap.end()) {
-					if (RefSbMap.count((uint8_t*)PeEntity->GetStartVa())) {
-						vector<Suspicion*>& SuspicionsList = AbMapItr->second.at(AbMapItr->first);
+			//
+			// Display suspicions associated with the entity, if the current entity has any suspicions associated with it
+			//
+
+			if (AbMapItr != SuspicionsMap.end()) {
+				if (RefSbMap.count((uint8_t*)Itr->second->GetStartVa())) {
+					vector<Suspicion*>& SuspicionsList = AbMapItr->second.at(AbMapItr->first);
+
+					for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
+						if ((*SuspItr)->IsFullEntitySuspicion()) {
+							Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
+						}
+					}
+				}
+			}
+
+			Interface::Log("\r\n");
+
+			//
+			// Display the section/sblock information associated with this eneity provided it meets the selection criteria
+			//
+
+			vector<SBlock*> SBlocks = Itr->second->GetSBlocks();
+
+			for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+				if (MemSelectType == MemorySelectionType::Process ||
+					(MemSelectType == MemorySelectionType::Block && (pSelectSblock == (*SbItr)->GetBasic()->BaseAddress || (qwOptFlags & MONETA_FLAG_FROM_BASE))) ||
+					(MemSelectType == MemorySelectionType::Suspicious && ((qwOptFlags & MONETA_FLAG_FROM_BASE) || RefSbMap.count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)))) {
+					wchar_t AlignedAttribDesc[9] = { 0 };
+
+					AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
+
+					if (Itr->second->GetType() == Entity::Type::PE_FILE && !dynamic_cast<PeVm::Body*>(Itr->second)->IsPhantom()) {
+						PeVm::Section* OverlapSect = dynamic_cast<PeVm::Body*>(Itr->second)->FindOverlapSect(*(*SbItr));
+						wchar_t AlignedSectName[9] = { 0 };
+						char AnsiSectName[9];
+
+						if (OverlapSect != nullptr) {
+							strncpy_s(AnsiSectName, 9, (char*)OverlapSect->GetHeader()->Name, 8);
+						}
+						else {
+							strncpy_s(AnsiSectName, 9, "?", 8);
+						}
+
+						wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
+						AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
+
+						Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
+							SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+					}
+					else {
+						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
+							SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+					}
+
+					if (RefSbMap.count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) {
+						vector<Suspicion*>& SuspicionsList = AbMapItr->second.at((uint8_t*)(*SbItr)->GetBasic()->BaseAddress);
 
 						for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
-							if ((*SuspItr)->IsFullEntitySuspicion()) {
+							if (!(*SuspItr)->IsFullEntitySuspicion()) {
 								Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
 							}
 						}
 					}
-				}
 
-				Interface::Log("\r\n");
+					Interface::Log("\r\n");
+					EnumerateThreads(L"      ", (*SbItr)->GetThreads());
 
-				//
-				// Display the section/sblock information associated with this eneity provided it meets the selection criteria
-				//
-
-				if (!PeEntity->IsPhantom()) {
-					vector<PeVm::Section*> Sections = PeEntity->GetSections();
-					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
-						vector<SBlock*> SBlocks = (*SectItr)->GetSBlocks();
-						wchar_t AlignedSectName[9] = { 0 };
-						char AnsiSectName[9];
-						strncpy_s(AnsiSectName, 9, (char*)(*SectItr)->GetHeader()->Name, 8);
-						wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
-						AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
-
-						for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-							if (MemSelectType == MemorySelectionType::Process ||
-								(MemSelectType == MemorySelectionType::Block && (pSelectSblock == (*SbItr)->GetBasic()->BaseAddress || (qwOptFlags & MONETA_FLAG_FROM_BASE))) ||
-								(MemSelectType == MemorySelectionType::Suspicious && ((qwOptFlags & MONETA_FLAG_FROM_BASE) || RefSbMap.count((uint8_t *)(*SbItr)->GetBasic()->BaseAddress)))) {
-								wchar_t AlignedAttribDesc[9] = { 0 };
-
-								AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
-
-								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
-									SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
-
-								if (RefSbMap.count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) {
-									vector<Suspicion*>& SuspicionsList = AbMapItr->second.at((uint8_t*)(*SbItr)->GetBasic()->BaseAddress);
-
-									for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
-										if (!(*SuspItr)->IsFullEntitySuspicion()) {
-											Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
-										}
-									}
-								}
-
-								Interface::Log("\r\n");
-								EnumerateThreads(L"      ", (*SbItr)->GetThreads());
-								
-								if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {
-									if (!(qwOptFlags & MONETA_FLAG_FROM_BASE)) {
-										if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
-											Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
-										}
-										else {
-											Interface::Log("      ~ Memory dump failed.\r\n");
-										}
-									}
-								}
+					if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {
+						if (!(qwOptFlags & MONETA_FLAG_FROM_BASE)) {
+							if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
+								Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
+							}
+							else {
+								Interface::Log("      ~ Memory dump failed.\r\n");
 							}
 						}
 					}
 				}
-				else {
-					EnumerateSBlocks(RefSbMap, PeEntity->GetSBlocks());
-				}
 
-				break;
-			}
-		}
-
-		if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {
-			if ((qwOptFlags & MONETA_FLAG_FROM_BASE)) {
-				if (Entity::Dump(ProcDmp, *Itr->second)) {
-					Interface::Log("      ~ Generated full region dump at 0x%p\r\n", Itr->second->GetStartVa());
-				}
-				else {
-					Interface::Log("      ~ Failed to generate full region dump at 0x%p\r\n", Itr->second->GetStartVa());
+				if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {
+					if ((qwOptFlags & MONETA_FLAG_FROM_BASE)) {
+						if (Entity::Dump(ProcDmp, *Itr->second)) {
+							Interface::Log("      ~ Generated full region dump at 0x%p\r\n", Itr->second->GetStartVa());
+						}
+						else {
+							Interface::Log("      ~ Failed to generate full region dump at 0x%p\r\n", Itr->second->GetStartVa());
+						}
+					}
 				}
 			}
 		}
 	}
 }
 
-void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl) {
-	bool bShownProc = false;
-	MemDump ProcDmp(this->Handle, this->Pid);
-	wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
-	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
-	map <uint8_t*, map<uint8_t*, vector<Suspicion*>>> SuspicionsMap; // More efficient to only filter this map once. Currently filtering it for every single entity
-
-	if (MemSelectType == MemorySelectionType::Suspicious) {
-		//
-		// Build suspicions list for following memory selection and apply filters to it.
-		//
-
-		for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-			Suspicion::InspectEntity(*this, *Itr->second, SuspicionsMap);
-
-			if (SuspicionsMap.size()) {
-				FilterSuspicions(SuspicionsMap);
-
-				//
-				// Enumerate entities and their sblocks, outputting them only if they correspond with suspicions
-				//
-
-				auto AbMapItr = SuspicionsMap.find(Itr->second->GetStartVa()); // An iterator into the main ablock map which points to the entry for the sb map.
-
-				if (AbMapItr != SuspicionsMap.end()) {
-					map<uint8_t*, vector<Suspicion*>>& RefSbMap = SuspicionsMap.at(Itr->second->GetStartVa());
-
-					if (!bShownProc) {
-						Interface::Log("\r\n%ws [%ws] : %d : %ws\r\n", this->Name.c_str(), this->ImageFilePath.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
-						bShownProc = true;
-					}
-
-					switch (Itr->second->GetType()) {
-					case Entity::Type::PE_FILE: {
-						PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
-
-						if (PeEntity->IsNonExecutableImage()) {
-							Interface::Log("  0x%p:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
-						}
-						else {
-							Interface::Log("  0x%p:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
-						}
-
-						if (RefSbMap.count((uint8_t*)PeEntity->GetStartVa())) {
-							vector<Suspicion*>& SuspicionsList = AbMapItr->second.at(AbMapItr->first);
-
-							for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
-								if ((*SuspItr)->IsFullEntitySuspicion()) {
-									Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
-								}
-							}
-						}
-
-						Interface::Log("\r\n");
-
-						if (!PeEntity->IsPhantom()) {
-							vector<PeVm::Section*> Sections = PeEntity->GetSections();
-							for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
-								vector<SBlock*> SBlocks = (*SectItr)->GetSBlocks();
-								wchar_t AlignedSectName[9] = { 0 };
-								char AnsiSectName[9];
-								strncpy_s(AnsiSectName, 9, (char*)(*SectItr)->GetHeader()->Name, 8);
-								wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
-								AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
-
-								for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-									bool bSuspiciousSblock = false;
-									wchar_t AlignedAttribDesc[9] = { 0 };
-
-									AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
-
-									Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
-										SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
-
-									if (RefSbMap.count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) {
-										vector<Suspicion*>& SuspicionsList = AbMapItr->second.at((uint8_t*)(*SbItr)->GetBasic()->BaseAddress);
-
-										for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
-											if (!(*SuspItr)->IsFullEntitySuspicion()) {
-												Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
-											}
-										}
-									}
-
-									Interface::Log("\r\n");
-									EnumerateThreads(L"      ", (*SbItr)->GetThreads());
-								}
-							}
-						}
-						else {
-							EnumerateSBlocks(RefSbMap, PeEntity->GetSBlocks());
-						}
-
-						break;
-					}
-					case Entity::Type::MAPPED_FILE: {
-						vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
-						Interface::Log("  0x%p:0x%08x | Mapped | %ws\r\n", SBlocks.front()->GetBasic()->BaseAddress, SBlocks.front()->GetBasic()->RegionSize, dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
-						EnumerateSBlocks(RefSbMap, SBlocks);
-						break;
-					}
-					case Entity::Type::UNKNOWN: {
-						vector<SBlock*> SBlocks = Itr->second->GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
-
-						if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
-							Interface::Log("  0x%p:0x%08x | Private\r\n", SBlocks.front()->GetBasic()->BaseAddress, (uint32_t)((uint8_t*)SBlocks.back()->GetBasic()->BaseAddress - SBlocks.front()->GetBasic()->BaseAddress) + SBlocks.back()->GetBasic()->RegionSize);
-							EnumerateSBlocks(RefSbMap, SBlocks);
-						}
-
-						break;
-					}
-					}
-				}
-			}
-		}
-	}
-
-
-
-//
-// Generate memory dump for suspicions
-//
-
-	if ((qwOptFlags & MEMDMP_OPT_FLAG_SUSPICIOUS)) {
-		bool bDmpFin;
-		for (map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>::const_iterator AbMapItr = SuspicionsMap.begin(); AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
-			bDmpFin = false;
-			//printf("0x%p [%d sblocks]\r\n", AbMapItr->first, AbMapItr->second.size());
-
-			for (map<uint8_t*, vector<Suspicion*>>::const_iterator SbMapItr = AbMapItr->second.begin(); !bDmpFin && SbMapItr != AbMapItr->second.end(); SbMapItr++) {
-				//printf("  0x%p [%d list elements]\r\n", SbMapItr->first, SbMapItr->second.size());
-				for (vector<Suspicion*>::const_iterator ListItr = SbMapItr->second.begin(); !bDmpFin && ListItr != SbMapItr->second.end(); ++ListItr) {
-
-					if ((qwOptFlags & MEMDMP_OPT_FLAG_FROM_BASE) || (*ListItr)->IsFullEntitySuspicion()) {
-						if (Entity::Dump(ProcDmp, *(*ListItr)->GetParentObject())) {
-							Interface::Log("      ~ Generated full region dump at 0x%p\r\n", (*ListItr)->GetParentObject()->GetStartVa());
-						}
-						else {
-							Interface::Log("      ~ Failed to generate full region dump at 0x%p\r\n", (*ListItr)->GetParentObject()->GetStartVa());
-						}
-
-						bDmpFin = true;
-					}
-					else {
-						if (ProcDmp.Create((*ListItr)->GetBlock()->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
-							Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
-						}
-						else {
-							Interface::Log("      ~ Memory dump failed.\r\n");
-						}
-					}
-					/*
-					if (!(*ListItr)->IsFullEntitySuspicion()) {
-						printf("    0x%p : %d : %ws\r\n", (*ListItr)->GetBlock()->GetBasic()->BaseAddress, (*ListItr)->GetType(), (*ListItr)->GetDescription().c_str());
-					}
-					else {
-						printf("    0x%p : %d : %ws : Full entity\r\n", (*ListItr)->GetParentObject()->GetStartVa(), (*ListItr)->GetType(), (*ListItr)->GetDescription().c_str());
-					}*/
-				}
-			}
-		}
-	}
-
-	
-	Interface::Log(2, "\r\n");
 	/*
 	bool bFileRange = false, bImageRange = false;
 
@@ -846,4 +689,3 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 
 		Interface::Log("\r\n");
 	}*/
-}
