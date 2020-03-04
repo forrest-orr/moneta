@@ -411,7 +411,7 @@ void Process::EnumerateSBlocks(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap,
    mselect == sblock and this eneity contains the sblock
    mselect == suspicious and there is 1 or more suspicions
 4. Show the process if it has not been shown before
-5. Display entity info (exe image, private, mapped + total size) ALWAYS (criteria already applied going into loop)
+5. Display entity info (exe image, private, mapped + total size) ALWAYS (criteria already applied going into loop) along with suspicions (if any)
 5. For PEs, loop sblocks/sections. Enum if:
 	mselect == process
 	mselect == sblock && sblock == current, or the  "from base" option is set
@@ -446,15 +446,124 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 		FilterSuspicions(SuspicionsMap);
 	}
 
+	//
+	// Display information on each selected sblock and/or entity within the process address space
+	//
+
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		auto AbMapItr = SuspicionsMap.find(Itr->second->GetStartVa()); // An iterator into the main ablock map which points to the entry for the sb map.
 
 		if (MemSelectType == MemorySelectionType::Process ||
 			(MemSelectType == MemorySelectionType::Block && ((pSelectSblock >= Itr->second->GetStartVa()) && (pSelectSblock < Itr->second->GetEndVa()))) ||
 			(MemSelectType == MemorySelectionType::Suspicious && AbMapItr != SuspicionsMap.end())) {
+			map<uint8_t*, vector<Suspicion*>>& RefSbMap = SuspicionsMap.at(Itr->second->GetStartVa());
+
+			//
+			// Display process and/or entity information: the criteria has already been met for this to be done without further checks
+			//
+
 			if (!bShownProc) {
 				Interface::Log("\r\n%ws [%ws] : %d : %ws\r\n", this->Name.c_str(), this->ImageFilePath.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
 				bShownProc = true;
+			}
+
+			switch (Itr->second->GetType()) {
+			case Entity::Type::PE_FILE: {
+				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
+
+				if (PeEntity->IsNonExecutableImage()) {
+					Interface::Log("  0x%p:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+				}
+				else {
+					Interface::Log("  0x%p:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+				}
+
+				//
+				// Display suspicions associated with the entity, if the current entity has any suspicions associated with it
+				//
+
+				if (AbMapItr != SuspicionsMap.end()) {
+					if (RefSbMap.count((uint8_t*)PeEntity->GetStartVa())) {
+						vector<Suspicion*>& SuspicionsList = AbMapItr->second.at(AbMapItr->first);
+
+						for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
+							if ((*SuspItr)->IsFullEntitySuspicion()) {
+								Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
+							}
+						}
+					}
+				}
+
+				Interface::Log("\r\n");
+
+				//
+				// Display the section/sblock information associated with this eneity provided it meets the selection criteria
+				//
+
+				if (!PeEntity->IsPhantom()) {
+					vector<PeVm::Section*> Sections = PeEntity->GetSections();
+					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
+						vector<SBlock*> SBlocks = (*SectItr)->GetSBlocks();
+						wchar_t AlignedSectName[9] = { 0 };
+						char AnsiSectName[9];
+						strncpy_s(AnsiSectName, 9, (char*)(*SectItr)->GetHeader()->Name, 8);
+						wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
+						AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
+
+						for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+							if (MemSelectType == MemorySelectionType::Process ||
+								(MemSelectType == MemorySelectionType::Block && (pSelectSblock == (*SbItr)->GetBasic()->BaseAddress || (qwOptFlags & MONETA_FLAG_FROM_BASE))) ||
+								(MemSelectType == MemorySelectionType::Suspicious && ((qwOptFlags & MONETA_FLAG_FROM_BASE) || RefSbMap.count((uint8_t *)(*SbItr)->GetBasic()->BaseAddress)))) {
+								wchar_t AlignedAttribDesc[9] = { 0 };
+
+								AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
+
+								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
+									SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+
+								if (RefSbMap.count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) {
+									vector<Suspicion*>& SuspicionsList = AbMapItr->second.at((uint8_t*)(*SbItr)->GetBasic()->BaseAddress);
+
+									for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
+										if (!(*SuspItr)->IsFullEntitySuspicion()) {
+											Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
+										}
+									}
+								}
+
+								Interface::Log("\r\n");
+								EnumerateThreads(L"      ", (*SbItr)->GetThreads());
+								
+								if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {
+									if (!(qwOptFlags & MONETA_FLAG_FROM_BASE)) {
+										if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
+											Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
+										}
+										else {
+											Interface::Log("      ~ Memory dump failed.\r\n");
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+				else {
+					EnumerateSBlocks(RefSbMap, PeEntity->GetSBlocks());
+				}
+
+				break;
+			}
+		}
+
+		if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {
+			if ((qwOptFlags & MONETA_FLAG_FROM_BASE)) {
+				if (Entity::Dump(ProcDmp, *Itr->second)) {
+					Interface::Log("      ~ Generated full region dump at 0x%p\r\n", Itr->second->GetStartVa());
+				}
+				else {
+					Interface::Log("      ~ Failed to generate full region dump at 0x%p\r\n", Itr->second->GetStartVa());
+				}
 			}
 		}
 	}
