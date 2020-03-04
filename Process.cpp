@@ -453,7 +453,11 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		auto AbMapItr = SuspicionsMap.find(Itr->second->GetStartVa()); // An iterator into the main ablock map which points to the entry for the sb map.
-		map<uint8_t*, vector<Suspicion*>>& RefSbMap = SuspicionsMap.at(Itr->second->GetStartVa());
+		map<uint8_t*, vector<Suspicion*>>* pSbMap = nullptr;
+
+		if (AbMapItr != SuspicionsMap.end()) {
+			pSbMap = &SuspicionsMap.at(Itr->second->GetStartVa());
+		}
 
 		if (MemSelectType == MemorySelectionType::Process ||
 			(MemSelectType == MemorySelectionType::Block && ((pSelectSblock >= Itr->second->GetStartVa()) && (pSelectSblock < Itr->second->GetEndVa()))) ||
@@ -479,21 +483,27 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 				}
 			}
 			else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
-				//
+				Interface::Log("  0x%p:0x%08x | Mapped | %ws", Itr->second->GetStartVa(), Itr->second->GetEntitySize(), dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
+			}
+			else {
+				if (Itr->second->GetSBlocks().front()->GetBasic()->Type == MEM_PRIVATE) {
+					Interface::Log("  0x%p:0x%08x | Private", Itr->second->GetStartVa(), Itr->second->GetEntitySize());
+				}
+				else {
+					continue;
+				}
 			}
 
 			//
 			// Display suspicions associated with the entity, if the current entity has any suspicions associated with it
 			//
 
-			if (AbMapItr != SuspicionsMap.end()) {
-				if (RefSbMap.count((uint8_t*)Itr->second->GetStartVa())) {
-					vector<Suspicion*>& SuspicionsList = AbMapItr->second.at(AbMapItr->first);
+			if (pSbMap != nullptr && pSbMap->count((uint8_t*)Itr->second->GetStartVa())) {
+				vector<Suspicion*>& SuspicionsList = AbMapItr->second.at(AbMapItr->first);
 
-					for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
-						if ((*SuspItr)->IsFullEntitySuspicion()) {
-							Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
-						}
+				for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
+					if ((*SuspItr)->IsFullEntitySuspicion()) {
+						Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
 					}
 				}
 			}
@@ -509,7 +519,7 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 			for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 				if (MemSelectType == MemorySelectionType::Process ||
 					(MemSelectType == MemorySelectionType::Block && (pSelectSblock == (*SbItr)->GetBasic()->BaseAddress || (qwOptFlags & MONETA_FLAG_FROM_BASE))) ||
-					(MemSelectType == MemorySelectionType::Suspicious && ((qwOptFlags & MONETA_FLAG_FROM_BASE) || RefSbMap.count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)))) {
+					(MemSelectType == MemorySelectionType::Suspicious && ((qwOptFlags & MONETA_FLAG_FROM_BASE) || (pSbMap != nullptr && pSbMap->count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress))))) {
 					wchar_t AlignedAttribDesc[9] = { 0 };
 
 					AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
@@ -537,7 +547,7 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 							SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
 					}
 
-					if (RefSbMap.count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) {
+					if (pSbMap != nullptr && pSbMap->count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) {
 						vector<Suspicion*>& SuspicionsList = AbMapItr->second.at((uint8_t*)(*SbItr)->GetBasic()->BaseAddress);
 
 						for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {

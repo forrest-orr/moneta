@@ -61,7 +61,7 @@ void Interface::Initialize(vector<wstring> &Args) {
 
 	for (vector<wstring>::const_iterator i = Args.begin(); i != Args.end(); ++i) {
 		if (*i == L"-v") {
-			nVerbosityLvl = stoi(*(i + 1));
+			//nVerbosityLvl = stoi(*(i + 1));
 		}
 		else if (*i == L"--log-file") {
 			LogFilePath = *(i + 1);

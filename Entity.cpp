@@ -288,8 +288,9 @@ bool Entity::Dump(MemDump & ProcDmp, Entity& Target) {
 
 PeVm::Section* PeVm::Body::FindOverlapSect(SBlock& Address) {
 	for (vector<Section*>::const_iterator SectItr = this->Sections.begin(); SectItr != this->Sections.end(); ++SectItr) {
-		for (vector<SBlock*>::const_iterator SbItr = (*SectItr)->GetSBlocks().begin(); SbItr != (*SectItr)->GetSBlocks().end(); ++SbItr) {
-			if ((*SbItr)->GetBasic()->BaseAddress == Address.GetBasic()->BaseAddress) {
+		vector<SBlock*> SbList = (*SectItr)->GetSBlocks();
+		for (vector<SBlock*>::const_iterator SbItr = SbList.begin(); SbItr != SbList.end(); ++SbItr) {
+			if (Address.GetBasic()->BaseAddress >= (*SbItr)->GetBasic()->BaseAddress && reinterpret_cast<uint8_t *>(Address.GetBasic()->BaseAddress) < (reinterpret_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress) + (*SbItr)->GetBasic()->RegionSize)) {
 				return *SectItr;
 			}
 		}

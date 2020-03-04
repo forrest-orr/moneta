@@ -253,8 +253,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			Interface::Log("- Failed to grant SeDebug privilege to self.\r\n");
 		}
 
-		Environment::Initialize();
-
 		if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {
 			MemDump::Initialize();
 		}

@@ -46,3 +46,6 @@ x64/Release/Moneta.exe
 *.exe
 *.exe
 *.exe
+*.exe
+*.idb
+*.ilk
