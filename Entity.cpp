@@ -286,15 +286,18 @@ bool Entity::Dump(MemDump & ProcDmp, Entity& Target) {
 	return nDumpCount ? true : false;
 }
 
-PeVm::Section* PeVm::Body::FindOverlapSect(SBlock& Address) {
+vector<PeVm::Section*> PeVm::Body::FindOverlapSect(SBlock& Address) {
+	vector<PeVm::Section*> OverlappingSections;
+
 	for (vector<Section*>::const_iterator SectItr = this->Sections.begin(); SectItr != this->Sections.end(); ++SectItr) {
 		vector<SBlock*> SbList = (*SectItr)->GetSBlocks();
 		for (vector<SBlock*>::const_iterator SbItr = SbList.begin(); SbItr != SbList.end(); ++SbItr) {
-			if (Address.GetBasic()->BaseAddress >= (*SbItr)->GetBasic()->BaseAddress && reinterpret_cast<uint8_t *>(Address.GetBasic()->BaseAddress) < (reinterpret_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress) + (*SbItr)->GetBasic()->RegionSize)) {
-				return *SectItr;
+			//if (Address.GetBasic()->BaseAddress >= (*SbItr)->GetBasic()->BaseAddress && reinterpret_cast<uint8_t *>(Address.GetBasic()->BaseAddress) < (reinterpret_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress) + (*SbItr)->GetBasic()->RegionSize)) {
+			if (Address.GetBasic()->BaseAddress == (*SbItr)->GetBasic()->BaseAddress) {
+				OverlappingSections.push_back(*SectItr);
 			}
 		}
 	}
 
-	return nullptr;
+	return OverlappingSections;
 }

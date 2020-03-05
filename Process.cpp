@@ -404,6 +404,18 @@ void Process::EnumerateSBlocks(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap,
 	}
 }*/
 
+int32_t AppendOverlapSuspicion(map<uint8_t*, vector<Suspicion*>>* pSbMap, uint8_t *pSbAddress, bool bEntityTop) {
+	if (pSbMap != nullptr && pSbMap->count(pSbAddress)) {
+		vector<Suspicion*>& SuspicionsList = pSbMap->at(pSbAddress);
+
+		for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
+			if (bEntityTop == (*SuspItr)->IsFullEntitySuspicion()) {
+				Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
+			}
+		}
+	}
+}
+
 /*
 1. Loop entities to build suspicions list
 2. Filter suspicions
@@ -497,7 +509,7 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 			//
 			// Display suspicions associated with the entity, if the current entity has any suspicions associated with it
 			//
-
+			/*
 			if (pSbMap != nullptr && pSbMap->count((uint8_t*)Itr->second->GetStartVa())) {
 				vector<Suspicion*>& SuspicionsList = AbMapItr->second.at(AbMapItr->first);
 
@@ -506,7 +518,8 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 						Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
 					}
 				}
-			}
+			}*/
+			AppendOverlapSuspicion(pSbMap, (uint8_t*)Itr->second->GetStartVa(), true);
 
 			Interface::Log("\r\n");
 
@@ -525,28 +538,42 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 					AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
 
 					if (Itr->second->GetType() == Entity::Type::PE_FILE && !dynamic_cast<PeVm::Body*>(Itr->second)->IsPhantom()) {
-						PeVm::Section* OverlapSect = dynamic_cast<PeVm::Body*>(Itr->second)->FindOverlapSect(*(*SbItr));
-						wchar_t AlignedSectName[9] = { 0 };
-						char AnsiSectName[9];
+						//
+						// Generate a list of all sections overlapping with this sblock and display them all. A typical example is a +r sblock at the end of the PE which encompasses all consecutive readonly sections ie. .rdata, .rsrc, .reloc
+						//
+						vector<PeVm::Section*> OverlapSections = dynamic_cast<PeVm::Body*>(Itr->second)->FindOverlapSect(*(*SbItr));
 
-						if (OverlapSect != nullptr) {
-							strncpy_s(AnsiSectName, 9, (char*)OverlapSect->GetHeader()->Name, 8);
+						if (OverlapSections.empty()) {
+							Interface::Log("    0x%p:0x%08x | %ws | ?        | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
+								SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+							AppendOverlapSuspicion(pSbMap, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, false);
+							Interface::Log("\r\n");
 						}
-						else {
-							strncpy_s(AnsiSectName, 9, "?", 8);
+						else{
+							for (vector<PeVm::Section*>::const_iterator SectItr = OverlapSections.begin(); SectItr != OverlapSections.end(); ++SectItr) {
+								wchar_t AlignedSectName[9] = { 0 };
+								char AnsiSectName[9];
+
+								strncpy_s(AnsiSectName, 9, (char*)(*SectItr)->GetHeader()->Name, 8);
+								wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
+								AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
+
+								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
+									SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+								AppendOverlapSuspicion(pSbMap, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, false);
+								Interface::Log("\r\n");
+
+							}
 						}
-
-						wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
-						AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
-
-						Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
-							SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
 					}
 					else {
 						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
 							SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+						AppendOverlapSuspicion(pSbMap, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, false);
+						Interface::Log("\r\n");
 					}
 
+					/*
 					if (pSbMap != nullptr && pSbMap->count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) {
 						vector<Suspicion*>& SuspicionsList = AbMapItr->second.at((uint8_t*)(*SbItr)->GetBasic()->BaseAddress);
 
@@ -555,9 +582,9 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 								Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
 							}
 						}
-					}
+					}*/
 
-					Interface::Log("\r\n");
+					//Interface::Log("\r\n");
 					EnumerateThreads(L"      ", (*SbItr)->GetThreads());
 
 					if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {
