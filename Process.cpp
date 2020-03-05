@@ -497,18 +497,18 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
 				if (PeEntity->IsNonExecutableImage()) {
-					Interface::Log("  0x%p:0x%08x | Non-executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+					Interface::Log("  0x%p:0x%08x   | Unexecutable image  | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
 				}
 				else {
-					Interface::Log("  0x%p:0x%08x | Executable image | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+					Interface::Log("  0x%p:0x%08x   | Executable image    | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
 				}
 			}
 			else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
-				Interface::Log("  0x%p:0x%08x | Mapped | %ws", Itr->second->GetStartVa(), Itr->second->GetEntitySize(), dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
+				Interface::Log("  0x%p:0x%08x   | Mapped   | %ws", Itr->second->GetStartVa(), Itr->second->GetEntitySize(), dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
 			}
 			else {
 				if (Itr->second->GetSBlocks().front()->GetBasic()->Type == MEM_PRIVATE) {
-					Interface::Log("  0x%p:0x%08x | Private", Itr->second->GetStartVa(), Itr->second->GetEntitySize());
+					Interface::Log("  0x%p:0x%08x   | Private", Itr->second->GetStartVa(), Itr->second->GetEntitySize());
 				}
 				else {
 					continue;
