@@ -305,11 +305,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>&Suspi
 
 				for (int32_t nSuspIndex = 0; !bReWalkMap && SuspItr != SbMapItr->second.end(); ++SuspItr, nSuspIndex++) {
 					switch ((*SuspItr)->GetType()) {
-					case Suspicion::Type::XPRV: {
-						/* Filter cases for private executable memory
-
-						*/
-
+					/*case Suspicion::Type::XPRV: {
 						//Interface::Log("* Filtered executable private memory at 0x%p\r\n", (*SuspItr)->GetBlock()->GetBasic()->BaseAddress);
 						bReWalkMap = true;
 						RefSuspList.erase(SuspItr);
@@ -326,7 +322,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>&Suspi
 							}
 						}
 						break;
-					}
+					}*/
 					case Suspicion::Type::MISSING_PEB_MODULE: {
 						/* Filter cases for missing PEB modules:
 							 ~ Signed metadata PEs. These appear in the C:\Windows\System32\WinMetadata folder with the .winmd extension. They've also been noted to appear in WindpwsApps, SystemApps and others.
@@ -416,6 +412,20 @@ int32_t AppendOverlapSuspicion(map<uint8_t*, vector<Suspicion*>>* pSbMap, uint8_
 	}
 }
 
+bool Process::DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION *pMbi, wstring Indent) {
+	wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
+
+	if (pMbi->State == MEM_COMMIT) {
+		if (ProcDmp.Create(pMbi, DumpFilePath, MAX_PATH + 1)) {
+			Interface::Log("%ws~ Memory dumped to %ws\r\n", Indent.c_str(), DumpFilePath);
+			return true;
+		}
+		else {
+			Interface::Log("%ws~ Memory dump failed.\r\n", Indent.c_str());
+			return false;
+		}
+	}
+}
 /*
 1. Loop entities to build suspicions list
 2. Filter suspicions
@@ -443,7 +453,6 @@ int32_t AppendOverlapSuspicion(map<uint8_t*, vector<Suspicion*>>* pSbMap, uint8_
 void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl, uint8_t *pSelectSblock) {
 	bool bShownProc = false;
 	MemDump ProcDmp(this->Handle, this->Pid);
-	wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
 	map <uint8_t*, map<uint8_t*, vector<Suspicion*>>> SuspicionsMap; // More efficient to only filter this map once. Currently filtering it for every single entity
 
@@ -509,18 +518,8 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 			//
 			// Display suspicions associated with the entity, if the current entity has any suspicions associated with it
 			//
-			/*
-			if (pSbMap != nullptr && pSbMap->count((uint8_t*)Itr->second->GetStartVa())) {
-				vector<Suspicion*>& SuspicionsList = AbMapItr->second.at(AbMapItr->first);
 
-				for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
-					if ((*SuspItr)->IsFullEntitySuspicion()) {
-						Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
-					}
-				}
-			}*/
 			AppendOverlapSuspicion(pSbMap, (uint8_t*)Itr->second->GetStartVa(), true);
-
 			Interface::Log("\r\n");
 
 			//
@@ -573,40 +572,23 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 						Interface::Log("\r\n");
 					}
 
-					/*
-					if (pSbMap != nullptr && pSbMap->count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) {
-						vector<Suspicion*>& SuspicionsList = AbMapItr->second.at((uint8_t*)(*SbItr)->GetBasic()->BaseAddress);
-
-						for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
-							if (!(*SuspItr)->IsFullEntitySuspicion()) {
-								Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
-							}
-						}
-					}*/
-
-					//Interface::Log("\r\n");
 					EnumerateThreads(L"      ", (*SbItr)->GetThreads());
 
 					if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {
 						if (!(qwOptFlags & MONETA_FLAG_FROM_BASE)) {
-							if (ProcDmp.Create((*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
-								Interface::Log("      ~ Memory dumped to %ws\r\n", DumpFilePath);
-							}
-							else {
-								Interface::Log("      ~ Memory dump failed.\r\n");
-							}
+							this->DumpBlock(ProcDmp, (*SbItr)->GetBasic(), L"      ");
 						}
 					}
 				}
+			}
 
-				if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {
-					if ((qwOptFlags & MONETA_FLAG_FROM_BASE)) {
-						if (Entity::Dump(ProcDmp, *Itr->second)) {
-							Interface::Log("      ~ Generated full region dump at 0x%p\r\n", Itr->second->GetStartVa());
-						}
-						else {
-							Interface::Log("      ~ Failed to generate full region dump at 0x%p\r\n", Itr->second->GetStartVa());
-						}
+			if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {
+				if ((qwOptFlags & MONETA_FLAG_FROM_BASE)) {
+					if (Entity::Dump(ProcDmp, *Itr->second)) {
+						Interface::Log("      ~ Generated full region dump at 0x%p\r\n", Itr->second->GetStartVa());
+					}
+					else {
+						Interface::Log("      ~ Failed to generate full region dump at 0x%p\r\n", Itr->second->GetStartVa());
 					}
 				}
 			}
