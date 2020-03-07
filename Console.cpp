@@ -174,6 +174,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		MemorySelectionType MemSelectType = MemorySelectionType::Invalid;
 		VerbosityLevel VLvl = VerbosityLevel::Surface;
 		uint32_t dwSelectedPid = 0;
+		uint8_t* pAddress = nullptr;
 
 		for (vector<wstring>::const_iterator i = Args.begin(); i != Args.end(); ++i) {
 			wstring Arg = *i;
@@ -203,6 +204,9 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 					MemSelectType = MemorySelectionType::Suspicious;
 				}
 			}
+			else if (Arg == L"--address") {
+				pAddress = (uint8_t*)wcstoull((*(i + 1)).c_str(), NULL, 0);
+			}
 			else if (Arg == L"-v") {
 				if (*(i + 1) == L"surface") {
 					VLvl = VerbosityLevel::Surface;
@@ -230,6 +234,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		// Validate user input
 		//
 
+		//Interface::Log("Selected address: 0x%p\r\n", pAddress);
 		//Interface::Log("* Scanning process \"%d\" 
 
 		if (ProcType == SelectedProcessType::InvalidPid) {
@@ -264,7 +269,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		if (ProcType == SelectedProcessType::SelfPid || ProcType == SelectedProcessType::SpecificPid) {
 			try {
 				Process TargetProc(dwSelectedPid);
-				TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl);
+				TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl, pAddress);
 
 				//MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(TargetProc.GetBlocks());
 				//MemPermRec->ShowRecords();
@@ -293,7 +298,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 						try {
 							//TargetProc = new Process(ProcEntry.th32ProcessID);
 							Process TargetProc(ProcEntry.th32ProcessID);
-							TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl);
+							TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl, pAddress);
 						}
 						catch (int32_t nError) {
 							Interface::Log(3, "- Failed to map address space of %d:%ws (error %d)\r\n", ProcEntry.th32ProcessID, ProcEntry.szExeFile, nError);
