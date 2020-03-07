@@ -484,6 +484,9 @@ bool Process::DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION *pMbi, wstrin
 	  | Initial protection: RWXC
 
   0x0000026D27C90000:0x00001000   | Mapped   | Page File
+  |__ Mapped file base: 0x0000026D27C90000
+    | Mapped file size: 0x00001000
+	| Mapped file path: N/A
 	0x0000026D27C90000:0x00001000 | R        | 0x00000000
 	|__ Base: 0x0000026D27C90000
 	  | Size: 0x1000
@@ -493,8 +496,17 @@ bool Process::DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION *pMbi, wstrin
 	  | Type: MEM_MAPPED
 	  | Allocation base: 0x00007FFC668B0000
 	  | Initial protection: R
+
   0x0000026D27CA0000:0x00002000   | Private
 	0x0000026D27CA0000:0x00002000 | RW       | 0x00002000
+	|__ Base: 0x0000026D27C90000
+	  | Size: 0x1000
+	  | Permissions: R
+	  | Size: 0x1000
+	  | State: MEM_COMMIT
+	  | Type: MEM_MAPPED
+	  | Allocation base: 0x00007FFC668B0000
+	  | Initial protection: R
   0x0000026D27CB0000:0x000c7000   | Mapped   | C:\Windows\System32\locale.nls
 	0x0000026D27CB0000:0x000c7000 | R        | 0x00000000
   0x0000026D27D80000:0x00007000   | Private
