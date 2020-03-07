@@ -427,6 +427,60 @@ bool Process::DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION *pMbi, wstrin
 	}
 }
 /*
+  0x00007FFC668B0000:0x0009e000   | Executable image    | C:\Windows\System32\msvcrt.dll
+  ___ Image base: 0x00007FFC668B0000
+    | Image size: 0x0009e000
+	| Image file path: C:\Windows\System32\msvcrt.dll
+	| Non-executable: no
+	| Signed: yes
+	0x00007FFC668B0000:0x00001000 | R        | Header   | 0x00000000
+	___ Base: 0x00007FFC668B0000
+	  | Size: 0x1000
+	  | Permissions: R
+	  | Size: 0x1000
+	  | State: MEM_COMMIT
+	  | Type: MEM_IMAGE
+	  | Allocation base: 0x00007FFC668B0000
+	  | Initial protection: RWXC
+	0x00007FFC668B1000:0x00075000 | RX       | .text    | 0x00000000
+	___ Base: 0x00007FFC668B0000
+	  | Size: 0x1000
+	  | Permissions: R
+	  | Size: 0x1000
+	  | State: MEM_COMMIT
+	  | Type: MEM_IMAGE
+	  | Allocation base: 0x00007FFC668B0000
+	  | Initial protection: RWXC
+	0x00007FFC66926000:0x00019000 | R        | .rdata   | 0x00002000
+	___ Base: 0x00007FFC668B0000
+	  | Size: 0x1000
+	  | Permissions: R
+	  | Size: 0x1000
+	  | State: MEM_COMMIT
+	  | Type: MEM_IMAGE
+	  | Allocation base: 0x00007FFC668B0000
+	  | Initial protection: RWXC
+	0x00007FFC6693F000:0x00002000 | RW       | .data    | 0x00002000
+	___ Base: 0x00007FFC668B0000
+	  | Size: 0x1000
+	  | Permissions: RW
+	  | Size: 0x00002000
+	  | State: MEM_COMMIT
+	  | Type: MEM_IMAGE
+	  | Allocation base: 0x00007FFC668B0000
+	  | Initial protection: RWXC
+
+  0x0000026D27C90000:0x00001000   | Mapped   | Page File
+	0x0000026D27C90000:0x00001000 | R        | 0x00000000
+  0x0000026D27CA0000:0x00002000   | Private
+	0x0000026D27CA0000:0x00002000 | RW       | 0x00002000
+  0x0000026D27CB0000:0x000c7000   | Mapped   | C:\Windows\System32\locale.nls
+	0x0000026D27CB0000:0x000c7000 | R        | 0x00000000
+  0x0000026D27D80000:0x00007000   | Private
+	0x0000026D27D80000:0x00001000 | RW       | 0x00001000
+	0x0000026D27D81000:0x00006000 | Reserve  | 0x00006000
+*/
+/*
 1. Loop entities to build suspicions list
 2. Filter suspicions
 3. Loop entities for enumeration if:
