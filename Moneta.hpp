@@ -22,13 +22,13 @@ namespace Moneta {
 
 	class ABlock : public Entity { // This is essential, since a parameterized constructor of the base entity class is impossible (since it is an abstract base class with a deferred method). new Entity() is impossible for this reason: only derived classes can be initialized.
 	public:
-		ABlock(std::vector<SBlock*> SBlocks);
+		ABlock(HANDLE hProcess, std::vector<SBlock*> SBlocks);
 		Entity::Type GetType() { return Entity::Type::UNKNOWN; }
 	};
 
 	class MappedFile : public FileBase, virtual public ABlock { // Virtual inheritance from entity prevents classes derived from multiple classes derived from entity from having ambiguous/conflicting content.
 	public:
-		MappedFile(std::vector<SBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore = false);
+		MappedFile(HANDLE hProcess, std::vector<SBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore = false);
 		Entity::Type GetType() { return Entity::Type::MAPPED_FILE; }
 	};
 
@@ -36,7 +36,7 @@ namespace Moneta {
 		class Component : virtual public ABlock {
 		public:
 			uint8_t* GetPeBase();
-			Component(std::vector<SBlock*> SBlocks, uint8_t* pPeBase);
+			Component(HANDLE hProcess, std::vector<SBlock*> SBlocks, uint8_t* pPeBase);
 		protected:
 			uint8_t* PeBase;
 		};
@@ -84,7 +84,7 @@ namespace Moneta {
 
 		class Section : public Component {
 		public:
-			Section(std::vector<SBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase);
+			Section(HANDLE hProcess, std::vector<SBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase);
 			IMAGE_SECTION_HEADER* GetHeader();
 			Entity::Type GetType() { return Entity::Type::PE_SECTION; }
 		protected:

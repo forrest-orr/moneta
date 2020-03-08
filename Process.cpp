@@ -182,7 +182,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				}
 
 				Interface::Log(5, "Adding mew sblock to list\r\n");
-				SBlocks.push_back(new SBlock((MEMORY_BASIC_INFORMATION*)pMbi, nullptr, this->Threads));
+				SBlocks.push_back(new SBlock(this->Handle, (MEMORY_BASIC_INFORMATION*)pMbi, nullptr, this->Threads));
 				ABlock = SBlocks.begin(); // This DOES fix a bug.
 			}
 			else {
@@ -615,21 +615,6 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 					Interface::Log("    | Mapped file path: %ws\r\n", dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
 				}
 			}
-			
-			/*
-
-|__ Mapped file base: 0x00007FFC668B0000
-  | Mapped file size: 0x0009e000
-  | Mapped file path: C:\Windows\System32\msvcrt.dll
-  | Non-executable: no
-  | Signed: yes
-  |__ PEB module
-	| Image base: 0x00007FFC668B0000
-	| Image size: 0x0009e000
-	| Image file path: C:\Windows\System32\msvcrt.dll
-	| Module name: msvcrt.dll
-	| Entry point: 0x00007FFC668B0000
-  */
 
 			//
 			// Display the section/sblock information associated with this eneity provided it meets the selection criteria
@@ -652,8 +637,7 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 						vector<PeVm::Section*> OverlapSections = dynamic_cast<PeVm::Body*>(Itr->second)->FindOverlapSect(*(*SbItr));
 
 						if (OverlapSections.empty()) {
-							Interface::Log("    0x%p:0x%08x | %ws | ?        | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
-								SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+							Interface::Log("    0x%p:0x%08x | %ws | ?        | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbItr)->GetPrivateSize());
 							AppendOverlapSuspicion(pSbMap, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, false);
 							Interface::Log("\r\n");
 						}
@@ -666,8 +650,7 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 								wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
 								AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
 
-								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName,
-									SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName, (*SbItr)->GetPrivateSize());
 								AppendOverlapSuspicion(pSbMap, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, false);
 								Interface::Log("\r\n");
 
@@ -675,8 +658,7 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 						}
 					}
 					else {
-						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
-							SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
+						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbItr)->GetPrivateSize());
 						AppendOverlapSuspicion(pSbMap, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, false);
 						Interface::Log("\r\n");
 					}

@@ -88,7 +88,7 @@ uint8_t* PeVm::Body::GetPeBase() {
 	return this->PeBase;
 }
 
-PeVm::Component::Component(std::vector<SBlock*> SBlocks, uint8_t* pPeBase) : ABlock(SBlocks), PeBase(pPeBase) {}
+PeVm::Component::Component(HANDLE hProcess, std::vector<SBlock*> SBlocks, uint8_t* pPeBase) : ABlock(hProcess, SBlocks), PeBase(pPeBase) {}
 
 void Entity::SetSBlocks(vector<SBlock*> SBlocks) {
 	this->SBlocks = SBlocks;
@@ -97,16 +97,24 @@ void Entity::SetSBlocks(vector<SBlock*> SBlocks) {
 	this->EntitySize = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize) - (SBlocks.front())->GetBasic()->BaseAddress;
 }
 
-ABlock::ABlock(vector<SBlock*> SBlocks) {
+ABlock::ABlock(HANDLE hProcess, vector<SBlock*> SBlocks) {
+	static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory");
+	MEMORY_REGION_INFORMATION Mri = { 0 };
+	NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, SBlocks.front()->GetBasic()->AllocationBase, MemoryRegionInformation, &Mri, sizeof(MEMORY_REGION_INFORMATION), nullptr);
+
+	if (NT_SUCCESS(NtStatus)) {
+		//
+	}
+
 	SetSBlocks(SBlocks);
 }
 
-PeVm::Section::Section(vector<SBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase) : ABlock(SBlocks), PeVm::Component(SBlocks, pPeBase) {
+PeVm::Section::Section(HANDLE hProcess, vector<SBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase) : ABlock(hProcess, SBlocks), PeVm::Component(hProcess, SBlocks, pPeBase) {
 	memcpy(&this->Hdr, pHdr, sizeof(IMAGE_SECTION_HEADER));
 	this->EntitySize = this->Hdr.SizeOfRawData == 0 ? this->Hdr.Misc.VirtualSize : this->Hdr.SizeOfRawData; // Overwrite default size determined by sblocks. Verified correct order.
 }
 
-MappedFile::MappedFile(vector<SBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore) : ABlock(SBlocks), FileBase(pFilePath, bMemStore, false) {}
+MappedFile::MappedFile(HANDLE hProcess, vector<SBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore) : ABlock(hProcess, SBlocks), FileBase(pFilePath, bMemStore, false) {}
 
 bool PeVm::Body::PebModule::Exists() {
 	return (this->Missing ? false : true);
@@ -173,13 +181,12 @@ uint32_t PeVm::Body::GetImageSize() {
 	return this->ImageSize;
 }
 
-PeVm::Body::Body(HANDLE hProcess, vector<SBlock*> SBlocks, const wchar_t* pFilePath) : ABlock(SBlocks), PeVm::Component(SBlocks, (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress), MappedFile(SBlocks, pFilePath, true), PebMod(hProcess, this->PeBase) {
+PeVm::Body::Body(HANDLE hProcess, vector<SBlock*> SBlocks, const wchar_t* pFilePath) : ABlock(hProcess, SBlocks), PeVm::Component(hProcess, SBlocks, (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress), MappedFile(hProcess, SBlocks, pFilePath, true), PebMod(hProcess, this->PeBase) {
 	static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory");
 	MEMORY_IMAGE_INFORMATION Mii = { 0 };
 	NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, this->PeBase, MemoryImageInformation, &Mii, sizeof(MEMORY_IMAGE_INFORMATION), nullptr);
 
 	if (NT_SUCCESS(NtStatus)) {
-		//Interface::Log("ImageNotExecutable: %d\r\n", Mii.ImageNotExecutable);
 		this->NonExecutableImage = Mii.ImageNotExecutable;
 		this->PartiallyMapped = Mii.ImagePartialMap;
 		this->ImageSize = Mii.SizeOfImage;
@@ -229,11 +236,11 @@ PeVm::Body::Body(HANDLE hProcess, vector<SBlock*> SBlocks, const wchar_t* pFileP
 						//Interface::Log("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, pSectStartVa, pSectEndVa, pSBlockStartVa, pSBlockEndVa);
 						MEMORY_BASIC_INFORMATION* pMbi = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
 						memcpy(pMbi, (*SbItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
-						OverlapSBlock.push_back(new SBlock(pMbi, nullptr, (*SbItr)->GetThreads()));
+						OverlapSBlock.push_back(new SBlock(hProcess, pMbi, nullptr, (*SbItr)->GetThreads()));
 					}
 				}
 
-				this->Sections.push_back(new Section(OverlapSBlock, &ArtificialPeHdr, this->PeBase));
+				this->Sections.push_back(new Section(hProcess, OverlapSBlock, &ArtificialPeHdr, this->PeBase));
 			}
 		}
 		else {
@@ -273,14 +280,14 @@ Entity* Entity::Create(HANDLE hProcess, std::vector<SBlock*> SBlocks) {
 		}
 
 		if (SBlocks.front()->GetBasic()->Type == MEM_MAPPED) {
-			pNewEntity = new MappedFile(SBlocks, MapFilePath);
+			pNewEntity = new MappedFile(hProcess, SBlocks, MapFilePath);
 		}
 		else if (SBlocks.front()->GetBasic()->Type == MEM_IMAGE) {
 			pNewEntity = new PeVm::Body(hProcess, SBlocks, MapFilePath);
 		}
 	}
 	else {
-		pNewEntity = new ABlock(SBlocks);
+		pNewEntity = new ABlock(hProcess, SBlocks);
 	}
 
 	return pNewEntity;

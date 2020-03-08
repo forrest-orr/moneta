@@ -183,7 +183,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 							// Headers with private pages
 							//
 
-							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && SBlock::GetPrivateSize(ParentProc.GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
+							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && (*SbItr)->GetPrivateSize()) {
 								TargetSuspList.push_back(new ModifiedPeHeader(&ParentProc, &ParentObj, *SbItr));
 							}
 
@@ -199,7 +199,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 							// Executable regions in memory with private pages. Whether their +x is consistent with their section on disk is examined as well.
 							//
 
-							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && SBlock::GetPrivateSize(ParentProc.GetHandle(), (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, (uint32_t)(*SbItr)->GetBasic()->RegionSize)) {
+							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && (*SbItr)->GetPrivateSize()) {
 								TargetSuspList.push_back(new ModifiedCode(&ParentProc, &ParentObj, *SbItr));
 							}
 

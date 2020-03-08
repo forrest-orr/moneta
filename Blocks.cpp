@@ -10,18 +10,17 @@ using namespace std;
 using namespace PeFile;
 using namespace Moneta;
 
-SBlock::SBlock(MEMORY_BASIC_INFORMATION* pMemBasicInfo, MEMORY_REGION_INFORMATION* pMemRegionInfo, vector<Thread *> Threads1) : Basic(pMemBasicInfo), Region(pMemRegionInfo) {
-	// Detect overlapping threads
+SBlock::SBlock(HANDLE hProcess, MEMORY_BASIC_INFORMATION* pMbi, MEMORY_REGION_INFORMATION* pMemRegionInfo, vector<Thread *> Threads1) : Basic(pMbi), Region(pMemRegionInfo) {
 	for (vector<Thread *>::const_iterator ThItr = Threads1.begin(); ThItr != Threads1.end(); ++ThItr) {
 		if ((*ThItr)->GetEntryPoint() >= this->Basic->BaseAddress && (*ThItr)->GetEntryPoint() < ((uint8_t *)this->Basic->BaseAddress + this->Basic->RegionSize)) {
-			//Thread* SbTh = new Thread((*ThItr)->GetTid());
 			this->Threads.push_back(new Thread((*ThItr)->GetTid(), (*ThItr)->GetEntryPoint()));
 		}
 	}
+
+	this->PrivateSize = SBlock::QueryPrivateSize(hProcess, static_cast<uint8_t*>(this->Basic->BaseAddress), (uint32_t)(this->Basic->RegionSize));
 }
 
 SBlock::~SBlock() {
-	//Interface::Log("mem destructor\r\n");
 	if (this->Basic != nullptr) {
 		delete Basic;
 	}
@@ -33,8 +32,6 @@ SBlock::~SBlock() {
 	for (vector<Thread*>::const_iterator Itr = this->Threads.begin(); Itr != this->Threads.end(); ++Itr) {
 		delete* Itr;
 	}
-
-	//Interface::Log("mem destructor2\r\n");
 }
 
 std::vector<Thread*> SBlock::GetThreads() {
@@ -121,7 +118,11 @@ const wchar_t* SBlock::TypeSymbol(uint32_t dwType) {
 	}
 }
 
-uint32_t SBlock::GetPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t dwSize) {
+const wchar_t* TranslateRegionType() {
+	//
+}
+
+uint32_t SBlock::QueryPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t dwSize) {
 	PSAPI_WORKING_SET_EX_INFORMATION* pWorkingSets = new PSAPI_WORKING_SET_EX_INFORMATION;
 	uint32_t dwWorkingSetsSize = sizeof(PSAPI_WORKING_SET_EX_INFORMATION);
 	uint32_t dwPrivateSize = 0;
