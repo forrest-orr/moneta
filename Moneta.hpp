@@ -51,6 +51,7 @@ namespace Moneta {
 			class PebModule {
 			public:
 				uint8_t* GetBase();
+				uint8_t* GetEntryPoint();
 				std::wstring GetPath();
 				uint32_t GetSize();
 				PebModule(HANDLE hProcess, uint8_t* pModBase);

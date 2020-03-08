@@ -624,6 +624,7 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 						Interface::Log("\r\n");
 						Interface::Log("      | Image base: 0x%p\r\n", PeEntity->GetPebModule().GetBase());
 						Interface::Log("      | Image size: %d\r\n", PeEntity->GetPebModule().GetSize());
+						Interface::Log("      | Entry point: 0x%p\r\n", PeEntity->GetPebModule().GetEntryPoint());
 						Interface::Log("      | Image file path: %ws\r\n", PeEntity->GetPebModule().GetPath().c_str());
 					}
 					else {
@@ -636,6 +637,7 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 					Interface::Log("    | Mapped file path: %ws\r\n", dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
 				}
 			}
+
 			/*
 
 |__ Mapped file base: 0x00007FFC668B0000

@@ -141,6 +141,10 @@ uint8_t *PeVm::Body::PebModule::GetBase() {
 	return (uint8_t *)this->Info.lpBaseOfDll;
 }
 
+uint8_t* PeVm::Body::PebModule::GetEntryPoint() {
+	return (uint8_t*)this->Info.EntryPoint;
+}
+
 uint32_t PeVm::Body::PebModule::GetSize() {
 	return this->Info.SizeOfImage;
 }
