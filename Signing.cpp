@@ -278,3 +278,20 @@ bool CheckSigning(const wchar_t* pTargetFilePath) {
         return true;
     }
 }
+
+/*
+ 0->Unchecked, 1->Unsigned, 4->Authenticode, 8->Microsoft, 12->Windows • In Windows 8.1, this was extended to differentiate against the new types of processes and their protection levels • 6->Store, 7->Anti Malware, 14->Windows TCB
+*/
+const wchar_t* TranslateSigningLevel(uint32_t dwSigningLevel) {
+    switch (dwSigningLevel) {
+    case 0: return L"Unchecked";
+    case 1: return L"Unsigned";
+    case 4: return L"Authenticode";
+    case 6: return L"Store";
+    case 7: return L"Anti-malware";
+    case 8: return L"Microsoft";
+    case 12: return L"Windows";
+    case 14: return L"Windows TCB";
+    default: return L"?";
+    }
+}

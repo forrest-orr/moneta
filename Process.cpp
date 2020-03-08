@@ -7,6 +7,7 @@
 #include "Interface.hpp"
 #include "MemDump.hpp"
 #include "Suspicions.hpp"
+#include "Signing.hpp"
 
 using namespace std;
 using namespace PeFile;
@@ -373,32 +374,6 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>&Suspi
 	return 0;
 }
 
-/*
-void Process::EnumerateSBlocks(map<uint8_t*, vector<Suspicion*>> &SuspicionsMap, vector<SBlock*> SBlocks) {
-	for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-		bool bSuspiciousSblock = false;
-		wchar_t AlignedAttribDesc[9] = { 0 };
-
-		AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
-
-		Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc,
-			SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
-
-		if (SuspicionsMap.count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) {
-			vector<Suspicion*>& SuspicionsList = SuspicionsMap.at((uint8_t*)(*SbItr)->GetBasic()->BaseAddress);
-
-			for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
-				if (!(*SuspItr)->IsFullEntitySuspicion()) {
-					Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
-				}
-			}
-		}
-
-		Interface::Log("\r\n");
-		EnumerateThreads(L"      ", (*SbItr)->GetThreads());
-	}
-}*/
-
 int32_t AppendOverlapSuspicion(map<uint8_t*, vector<Suspicion*>>* pSbMap, uint8_t *pSbAddress, bool bEntityTop) {
 	if (pSbMap != nullptr && pSbMap->count(pSbAddress)) {
 		vector<Suspicion*>& SuspicionsList = pSbMap->at(pSbAddress);
@@ -619,7 +594,7 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 					Interface::Log("    | Non-executable: %ws\r\n", PeEntity->IsNonExecutableImage() ? L"yes" : L"no");
 					Interface::Log("    | Partially mapped: %ws\r\n", PeEntity->IsPartiallyMapped() ? L"yes" : L"no");
 					Interface::Log("    | Signed: %ws\r\n", PeEntity->IsSigned() ? L"yes" : L"no");
-					Interface::Log("    | Signing level: %d\r\n", PeEntity->GetSigningLevel());
+					Interface::Log("    | Signing level: %ws\r\n", TranslateSigningLevel(PeEntity->GetSigningLevel()));
 					Interface::Log("    |__ PEB module");
 
 					if (PeEntity->GetPebModule().Exists()) {
@@ -739,116 +714,3 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 		}
 	}
 }
-
-	/*
-	bool bFileRange = false, bImageRange = false;
-
-	for (list<SBlock*>::const_iterator RecordItr = this->SBlocks.begin(); RecordItr != this->SBlocks.end(); ++RecordItr) {
-		uint32_t dwPrivateSize = 0;
-
-		if ((*RecordItr)->GetBasic()->Type == MEM_MAPPED || (*RecordItr)->GetBasic()->Type == MEM_IMAGE) {
-			dwPrivateSize = VmProcess::GetPrivateSize((uint8_t*)(*RecordItr)->GetBasic()->BaseAddress, (*RecordItr)->GetBasic()->RegionSize);
-			if ((*RecordItr)->GetBasic()->AllocationBase == (*RecordItr)->GetBasic()->BaseAddress) {
-				bFileRange = true;
-				wchar_t FileName[MAX_PATH] = { 0 };
-				HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, this->Pid);
-
-				if (hProcess != nullptr) {
-					if ((*RecordItr)->GetBasic()->Type == MEM_MAPPED) {
-						if (GetMappedFileNameW(hProcess, (*RecordItr)->GetBasic()->AllocationBase, FileName, MAX_PATH)) {
-							//Interface::Log("%ws\r\n", MappedFileName);
-						}
-						else {
-							wcscpy_s(FileName, MAX_PATH, L"Page file");
-						}
-					}
-					else {
-						bImageRange = true;
-						if (GetModuleFileNameExW(hProcess, (HMODULE)(*RecordItr)->GetBasic()->AllocationBase, FileName, MAX_PATH)) {
-							//Interface::Log("%ws\r\n", ModuleFileName);
-						}
-						else {
-							wcscpy_s(FileName, MAX_PATH, L"?");
-							Interface::Log("!!!! FAILED to get module name\r\n");
-						}
-					}
-
-					CloseHandle(hProcess);
-				}
-				else {
-					wcscpy_s(FileName, MAX_PATH, L"Access denied");
-				}
-
-				Interface::Log("======[ 0x%p : %ws\r\n", (*RecordItr)->GetBasic()->BaseAddress, FileName);
-			}
-		}
-		else {
-			bFileRange = false;
-			bImageRange = false;
-			Interface::Log("======[ 0x%p\r\n", (*RecordItr)->GetBasic()->BaseAddress);
-		}
-
-		wchar_t Indent[40] = { 0 };
-
-		wcscpy_s(Indent, 40, L"  ");
-
-		if (bImageRange) {
-			wcscat_s(Indent, 40, L"  ");
-		}
-
-		Interface::Log(
-			"%wsAllocated base 0x%p\r\n"
-			"%wsBase: 0x%p\r\n"
-			"%wsSize: %zu\r\n",
-			Indent,
-			(*RecordItr)->GetBasic()->AllocationBase,
-			Indent,
-			(*RecordItr)->GetBasic()->BaseAddress,
-			Indent,
-			(*RecordItr)->GetBasic()->RegionSize);
-
-		Interface::Log("%wsState: ", Indent);
-		switch ((*RecordItr)->GetBasic()->State)
-		{
-		case MEM_COMMIT:
-			Interface::Log("MEM_COMMIT\r\n");
-			break;
-		case MEM_RESERVE:
-			Interface::Log("MEM_RESERVE\r\n");
-			break;
-		case MEM_FREE:
-			Interface::Log("MEM_FREE\r\n");
-			break;
-		default:
-			Interface::Log("?\r\n");
-		}
-
-		Interface::Log("%wsType: ", Indent);
-		switch ((*RecordItr)->GetBasic()->Type)
-		{
-		case MEM_IMAGE:
-			Interface::Log("MEM_IMAGE\r\n");
-			break;
-		case MEM_MAPPED:
-			Interface::Log("MEM_MAPPED\r\n");
-			break;
-		case MEM_PRIVATE:
-			Interface::Log("MEM_PRIVATE\r\n");
-			break;
-		default:
-			Interface::Log("N/A\r\n");
-		}
-
-		Interface::Log("%wsPrivate size: %d\r\n", Indent, dwPrivateSize);
-		Interface::Log("%wsCurrent permissions: 0x%08x\r\n", Indent, (*RecordItr)->GetBasic()->Protect);
-		Interface::Log("%wsOriginal permissions: 0x%08x\r\n", Indent, (*RecordItr)->GetBasic()->AllocationProtect);
-
-		if ((*RecordItr)->GetRegion() != nullptr) {
-			Interface::Log("%wsRegion allocation base: 0x%p\r\n", Indent, (*RecordItr)->GetRegion()->AllocationBase);
-			Interface::Log("%wsRegion size: %d\r\n", Indent, (*RecordItr)->GetRegion()->RegionSize);
-			Interface::Log("%wsCommit size: %d\r\n", Indent, (*RecordItr)->GetRegion()->CommitSize);
-			Interface::Log("%wsRegion type literal: 0x%08x\r\n", Indent, (*RecordItr)->GetRegion()->RegionType); // These fields do not match struct declaration, likely different across Windows versions. Ignore them for now.
-		}
-
-		Interface::Log("\r\n");
-	}*/
