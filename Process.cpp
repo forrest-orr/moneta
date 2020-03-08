@@ -529,7 +529,7 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 				}
 
 				if (Itr->second->GetRegionInfo() != nullptr) {
-					//
+					// Due to flag inconsistency between architectures and different Windows version MEMORY_REGION_INFORMATION has been excluded
 				}
 			}
 

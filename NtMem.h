@@ -14,6 +14,8 @@ typedef enum _MEMORY_INFORMATION_CLASS
 	MemoryBasicInformationCapped
 } MEMORY_INFORMATION_CLASS;
 
+//#pragma pack(push, 1)
+
 typedef struct _MEMORY_REGION_INFORMATION
 {
 	PVOID AllocationBase;
@@ -40,8 +42,7 @@ typedef struct _MEMORY_REGION_INFORMATION
 	ULONG_PTR PartitionId; // 19H1
 } MEMORY_REGION_INFORMATION, * PMEMORY_REGION_INFORMATION;
 
-//#pragma pack(push, 8)
-
+//#pragma pack(pop)
 typedef struct _MEMORY_IMAGE_INFORMATION
 {
 	PVOID ImageBase;
@@ -59,6 +60,5 @@ typedef struct _MEMORY_IMAGE_INFORMATION
 	};
 } MEMORY_IMAGE_INFORMATION, * PMEMORY_IMAGE_INFORMATION;
 
-//#pragma pack(pop)
 
 typedef NTSTATUS(__stdcall* NtQueryVirtualMemory_t)(HANDLE, void *, MEMORY_INFORMATION_CLASS, void *, SIZE_T, SIZE_T *);
