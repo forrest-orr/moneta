@@ -588,6 +588,7 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 						Interface::Log("      | State: %ws\r\n", SBlock::StateSymbol((*SbItr)->GetBasic()->State));
 						Interface::Log("      | Allocation base: 0x%p\r\n", (*SbItr)->GetBasic()->AllocationBase);
 						Interface::Log("      | Allocation permissions: %ws\r\n", SBlock::ProtectSymbol((*SbItr)->GetBasic()->AllocationProtect));
+						Interface::Log("      | Private size: %d [%d pages]\r\n", (*SbItr)->GetPrivateSize(), (*SbItr)->GetPrivateSize() / 0x1000);
 					}
 
 					EnumerateThreads(L"      ", (*SbItr)->GetThreads());
