@@ -98,12 +98,17 @@ void Entity::SetSBlocks(vector<SBlock*> SBlocks) {
 }
 
 ABlock::ABlock(HANDLE hProcess, vector<SBlock*> SBlocks) {
-	static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory");
-	MEMORY_REGION_INFORMATION Mri = { 0 };
-	NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, SBlocks.front()->GetBasic()->AllocationBase, MemoryRegionInformation, &Mri, sizeof(MEMORY_REGION_INFORMATION), nullptr);
+	if (SBlocks.front()->GetBasic()->State == MEM_COMMIT) {
+		static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory");
+		this->RegionInfo = new MEMORY_REGION_INFORMATION;
+		NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, SBlocks.front()->GetBasic()->AllocationBase, MemoryRegionInformation, this->RegionInfo, sizeof(MEMORY_REGION_INFORMATION), nullptr);
 
-	if (NT_SUCCESS(NtStatus)) {
-		//
+		if (!NT_SUCCESS(NtStatus)) {
+			delete this->RegionInfo;
+			this->RegionInfo = nullptr;
+			printf("- Failed to query region information at 0x%p (0x%08x)\r\n", SBlocks.front()->GetBasic()->AllocationBase, NtStatus);
+			system("pause");
+		}
 	}
 
 	SetSBlocks(SBlocks);
@@ -236,7 +241,7 @@ PeVm::Body::Body(HANDLE hProcess, vector<SBlock*> SBlocks, const wchar_t* pFileP
 						//Interface::Log("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, pSectStartVa, pSectEndVa, pSBlockStartVa, pSBlockEndVa);
 						MEMORY_BASIC_INFORMATION* pMbi = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
 						memcpy(pMbi, (*SbItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
-						OverlapSBlock.push_back(new SBlock(hProcess, pMbi, nullptr, (*SbItr)->GetThreads()));
+						OverlapSBlock.push_back(new SBlock(hProcess, pMbi, (*SbItr)->GetThreads()));
 					}
 				}
 

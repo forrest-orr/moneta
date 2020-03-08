@@ -182,7 +182,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				}
 
 				Interface::Log(5, "Adding mew sblock to list\r\n");
-				SBlocks.push_back(new SBlock(this->Handle, (MEMORY_BASIC_INFORMATION*)pMbi, nullptr, this->Threads));
+				SBlocks.push_back(new SBlock(this->Handle, (MEMORY_BASIC_INFORMATION*)pMbi, this->Threads));
 				ABlock = SBlocks.begin(); // This DOES fix a bug.
 			}
 			else {
@@ -401,93 +401,6 @@ bool Process::DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION *pMbi, wstrin
 	}
 }
 /*
-  0x00007FFC668B0000:0x0009e000   | Executable image    | C:\Windows\System32\msvcrt.dll
-  |__ Mapped file base: 0x00007FFC668B0000
-    | Mapped file size: 0x0009e000
-	| Mapped file path: C:\Windows\System32\msvcrt.dll
-	| Non-executable: no
-	| Signed: yes
-	|__ PEB module
-	  | Image base: 0x00007FFC668B0000
-	  | Image size: 0x0009e000
-	  | Image file path: C:\Windows\System32\msvcrt.dll
-	  | Module name: msvcrt.dll
-	  | Entry point: 0x00007FFC668B0000
-	__|
-	|__ PE file
-	  | AddressOfEntryPoint: 0x68B0000
-
-	0x00007FFC668B0000:0x00001000 | R        | Header   | 0x00000000
-	|__ Base: 0x00007FFC668B0000
-	  | Size: 0x1000
-	  | Permissions: R
-	  | Size: 0x1000
-	  | State: MEM_COMMIT
-	  | Type: MEM_IMAGE
-	  | Allocation base: 0x00007FFC668B0000
-	  | Initial protection: RWXC
-
-	0x00007FFC668B1000:0x00075000 | RX       | .text    | 0x00000000
-	|__ Base: 0x00007FFC668B0000
-	  | Size: 0x1000
-	  | Permissions: R
-	  | Size: 0x1000
-	  | State: MEM_COMMIT
-	  | Type: MEM_IMAGE
-	  | Allocation base: 0x00007FFC668B0000
-	  | Initial protection: RWXC
-
-	0x00007FFC66926000:0x00019000 | R        | .rdata   | 0x00002000
-	|__ Base: 0x00007FFC668B0000
-	  | Size: 0x1000
-	  | Permissions: R
-	  | Size: 0x1000
-	  | State: MEM_COMMIT
-	  | Type: MEM_IMAGE
-	  | Allocation base: 0x00007FFC668B0000
-	  | Initial protection: RWXC
-
-	0x00007FFC6693F000:0x00002000 | RW       | .data    | 0x00002000
-	|__ Base: 0x00007FFC668B0000
-	  | Size: 0x1000
-	  | Permissions: RW
-	  | Size: 0x00002000
-	  | State: MEM_COMMIT
-	  | Type: MEM_IMAGE
-	  | Allocation base: 0x00007FFC668B0000
-	  | Initial protection: RWXC
-
-  0x0000026D27C90000:0x00001000   | Mapped   | Page File
-  |__ Mapped file base: 0x0000026D27C90000
-    | Mapped file size: 0x00001000
-	| Mapped file path: N/A
-	0x0000026D27C90000:0x00001000 | R        | 0x00000000
-	|__ Base: 0x0000026D27C90000
-	  | Size: 0x1000
-	  | Permissions: R
-	  | Size: 0x1000
-	  | State: MEM_COMMIT
-	  | Type: MEM_MAPPED
-	  | Allocation base: 0x00007FFC668B0000
-	  | Initial protection: R
-
-  0x0000026D27CA0000:0x00002000   | Private
-	0x0000026D27CA0000:0x00002000 | RW       | 0x00002000
-	|__ Base: 0x0000026D27C90000
-	  | Size: 0x1000
-	  | Permissions: R
-	  | Size: 0x1000
-	  | State: MEM_COMMIT
-	  | Type: MEM_MAPPED
-	  | Allocation base: 0x00007FFC668B0000
-	  | Initial protection: R
-  0x0000026D27CB0000:0x000c7000   | Mapped   | C:\Windows\System32\locale.nls
-	0x0000026D27CB0000:0x000c7000 | R        | 0x00000000
-  0x0000026D27D80000:0x00007000   | Private
-	0x0000026D27D80000:0x00001000 | RW       | 0x00001000
-	0x0000026D27D81000:0x00006000 | Reserve  | 0x00006000
-*/
-/*
 1. Loop entities to build suspicions list
 2. Filter suspicions
 3. Loop entities for enumeration if:
@@ -613,6 +526,10 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 					Interface::Log("  |__ Mapped file base: 0x%p\r\n", Itr->second->GetStartVa());
 					Interface::Log("    | Mapped file size: %d\r\n", Itr->second->GetEntitySize());
 					Interface::Log("    | Mapped file path: %ws\r\n", dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
+				}
+
+				if (Itr->second->GetRegionInfo() != nullptr) {
+					//
 				}
 			}
 

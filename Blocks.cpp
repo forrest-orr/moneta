@@ -10,7 +10,7 @@ using namespace std;
 using namespace PeFile;
 using namespace Moneta;
 
-SBlock::SBlock(HANDLE hProcess, MEMORY_BASIC_INFORMATION* pMbi, MEMORY_REGION_INFORMATION* pMemRegionInfo, vector<Thread *> Threads1) : Basic(pMbi), Region(pMemRegionInfo) {
+SBlock::SBlock(HANDLE hProcess, MEMORY_BASIC_INFORMATION* pMbi, vector<Thread *> Threads1) : Basic(pMbi) {
 	for (vector<Thread *>::const_iterator ThItr = Threads1.begin(); ThItr != Threads1.end(); ++ThItr) {
 		if ((*ThItr)->GetEntryPoint() >= this->Basic->BaseAddress && (*ThItr)->GetEntryPoint() < ((uint8_t *)this->Basic->BaseAddress + this->Basic->RegionSize)) {
 			this->Threads.push_back(new Thread((*ThItr)->GetTid(), (*ThItr)->GetEntryPoint()));
@@ -25,10 +25,6 @@ SBlock::~SBlock() {
 		delete Basic;
 	}
 
-	if (this->Region != nullptr) {
-		delete Region;
-	}
-
 	for (vector<Thread*>::const_iterator Itr = this->Threads.begin(); Itr != this->Threads.end(); ++Itr) {
 		delete* Itr;
 	}
@@ -40,10 +36,6 @@ std::vector<Thread*> SBlock::GetThreads() {
 
 MEMORY_BASIC_INFORMATION* SBlock::GetBasic() {
 	return Basic;
-}
-
-MEMORY_REGION_INFORMATION* SBlock::GetRegion() {
-	return Region;
 }
 
 const wchar_t* SBlock::ProtectSymbol(uint32_t dwProtect) {

@@ -3,14 +3,12 @@
 class SBlock {
 protected:
 	MEMORY_BASIC_INFORMATION* Basic;
-	MEMORY_REGION_INFORMATION* Region;
 	std::vector<Moneta::Thread*> Threads;
 	uint32_t PrivateSize;
 public:
 	SBlock(HANDLE hProcess, MEMORY_BASIC_INFORMATION* pMbi, std::vector<Moneta::Thread*> Threads1);
 	~SBlock();
 	MEMORY_BASIC_INFORMATION* GetBasic();
-	MEMORY_REGION_INFORMATION* GetRegion();
 	std::vector<Moneta::Thread*> GetThreads();
 	uint32_t GetPrivateSize() { return this->PrivateSize;  }
 	static uint32_t QueryPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t dwSize);

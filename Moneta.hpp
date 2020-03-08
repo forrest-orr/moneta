@@ -7,9 +7,11 @@ namespace Moneta {
 		std::vector<SBlock*> SBlocks;
 		uint8_t* StartVa, * EndVa;
 		uint32_t EntitySize;
+		MEMORY_REGION_INFORMATION *RegionInfo;
 	public:
 		enum Type { UNKNOWN, PE_FILE, MAPPED_FILE, PE_SECTION };
 		std::vector<SBlock*> GetSBlocks();
+		MEMORY_REGION_INFORMATION* GetRegionInfo() { return RegionInfo; }
 		uint8_t* GetStartVa();
 		uint8_t* GetEndVa();
 		uint32_t GetEntitySize();
