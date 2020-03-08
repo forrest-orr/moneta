@@ -77,6 +77,21 @@ const wchar_t* SBlock::ProtectSymbol(uint32_t dwProtect) {
 	}
 }
 
+const wchar_t* SBlock::StateSymbol(uint32_t dwState) {
+	if (dwState == MEM_COMMIT) {
+		return L"Commit";
+	}
+	else if (dwState == MEM_FREE) {
+		return L"Free";
+	}
+	else if (dwState == MEM_RESERVE) {
+		return L"Reserve";
+	}
+	else {
+		return L"?";
+	}
+}
+
 const wchar_t* SBlock::AttribDesc(MEMORY_BASIC_INFORMATION *pMbi) {
 	if (pMbi->State == MEM_COMMIT) {
 		return ProtectSymbol(pMbi->Protect);

@@ -609,6 +609,48 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 			AppendOverlapSuspicion(pSbMap, (uint8_t*)Itr->second->GetStartVa(), true);
 			Interface::Log("\r\n");
 
+			if (VLvl == VerbosityLevel::Detail) {
+				if (Itr->second->GetType() == Entity::Type::PE_FILE) {
+					PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
+
+					Interface::Log("  |__ Mapped file base: 0x%p\r\n", PeEntity->GetStartVa());
+					Interface::Log("    | Mapped file size: %d\r\n", PeEntity->GetEntitySize());
+					Interface::Log("    | Mapped file path: %ws\r\n", PeEntity->GetPath().c_str());
+					Interface::Log("    | Non-executable: %ws\r\n", PeEntity->IsNonExecutableImage() ? L"yes" : L"no");
+					Interface::Log("    | Signed: %ws\r\n", PeEntity->IsSigned() ? L"yes" : L"no");
+					Interface::Log("    |__ PEB module");
+
+					if (PeEntity->GetPebModule().Exists()) {
+						Interface::Log("\r\n");
+						Interface::Log("      | Image base: 0x%p\r\n", PeEntity->GetPebModule().GetBase());
+						Interface::Log("      | Image size: %d\r\n", PeEntity->GetPebModule().GetSize());
+						Interface::Log("      | Image file path: %ws\r\n", PeEntity->GetPebModule().GetPath().c_str());
+					}
+					else {
+						Interface::Log(" (missing)\r\n");
+					}
+				}
+				else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
+					Interface::Log("  |__ Mapped file base: 0x%p\r\n", Itr->second->GetStartVa());
+					Interface::Log("    | Mapped file size: %d\r\n", Itr->second->GetEntitySize());
+					Interface::Log("    | Mapped file path: %ws\r\n", dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
+				}
+			}
+			/*
+
+|__ Mapped file base: 0x00007FFC668B0000
+  | Mapped file size: 0x0009e000
+  | Mapped file path: C:\Windows\System32\msvcrt.dll
+  | Non-executable: no
+  | Signed: yes
+  |__ PEB module
+	| Image base: 0x00007FFC668B0000
+	| Image size: 0x0009e000
+	| Image file path: C:\Windows\System32\msvcrt.dll
+	| Module name: msvcrt.dll
+	| Entry point: 0x00007FFC668B0000
+  */
+
 			//
 			// Display the section/sblock information associated with this eneity provided it meets the selection criteria
 			//
@@ -657,6 +699,16 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 							SBlock::GetPrivateSize(this->GetHandle(), static_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress), (uint32_t)(*SbItr)->GetBasic()->RegionSize));
 						AppendOverlapSuspicion(pSbMap, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, false);
 						Interface::Log("\r\n");
+					}
+
+					if (VLvl == VerbosityLevel::Detail) {
+						Interface::Log("    |__ Base address: 0x%p\r\n", (*SbItr)->GetBasic()->BaseAddress);
+						Interface::Log("      | Size: 0x%d\r\n", (*SbItr)->GetBasic()->RegionSize);
+						Interface::Log("      | Permissions: %ws\r\n", SBlock::ProtectSymbol((*SbItr)->GetBasic()->Protect));
+						Interface::Log("      | Type: %ws\r\n", SBlock::TypeSymbol((*SbItr)->GetBasic()->Type));
+						Interface::Log("      | State: %ws\r\n", SBlock::StateSymbol((*SbItr)->GetBasic()->State));
+						Interface::Log("      | Allocation base: 0x%p\r\n", (*SbItr)->GetBasic()->AllocationBase);
+						Interface::Log("      | Allocation permissions: %ws\r\n", SBlock::ProtectSymbol((*SbItr)->GetBasic()->AllocationProtect));
 					}
 
 					EnumerateThreads(L"      ", (*SbItr)->GetThreads());

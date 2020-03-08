@@ -16,6 +16,7 @@ public:
 	static const wchar_t* ProtectSymbol(uint32_t dwProtect);
 	static const wchar_t* AttribDesc(MEMORY_BASIC_INFORMATION* pMbi);
 	static const wchar_t* TypeSymbol(uint32_t dwType);
+	static const wchar_t* StateSymbol(uint32_t dwState);
 	static bool PageExecutable(uint32_t dwProtect);
 };
 
