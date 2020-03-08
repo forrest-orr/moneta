@@ -48,11 +48,15 @@ namespace Moneta {
 			PeFile::PeBase* Pe;
 			bool Signed;
 			bool NonExecutableImage;
+			bool PartiallyMapped;
+			uint32_t ImageSize;
+			uint32_t SigningLevel;
 			class PebModule {
 			public:
 				uint8_t* GetBase();
 				uint8_t* GetEntryPoint();
 				std::wstring GetPath();
+				std::wstring GetName();
 				uint32_t GetSize();
 				PebModule(HANDLE hProcess, uint8_t* pModBase);
 				bool Exists();
@@ -68,9 +72,12 @@ namespace Moneta {
 			PeFile::PeBase* GetPe();
 			bool IsSigned();
 			bool IsNonExecutableImage();
+			bool IsPartiallyMapped();
 			std::vector<Section*> GetSections();
 			PebModule &GetPebModule();
 			std::vector<Section*> FindOverlapSect(SBlock& Address);
+			uint32_t GetImageSize();
+			uint32_t GetSigningLevel() { return this->SigningLevel; }
 			Body(HANDLE hProcess, std::vector<SBlock*> SBlocks, const wchar_t* pFilePath);
 			~Body();
 		};

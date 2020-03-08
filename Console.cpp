@@ -34,7 +34,6 @@ ________________________________________________________________________________
 #include "Blocks.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
-#include "Environment.hpp"
 
 using namespace std;
 using namespace Moneta;

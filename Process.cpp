@@ -7,7 +7,6 @@
 #include "Interface.hpp"
 #include "MemDump.hpp"
 #include "Suspicions.hpp"
-#include "Environment.hpp"
 
 using namespace std;
 using namespace PeFile;
@@ -616,12 +615,16 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 					Interface::Log("  |__ Mapped file base: 0x%p\r\n", PeEntity->GetStartVa());
 					Interface::Log("    | Mapped file size: %d\r\n", PeEntity->GetEntitySize());
 					Interface::Log("    | Mapped file path: %ws\r\n", PeEntity->GetPath().c_str());
+					Interface::Log("    | Size of image: %d\r\n", PeEntity->GetImageSize());
 					Interface::Log("    | Non-executable: %ws\r\n", PeEntity->IsNonExecutableImage() ? L"yes" : L"no");
+					Interface::Log("    | Partially mapped: %ws\r\n", PeEntity->IsPartiallyMapped() ? L"yes" : L"no");
 					Interface::Log("    | Signed: %ws\r\n", PeEntity->IsSigned() ? L"yes" : L"no");
+					Interface::Log("    | Signing level: %d\r\n", PeEntity->GetSigningLevel());
 					Interface::Log("    |__ PEB module");
 
 					if (PeEntity->GetPebModule().Exists()) {
 						Interface::Log("\r\n");
+						Interface::Log("      | Name: %ws\r\n", PeEntity->GetPebModule().GetName().c_str());
 						Interface::Log("      | Image base: 0x%p\r\n", PeEntity->GetPebModule().GetBase());
 						Interface::Log("      | Image size: %d\r\n", PeEntity->GetPebModule().GetSize());
 						Interface::Log("      | Entry point: 0x%p\r\n", PeEntity->GetPebModule().GetEntryPoint());
@@ -637,7 +640,7 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 					Interface::Log("    | Mapped file path: %ws\r\n", dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
 				}
 			}
-
+			
 			/*
 
 |__ Mapped file base: 0x00007FFC668B0000

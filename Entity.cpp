@@ -137,6 +137,10 @@ wstring PeVm::Body::PebModule::GetPath() {
 	return this->Path;
 }
 
+wstring PeVm::Body::PebModule::GetName() {
+	return this->Name;
+}
+
 uint8_t *PeVm::Body::PebModule::GetBase() {
 	return (uint8_t *)this->Info.lpBaseOfDll;
 }
@@ -161,6 +165,14 @@ bool PeVm::Body::IsNonExecutableImage() {
 	return this->NonExecutableImage;
 }
 
+bool PeVm::Body::IsPartiallyMapped() {
+	return this->PartiallyMapped;
+}
+
+uint32_t PeVm::Body::GetImageSize() {
+	return this->ImageSize;
+}
+
 PeVm::Body::Body(HANDLE hProcess, vector<SBlock*> SBlocks, const wchar_t* pFilePath) : ABlock(SBlocks), PeVm::Component(SBlocks, (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress), MappedFile(SBlocks, pFilePath, true), PebMod(hProcess, this->PeBase) {
 	static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory");
 	MEMORY_IMAGE_INFORMATION Mii = { 0 };
@@ -169,6 +181,9 @@ PeVm::Body::Body(HANDLE hProcess, vector<SBlock*> SBlocks, const wchar_t* pFileP
 	if (NT_SUCCESS(NtStatus)) {
 		//Interface::Log("ImageNotExecutable: %d\r\n", Mii.ImageNotExecutable);
 		this->NonExecutableImage = Mii.ImageNotExecutable;
+		this->PartiallyMapped = Mii.ImagePartialMap;
+		this->ImageSize = Mii.SizeOfImage;
+		this->SigningLevel = Mii.ImageSigningLevel;
 	}
 	else {
 		Interface::Log("- NtQueryVirtualMemory failed for image information (0x%08x)\r\n", NtStatus);
