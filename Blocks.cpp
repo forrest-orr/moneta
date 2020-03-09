@@ -141,9 +141,6 @@ bool SBlock::PageExecutable(uint32_t dwProtect) {
 	return (dwProtect == PAGE_EXECUTE || dwProtect == PAGE_EXECUTE_READ || dwProtect == PAGE_EXECUTE_READWRITE);
 }
 
-
-///////
-
 void MemoryPermissionRecord::UpdateMap(list<SBlock*> MemBasicRecords) {
 	for (list<SBlock*>::const_iterator RecordItr = MemBasicRecords.begin(); RecordItr != MemBasicRecords.end(); ++RecordItr) {
 		if (!MemPermMap->count((*RecordItr)->GetBasic()->Type)) {

@@ -147,6 +147,21 @@ bool GrantSelfSeDebug() {
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	vector<wstring> Args(&pArgv[0], &pArgv[0 + nArgc]);
 	Interface::Initialize(Args);
+
+	CONSOLE_SCREEN_BUFFER_INFOEX OriginalScrnInfo = { 0 }, NewScrnInfo = { 0 };
+	OriginalScrnInfo.cbSize = sizeof(OriginalScrnInfo);
+	NewScrnInfo.cbSize = sizeof(NewScrnInfo);
+	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+	GetConsoleScreenBufferInfoEx(hConsole, &OriginalScrnInfo);
+	GetConsoleScreenBufferInfoEx(hConsole, &NewScrnInfo);
+	//memcpy(&NewScrnInfo, &OriginalScrnInfo, sizeof(OriginalScrnInfo));
+	OriginalScrnInfo.ColorTable[14] = RGB(255, 128, 0);  // Replace yellow
+	SetConsoleScreenBufferInfoEx(hConsole, &OriginalScrnInfo);
+	SetConsoleTextAttribute(hConsole, FOREGROUND_INTENSITY | FOREGROUND_RED | FOREGROUND_GREEN);
+	printf("abc123\r\n");
+	Interface::Log("Test 123\r\n");
+	SetConsoleScreenBufferInfoEx(hConsole, &OriginalScrnInfo);
+
 	SYSTEM_INFO SystemInfo = { 0 };
 	typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
 	static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
@@ -233,9 +248,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		// Validate user input
 		//
 
-		//Interface::Log("Selected address: 0x%p\r\n", pAddress);
-		//Interface::Log("* Scanning process \"%d\" 
-
 		if (ProcType == SelectedProcessType::InvalidPid) {
 			Interface::Log("- Invalid target process type selected\r\n");
 			return 0;
@@ -269,9 +281,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			try {
 				Process TargetProc(dwSelectedPid);
 				TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl, pAddress);
-
-				//MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(TargetProc.GetBlocks());
-				//MemPermRec->ShowRecords();
 			}
 			catch (int32_t nError) {
 				Interface::Log("- Failed to map address space of %d (error %d)\r\n", dwSelectedPid, nError);

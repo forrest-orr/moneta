@@ -429,6 +429,7 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 	MemDump ProcDmp(this->Handle, this->Pid);
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
 	map <uint8_t*, map<uint8_t*, vector<Suspicion*>>> SuspicionsMap; // More efficient to only filter this map once. Currently filtering it for every single entity
+	vector<SBlock*> SelectedSbrs;
 
 	//
 	// Build suspicions list for following memory selection and apply filters to it.
@@ -613,4 +614,7 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 			}
 		}
 	}
+
+	MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(SelectedSbrs);
+	MemPermRec->ShowRecords();
 }

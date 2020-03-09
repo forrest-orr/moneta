@@ -35,12 +35,15 @@ Dump selected memory: -d
   All memory blocks/regions selected via the "-m" parameter will
   be dumped to a physical file on disk.
 
-Memory selection options: --option ["from-base"]
+Memory selection options: --option ["from-base", "statistics"]
   + Optionally select memory "from base"
 	All selected blocks will implicitly also select all other
 	blocks which share their allocation base. For example, a
 	block within a PE image will implicitly select all blocks
 	within the PE image region.
+  + Optionally calculate the attribute statistics for all selected
+    memory regions/subregions. These are based upon the memory
+	permissions and types.
 	
 Examples:
 
