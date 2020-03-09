@@ -162,6 +162,27 @@ MemoryPermissionRecord::MemoryPermissionRecord(vector<SBlock*> MemBasicRecords) 
 	UpdateMap(MemBasicRecords);
 }
 
+/*
+________________________________________
+|                        | MEM_PRIVATE
+|------------------------|
+| PAGE_READONLY          |
+|-------------------------
+| PAGE_READWRITE
+|-------------------------
+| PAGE_EXECUTE_READ
+|-------------------------
+| PAGE_EXECUTE_READWRITE
+|-------------------------
+| PAGE_EXECUTE_WRITECOPY
+|-------------------------
+| PAGE_WRITECOPY
+|-------------------------
+| PAGE_EXECUTE
+|-------------------------
+| PAGE_NOACCESS
+|__________________
+*/
 void MemoryPermissionRecord::ShowRecords() {
 	for (map<uint32_t, map<uint32_t, uint32_t>>::const_iterator Itr = MemPermMap->begin(); Itr != MemPermMap->end(); ++Itr) {
 		switch (Itr->first) {

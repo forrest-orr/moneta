@@ -102,6 +102,7 @@ void Entity::SetSBlocks(vector<SBlock*> SBlocks) {
 }
 
 ABlock::ABlock(HANDLE hProcess, vector<SBlock*> SBlocks) {
+	/* Removed as a temporary performance optimization since the region info is not being used during detailed enumeration
 	if (SBlocks.front()->GetBasic()->State == MEM_COMMIT) {
 		static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory");
 		this->RegionInfo = new MEMORY_REGION_INFORMATION;
@@ -114,6 +115,7 @@ ABlock::ABlock(HANDLE hProcess, vector<SBlock*> SBlocks) {
 			system("pause");
 		}
 	}
+	*/
 
 	SetSBlocks(SBlocks);
 }
