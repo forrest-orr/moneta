@@ -59,8 +59,8 @@ Process* Suspicion::GetProcess() {
 	return this->ParentProcess;
 }
 
-void EnumerateAll(vector<Suspicion *> &SuspicionsList) {
-	for (vector<Suspicion *>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
+void EnumerateAll(list<Suspicion *> &SuspicionsList) {
+	for (list<Suspicion *>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
 		Interface::Log("~ ");
 		Interface::Log("%ws", (*SuspItr)->GetDescription().c_str());
 
@@ -105,12 +105,12 @@ PhantomImage::PhantomImage(Process* ParentProc, Entity* ParentObj) : Suspicion(P
 MappedExecPermission::MappedExecPermission(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
 PrivateExecPermission::PrivateExecPermission(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
 
-void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>& SuspicionsMap) {
-	for (map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>::const_iterator AbMapItr = SuspicionsMap.begin(); AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
+void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>& SuspicionsMap) {
+	for (map <uint8_t*, map<uint8_t*, list<Suspicion *>>>::const_iterator AbMapItr = SuspicionsMap.begin(); AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
 		printf("0x%p [%d sblocks]\r\n", AbMapItr->first, AbMapItr->second.size());
-		for (map<uint8_t*, vector<Suspicion*>>::const_iterator SbMapItr = AbMapItr->second.begin(); SbMapItr != AbMapItr->second.end(); SbMapItr++) {
+		for (map<uint8_t*, list<Suspicion *>>::const_iterator SbMapItr = AbMapItr->second.begin(); SbMapItr != AbMapItr->second.end(); SbMapItr++) {
 			printf("  0x%p [%d list elements]\r\n", SbMapItr->first, SbMapItr->second.size());
-			for (vector<Suspicion*>::const_iterator ListItr = SbMapItr->second.begin(); ListItr != SbMapItr->second.end(); ++ListItr) {
+			for (list<Suspicion *>::const_iterator ListItr = SbMapItr->second.begin(); ListItr != SbMapItr->second.end(); ++ListItr) {
 				if (!(*ListItr)->IsFullEntitySuspicion()) {
 					printf("    0x%p : %d : %ws\r\n", (*ListItr)->GetBlock()->GetBasic()->BaseAddress, (*ListItr)->GetType(), (*ListItr)->GetDescription().c_str());
 				}
@@ -136,10 +136,10 @@ It is important to ensure that all new suspicions are added to the list of the e
 ~ In the event that no new lists were added to the secondary map, erase the primary map entry. Otherwise, preserve both the primary and secondary map entries.
 
 */
-bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, map<uint8_t*, vector<Suspicion *>>> &SuspicionsMap) { // Generate suspicions for an entity
-	vector<Suspicion *> AbSuspList;
-	SuspicionsMap.insert(make_pair(ParentObj.GetStartVa(), map<uint8_t*, vector<Suspicion*>>()));
-	map<uint8_t*, vector<Suspicion*>>& RefSbMap = SuspicionsMap.at(ParentObj.GetStartVa());
+bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, map<uint8_t*, list<Suspicion *>>> &SuspicionsMap) { // Generate suspicions for an entity
+	list<Suspicion *> AbSuspList;
+	SuspicionsMap.insert(make_pair(ParentObj.GetStartVa(), map<uint8_t*, list<Suspicion *>>()));
+	map<uint8_t*, list<Suspicion *>>& RefSbMap = SuspicionsMap.at(ParentObj.GetStartVa());
 
 	switch (ParentObj.GetType()) {
 		case Entity::Type::PE_FILE: {
@@ -176,8 +176,8 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 						vector<SBlock*> SBlocks = (*SectItr)->GetSBlocks();
 
 						for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-							vector<Suspicion*> SbSuspList;
-							vector<Suspicion*>& TargetSuspList = (*SbItr)->GetBasic()->BaseAddress == ParentObj.GetStartVa() ? AbSuspList : SbSuspList;
+							list<Suspicion *> SbSuspList;
+							list<Suspicion *>& TargetSuspList = (*SbItr)->GetBasic()->BaseAddress == ParentObj.GetStartVa() ? AbSuspList : SbSuspList;
 
 							//
 							// Headers with private pages
@@ -219,7 +219,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 		case Entity::Type::MAPPED_FILE: {
 			vector<SBlock*> SBlocks = ParentObj.GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 			for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-				vector<Suspicion*> SbSuspList;
+				list<Suspicion *> SbSuspList;
 				if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect)) {
 					SbSuspList.push_back(new MappedExecPermission(&ParentProc, &ParentObj, *SbItr));
 				}
@@ -235,7 +235,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 
 			if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
 				for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-					vector<Suspicion*> SbSuspList;
+					list<Suspicion *> SbSuspList;
 					if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect)) {
 						SbSuspList.push_back(new PrivateExecPermission(&ParentProc, &ParentObj, *SbItr));
 					}

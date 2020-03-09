@@ -274,7 +274,7 @@ Region map -> Key [Allocation base]
 									   -> Suspicions list
 */
 
-int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>&SuspicionsMap) {
+int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&SuspicionsMap) {
 	//printf("before:\r\n");
 	//Suspicion::EnumerateMap(SuspicionsMap);
 	bool bReWalkMap = false;
@@ -292,16 +292,16 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>&Suspi
 					 filterable suspicions remaining
 		
 		*/
-		for (map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>::const_iterator AbMapItr = SuspicionsMap.begin(); !bReWalkMap && AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
-			map < uint8_t*, vector<Suspicion*>>& RefSbMap = SuspicionsMap.at(AbMapItr->first);
+		for (map <uint8_t*, map<uint8_t*, list<Suspicion *>>>::const_iterator AbMapItr = SuspicionsMap.begin(); !bReWalkMap && AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
+			map < uint8_t*, list<Suspicion *>>& RefSbMap = SuspicionsMap.at(AbMapItr->first);
 			int32_t nSbIndex = 0;
 
-			for (map<uint8_t*, vector<Suspicion*>>::const_iterator SbMapItr = AbMapItr->second.begin(); !bReWalkMap && SbMapItr != AbMapItr->second.end(); ++SbMapItr, nSbIndex++) {
-				//vector<Suspicion*> SuspListCopy = SbMapItr->second;
-				//vector<Suspicion*>::const_iterator SuspCopyItr = SuspListCopy.begin();
-				vector<Suspicion*>& RefSuspList = RefSbMap.at(SbMapItr->first);
-				//vector<Suspicion*>& RefSuspList = reinterpret_cast<vector<Suspicion*>>(SbMapItr->second); // Bug: element removed from list which is still being iterated
-				vector<Suspicion*>::const_iterator SuspItr = SbMapItr->second.begin();
+			for (map<uint8_t*, list<Suspicion *>>::const_iterator SbMapItr = AbMapItr->second.begin(); !bReWalkMap && SbMapItr != AbMapItr->second.end(); ++SbMapItr, nSbIndex++) {
+				//list<Suspicion *> SuspListCopy = SbMapItr->second;
+				//list<Suspicion *>::const_iterator SuspCopyItr = SuspListCopy.begin();
+				list<Suspicion *>& RefSuspList = RefSbMap.at(SbMapItr->first);
+				//list<Suspicion *>& RefSuspList = reinterpret_cast<list<Suspicion *>>(SbMapItr->second); // Bug: element removed from list which is still being iterated
+				list<Suspicion *>::const_iterator SuspItr = SbMapItr->second.begin();
 
 				for (int32_t nSuspIndex = 0; !bReWalkMap && SuspItr != SbMapItr->second.end(); ++SuspItr, nSuspIndex++) {
 					switch ((*SuspItr)->GetType()) {
@@ -374,11 +374,11 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, vector<Suspicion*>>>&Suspi
 	return 0;
 }
 
-int32_t AppendOverlapSuspicion(map<uint8_t*, vector<Suspicion*>>* pSbMap, uint8_t *pSbAddress, bool bEntityTop) {
+int32_t AppendOverlapSuspicion(map<uint8_t*, list<Suspicion *>>* pSbMap, uint8_t *pSbAddress, bool bEntityTop) {
 	if (pSbMap != nullptr && pSbMap->count(pSbAddress)) {
-		vector<Suspicion*>& SuspicionsList = pSbMap->at(pSbAddress);
+		list<Suspicion *>& SuspicionsList = pSbMap->at(pSbAddress);
 
-		for (vector<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
+		for (list<Suspicion *>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
 			if (bEntityTop == (*SuspItr)->IsFullEntitySuspicion()) {
 				Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
 			}
@@ -428,7 +428,7 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 	bool bShownProc = false;
 	MemDump ProcDmp(this->Handle, this->Pid);
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
-	map <uint8_t*, map<uint8_t*, vector<Suspicion*>>> SuspicionsMap; // More efficient to only filter this map once. Currently filtering it for every single entity
+	map <uint8_t*, map<uint8_t*, list<Suspicion *>>> SuspicionsMap; // More efficient to only filter this map once. Currently filtering it for every single entity
 	vector<SBlock*> SelectedSbrs;
 
 	//
@@ -449,7 +449,7 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		auto AbMapItr = SuspicionsMap.find(Itr->second->GetStartVa()); // An iterator into the main ablock map which points to the entry for the sb map.
-		map<uint8_t*, vector<Suspicion*>>* pSbMap = nullptr;
+		map<uint8_t*, list<Suspicion *>>* pSbMap = nullptr;
 
 		if (AbMapItr != SuspicionsMap.end()) {
 			pSbMap = &SuspicionsMap.at(Itr->second->GetStartVa());
