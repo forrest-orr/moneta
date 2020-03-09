@@ -23,7 +23,7 @@ class MemoryPermissionRecord { // Record takes basic/region memory structures, a
 protected:
 	std::map<uint32_t, std::map<uint32_t, uint32_t>>* MemPermMap; // Primary key is the memory type, secondary map key is the permission attribute (and its pair value is the count).
 public:
-	void UpdateMap(std::list<SBlock*> MemBasicRecords);
-	MemoryPermissionRecord(std::list<SBlock*> MemBasicRecords);
+	void UpdateMap(std::vector<SBlock*> MemBasicRecords);
+	MemoryPermissionRecord(std::vector<SBlock*> MemBasicRecords);
 	void ShowRecords();
 };

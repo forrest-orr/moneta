@@ -240,6 +240,9 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 					if (OptArg == L"from-base") {
 						qwOptFlags |= MONETA_FLAG_FROM_BASE;
 					}
+					else if (OptArg == L"statistics") {
+						qwOptFlags |= MONETA_FLAG_STATISTICS;
+					}
 				}
 			}
 		}
@@ -280,7 +283,11 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		if (ProcType == SelectedProcessType::SelfPid || ProcType == SelectedProcessType::SpecificPid) {
 			try {
 				Process TargetProc(dwSelectedPid);
-				TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl, pAddress);
+				vector<SBlock*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl, pAddress);
+				if ((qwOptFlags & MONETA_FLAG_STATISTICS)) {
+					MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(SelectedSbrs);
+					MemPermRec->ShowRecords();
+				}
 			}
 			catch (int32_t nError) {
 				Interface::Log("- Failed to map address space of %d (error %d)\r\n", dwSelectedPid, nError);
@@ -306,22 +313,21 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 						try {
 							//TargetProc = new Process(ProcEntry.th32ProcessID);
 							Process TargetProc(ProcEntry.th32ProcessID);
-							TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl, pAddress);
+							vector<SBlock*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl, pAddress);
+
+							if ((qwOptFlags & MONETA_FLAG_STATISTICS)) {
+								if (MemPermRec == nullptr) {
+									MemPermRec = new MemoryPermissionRecord(SelectedSbrs);
+								}
+								else {
+									MemPermRec->UpdateMap(SelectedSbrs);
+								}
+							}
 						}
 						catch (int32_t nError) {
 							Interface::Log(3, "- Failed to map address space of %d:%ws (error %d)\r\n", ProcEntry.th32ProcessID, ProcEntry.szExeFile, nError);
 							continue;
 						}
-						/*
-						else if (OutputType == SelectedOutputType::Statistics) {
-							list<SBlock*> ProcessMem = QueryProcessMem(ProcEntry.th32ProcessID);
-							if (MemPermRec == nullptr) {
-								MemPermRec = new MemoryPermissionRecord(ProcessMem);
-							}
-							else {
-								MemPermRec->UpdateMap(ProcessMem);
-							}
-						}*/
 					} while (Process32NextW(hSnapshot, &ProcEntry));
 				}
 

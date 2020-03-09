@@ -141,8 +141,8 @@ bool SBlock::PageExecutable(uint32_t dwProtect) {
 	return (dwProtect == PAGE_EXECUTE || dwProtect == PAGE_EXECUTE_READ || dwProtect == PAGE_EXECUTE_READWRITE);
 }
 
-void MemoryPermissionRecord::UpdateMap(list<SBlock*> MemBasicRecords) {
-	for (list<SBlock*>::const_iterator RecordItr = MemBasicRecords.begin(); RecordItr != MemBasicRecords.end(); ++RecordItr) {
+void MemoryPermissionRecord::UpdateMap(vector<SBlock*> MemBasicRecords) {
+	for (vector<SBlock*>::const_iterator RecordItr = MemBasicRecords.begin(); RecordItr != MemBasicRecords.end(); ++RecordItr) {
 		if (!MemPermMap->count((*RecordItr)->GetBasic()->Type)) {
 			MemPermMap->insert(make_pair((*RecordItr)->GetBasic()->Type, map<uint32_t, uint32_t>()));
 		}
@@ -157,7 +157,7 @@ void MemoryPermissionRecord::UpdateMap(list<SBlock*> MemBasicRecords) {
 	}
 }
 
-MemoryPermissionRecord::MemoryPermissionRecord(list<SBlock*> MemBasicRecords) {
+MemoryPermissionRecord::MemoryPermissionRecord(vector<SBlock*> MemBasicRecords) {
 	MemPermMap = new map<uint32_t, map<uint32_t, uint32_t>>();
 	UpdateMap(MemBasicRecords);
 }

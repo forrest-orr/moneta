@@ -42,7 +42,7 @@ namespace Moneta {
 		bool DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION* pMbi, std::wstring Indent);
 		BOOL IsWow64();
 		Process(uint32_t);
-		void Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl, uint8_t* pSelectSblock = nullptr);
+		std::vector<SBlock*> Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl, uint8_t* pSelectSblock = nullptr);
 		~Process();
 	};
 }

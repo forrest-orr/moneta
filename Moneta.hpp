@@ -99,3 +99,4 @@ namespace Moneta {
 
 #define MONETA_FLAG_MEMDUMP 0x1
 #define MONETA_FLAG_FROM_BASE 0x2
+#define MONETA_FLAG_STATISTICS 0x4

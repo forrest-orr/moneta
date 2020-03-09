@@ -424,7 +424,7 @@ bool Process::DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION *pMbi, wstrin
 10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
 */
 
-void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl, uint8_t *pSelectSblock) {
+vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl, uint8_t *pSelectSblock) {
 	bool bShownProc = false;
 	MemDump ProcDmp(this->Handle, this->Pid);
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
@@ -599,6 +599,8 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 							this->DumpBlock(ProcDmp, (*SbItr)->GetBasic(), L"      ");
 						}
 					}
+
+					SelectedSbrs.push_back(*SbItr);
 				}
 			}
 
@@ -615,6 +617,5 @@ void Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, 
 		}
 	}
 
-	MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(SelectedSbrs);
-	MemPermRec->ShowRecords();
+	return SelectedSbrs;
 }

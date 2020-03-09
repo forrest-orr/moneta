@@ -46,6 +46,10 @@ Entity::~Entity() {
 		//if(!(*Itr)) Interface::Log("null itr\r\n");
 		delete * Itr;
 	}
+
+	if (RegionInfo != nullptr) {
+		delete this->RegionInfo;
+	}
 	//Interface::Log("Entity destructor2\r\n");
 }
 
