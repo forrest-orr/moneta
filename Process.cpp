@@ -557,7 +557,7 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 					wchar_t AlignedAttribDesc[9] = { 0 };
 
 					if (!(*SbItr)->GetPrivateSize()) {
-						(*SbItr)->QueryPrivateSize(); //Performance optimization: only query the working set on selected regions/subregions. Doing it on every block of enumerated memory slows scans down substantially.
+						(*SbItr)->SetPrivateSize((*SbItr)->QueryPrivateSize()); //Performance optimization: only query the working set on selected regions/subregions. Doing it on every block of enumerated memory slows scans down substantially.
 					}
 
 					AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);

@@ -203,7 +203,100 @@ _________________________________________________________________
 |------------------------|
 | PAGE_NOACCESS          |
 |________________________|
+
+
+Memory statistics
+  MEM_IMAGE [12007 total]
+  |__ PAGE_NOACCESS 481 (4.005997%)
+    | PAGE_READONLY: 189 (1.574082%)
+	| PAGE_READWRITE: 5467 (45.531774%)
+	| PAGE_EXECUTE_READ: 117 (0.974432%)
+	| PAGE_EXECUTE_READWRITE: 352 (2.931623%)
+  MEM_MAPPED [8052 total]
+  |__   PAGE_NOACCESS: 1320 (16.393442%)
+
+
+~ Private memory:
+  Total: 12007
+  0x00000000: 4729 (39.385357%)
+  PAGE_NOACCESS: 481 (4.005997%)
+  PAGE_READONLY: 189 (1.574082%)
+  PAGE_READWRITE: 5467 (45.531774%)
+  PAGE_EXECUTE_READ: 117 (0.974432%)
+  PAGE_EXECUTE_READWRITE: 352 (2.931623%)
+  0x00000104: 672 (5.596735%)
+~ Mapped memory:
+  Total: 8052
+  0x00000000: 438 (5.439642%)
+  PAGE_NOACCESS: 1320 (16.393442%)
+  PAGE_READONLY: 2748 (34.128168%)
+  PAGE_READWRITE: 3415 (42.411822%)
+  PAGE_WRITECOPY: 131 (1.626925%)
+~ Image memory:
+  Total: 37319
+  0x00000000: 3259 (8.732817%)
+  PAGE_READONLY: 14749 (39.521423%)
+  PAGE_READWRITE: 8980 (24.062809%)
+  PAGE_WRITECOPY: 5988 (16.045447%)
+  PAGE_EXECUTE: 1 (0.002680%)
+  PAGE_EXECUTE_READ: 4332 (11.608028%)
+  PAGE_EXECUTE_READWRITE: 10 (0.026796%)
+
 */
+void MemoryPermissionRecord::ShowRecords() {
+	Interface::Log("\r\nMemory statistics\r\n");
+	for (map<uint32_t, map<uint32_t, uint32_t>>::const_iterator Itr = MemPermMap->begin(); Itr != MemPermMap->end(); ++Itr) {
+		int32_t nTotalRegions = 0, nX = 0;
+
+		for (map<uint32_t, uint32_t>::const_iterator Itr2 = Itr->second.begin(); Itr2 != Itr->second.end(); ++Itr2) {
+			nTotalRegions += Itr2->second;
+		}
+
+		Interface::Log("  %ws [%d total]\r\n", SBlock::TypeSymbol(Itr->first), nTotalRegions);
+
+		for (map<uint32_t, uint32_t>::const_iterator Itr2 = Itr->second.begin(); Itr2 != Itr->second.end(); ++Itr2, nX++) {
+			if (!nX) {
+				Interface::Log("  |__ ");
+			}
+			else {
+				Interface::Log("    | ");
+			}
+			switch (Itr2->first) {
+			case PAGE_READONLY:
+				Interface::Log("PAGE_READONLY: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				break;
+			case PAGE_READWRITE:
+				Interface::Log("PAGE_READWRITE: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				break;
+			case PAGE_EXECUTE_READ:
+				Interface::Log("PAGE_EXECUTE_READ: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				break;
+			case PAGE_EXECUTE_READWRITE:
+				Interface::Log("PAGE_EXECUTE_READWRITE: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				break;
+			case PAGE_EXECUTE_WRITECOPY:
+				Interface::Log("PAGE_EXECUTE_WRITECOPY: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				break;
+			case PAGE_WRITECOPY:
+				Interface::Log("PAGE_WRITECOPY: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				break;
+			case PAGE_EXECUTE:
+				Interface::Log("PAGE_EXECUTE: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				break;
+			case PAGE_NOACCESS:
+				Interface::Log("PAGE_NOACCESS: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				break;
+			default:
+				Interface::Log("0x%08x: %d (%f%%)", Itr2->first, Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				break;
+			}
+
+			Interface::Log("\r\n");
+		}
+	}
+}
+
+/*
 void MemoryPermissionRecord::ShowRecords() {
 	for (map<uint32_t, map<uint32_t, uint32_t>>::const_iterator Itr = MemPermMap->begin(); Itr != MemPermMap->end(); ++Itr) {
 		switch (Itr->first) {
@@ -261,4 +354,4 @@ void MemoryPermissionRecord::ShowRecords() {
 			}
 		}
 	}
-}
+}*/
