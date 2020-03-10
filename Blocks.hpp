@@ -5,13 +5,15 @@ protected:
 	MEMORY_BASIC_INFORMATION* Basic;
 	std::vector<Moneta::Thread*> Threads;
 	uint32_t PrivateSize;
+	HANDLE ProcessHandle;
 public:
 	SBlock(HANDLE hProcess, MEMORY_BASIC_INFORMATION* pMbi, std::vector<Moneta::Thread*> Threads1);
 	~SBlock();
 	MEMORY_BASIC_INFORMATION* GetBasic();
 	std::vector<Moneta::Thread*> GetThreads();
+	void SetPrivateSize(uint32_t dwPrivateSize);
 	uint32_t GetPrivateSize() { return this->PrivateSize;  }
-	static uint32_t QueryPrivateSize(HANDLE hProcess, uint8_t* pBaseAddress, uint32_t dwSize);
+	uint32_t QueryPrivateSize();
 	static const wchar_t* ProtectSymbol(uint32_t dwProtect);
 	static const wchar_t* AttribDesc(MEMORY_BASIC_INFORMATION* pMbi);
 	static const wchar_t* TypeSymbol(uint32_t dwType);

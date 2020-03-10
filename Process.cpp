@@ -67,6 +67,8 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	this->Handle = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
 
 	if (this->Handle != nullptr) {
+		Interface::Log("* Generating region and subregion blocks.\r\n");
+
 		//
 		//
 		//
@@ -204,6 +206,8 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		Interface::Log(4, "- Failed to open handle to PID %d\r\n", this->Pid);
 		throw 1; // Not throwing a specific value crashes it
 	}
+
+	Interface::Log("* Finished generating region and subregion blocks\r\n");
 }
 
 
@@ -275,6 +279,7 @@ Region map -> Key [Allocation base]
 */
 
 int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&SuspicionsMap) {
+	Interface::Log("* Filtering suspicions...\r\n");
 	//printf("before:\r\n");
 	//Suspicion::EnumerateMap(SuspicionsMap);
 	bool bReWalkMap = false;
@@ -371,6 +376,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 
 	//Suspicion::EnumerateMap(SuspicionsMap);
 	//printf("enum done\r\n");
+	Interface::Log("* Done filtering suspicions.\r\n");
 	return 0;
 }
 
@@ -435,6 +441,8 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 	// Build suspicions list for following memory selection and apply filters to it.
 	//
 
+	Interface::Log("* Inspecting/filtering entities...\r\n");
+
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		Suspicion::InspectEntity(*this, *Itr->second, SuspicionsMap);
 	}
@@ -442,6 +450,8 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 	if (SuspicionsMap.size()) {
 		FilterSuspicions(SuspicionsMap);
 	}
+
+	Interface::Log("* Finished inspecting/filtering entities.\r\n");
 
 	//
 	// Display information on each selected sblock and/or entity within the process address space
@@ -545,6 +555,10 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 					(MemSelectType == MemorySelectionType::Block && (pSelectSblock == (*SbItr)->GetBasic()->BaseAddress || (qwOptFlags & MONETA_FLAG_FROM_BASE))) ||
 					(MemSelectType == MemorySelectionType::Suspicious && ((qwOptFlags & MONETA_FLAG_FROM_BASE) || (pSbMap != nullptr && pSbMap->count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress))))) {
 					wchar_t AlignedAttribDesc[9] = { 0 };
+
+					if (!(*SbItr)->GetPrivateSize()) {
+						(*SbItr)->QueryPrivateSize(); //Performance optimization: only query the working set on selected regions/subregions. Doing it on every block of enumerated memory slows scans down substantially.
+					}
 
 					AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
 
