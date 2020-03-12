@@ -392,6 +392,22 @@ int32_t AppendOverlapSuspicion(map<uint8_t*, list<Suspicion *>>* pSbMap, uint8_t
 	}
 }
 
+int32_t SubEntitySuspCount(map<uint8_t*, list<Suspicion*>>* pSbMap, uint8_t* pSbAddress) {
+	int32_t nCount = 0;
+
+	if (pSbMap != nullptr && pSbMap->count(pSbAddress)) {
+		list<Suspicion*>& SuspicionsList = pSbMap->at(pSbAddress);
+
+		for (list<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
+			if (!(*SuspItr)->IsFullEntitySuspicion()) {
+				nCount++;
+			}
+		}
+	}
+
+	return nCount;
+}
+
 bool Process::DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION *pMbi, wstring Indent) {
 	wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
 
@@ -553,7 +569,10 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 			for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 				if (MemSelectType == MemorySelectionType::Process ||
 					(MemSelectType == MemorySelectionType::Block && (pSelectSblock == (*SbItr)->GetBasic()->BaseAddress || (qwOptFlags & MONETA_FLAG_FROM_BASE))) ||
-					(MemSelectType == MemorySelectionType::Suspicious && ((qwOptFlags & MONETA_FLAG_FROM_BASE) || (pSbMap != nullptr && pSbMap->count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress))))) {
+					(MemSelectType == MemorySelectionType::Suspicious && ((qwOptFlags & MONETA_FLAG_FROM_BASE) || 
+																		  (pSbMap != nullptr &&
+																		   pSbMap->count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) &&
+																		   SubEntitySuspCount(pSbMap, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress) > 0))) {
 					wchar_t AlignedAttribDesc[9] = { 0 };
 
 					if (!(*SbItr)->GetPrivateSize()) {
