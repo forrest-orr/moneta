@@ -279,7 +279,7 @@ Region map -> Key [Allocation base]
 */
 
 int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&SuspicionsMap) {
-	Interface::Log("* Filtering suspicions...\r\n");
+	//Interface::Log("* Filtering suspicions...\r\n");
 	//printf("before:\r\n");
 	//Suspicion::EnumerateMap(SuspicionsMap);
 	bool bReWalkMap = false;
@@ -376,7 +376,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 
 	//Suspicion::EnumerateMap(SuspicionsMap);
 	//printf("enum done\r\n");
-	Interface::Log("* Done filtering suspicions.\r\n");
+	//Interface::Log("* Done filtering suspicions.\r\n");
 	return 0;
 }
 
@@ -457,7 +457,7 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 	// Build suspicions list for following memory selection and apply filters to it.
 	//
 
-	Interface::Log("* Inspecting/filtering entities...\r\n");
+	//Interface::Log("* Inspecting/filtering entities...\r\n");
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		Suspicion::InspectEntity(*this, *Itr->second, SuspicionsMap);
@@ -467,7 +467,7 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 		FilterSuspicions(SuspicionsMap);
 	}
 
-	Interface::Log("* Finished inspecting/filtering entities.\r\n");
+	//Interface::Log("* Finished inspecting/filtering entities.\r\n");
 
 	//
 	// Display information on each selected sblock and/or entity within the process address space

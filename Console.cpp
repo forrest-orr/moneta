@@ -280,6 +280,8 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		// Analyze processes and generate memory maps/suspicions
 		//
 
+		uint64_t qwStartTick = GetTickCount64();
+
 		if (ProcType == SelectedProcessType::SelfPid || ProcType == SelectedProcessType::SpecificPid) {
 			try {
 				Process TargetProc(dwSelectedPid);
@@ -342,6 +344,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			}
 		}
 
-		Interface::Log("* Scan completed.\r\n");
+		float qwElapsedTime = GetTickCount64() - qwStartTick;
+		Interface::Log("* Scan completed (%f second duration)\r\n", qwElapsedTime / 1000.0);
 	}
 }
