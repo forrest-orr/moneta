@@ -344,7 +344,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			}
 		}
 
-		float qwElapsedTime = GetTickCount64() - qwStartTick;
-		Interface::Log("* Scan completed (%f second duration)\r\n", qwElapsedTime / 1000.0);
+		float fElapsedTime = GetTickCount64() - qwStartTick;
+		Interface::Log("* Scan completed (%f second duration)\r\n", fElapsedTime / 1000.0);
 	}
 }
