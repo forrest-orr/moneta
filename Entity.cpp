@@ -210,7 +210,8 @@ PeVm::Body::Body(HANDLE hProcess, vector<SBlock*> SBlocks, const wchar_t* pFileP
 	if (!this->IsPhantom()) {
 		this->Signed = CheckSigning(pFilePath);
 
-		if ((this->Pe = PeBase::Load(this->GetFileBaseData(), this->GetFileBaseSize())) != nullptr) {
+		if ((this->Pe = PeBase::Load(pFilePath)) != nullptr) {
+		//if ((this->Pe = PeBase::Load(this->GetFileBaseData(), this->GetFileBaseSize())) != nullptr) {
 			//
 			// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
 			//

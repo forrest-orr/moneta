@@ -481,7 +481,7 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 			pSbMap = &SuspicionsMap.at(Itr->second->GetStartVa());
 		}
 
-		if (MemSelectType == MemorySelectionType::Process ||
+		if (MemSelectType == MemorySelectionType::All ||
 			(MemSelectType == MemorySelectionType::Block && ((pSelectSblock >= Itr->second->GetStartVa()) && (pSelectSblock < Itr->second->GetEndVa()))) ||
 			(MemSelectType == MemorySelectionType::Suspicious && AbMapItr != SuspicionsMap.end())) {
 
@@ -568,7 +568,7 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 			vector<SBlock*> SBlocks = Itr->second->GetSBlocks();
 
 			for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
-				if (MemSelectType == MemorySelectionType::Process ||
+				if (MemSelectType == MemorySelectionType::All ||
 					(MemSelectType == MemorySelectionType::Block && (pSelectSblock == (*SbItr)->GetBasic()->BaseAddress || (qwOptFlags & MONETA_FLAG_FROM_BASE))) ||
 					(MemSelectType == MemorySelectionType::Suspicious && ((qwOptFlags & MONETA_FLAG_FROM_BASE) || 
 																		  (pSbMap != nullptr &&

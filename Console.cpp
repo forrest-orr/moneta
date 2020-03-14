@@ -211,8 +211,8 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				if (*(i + 1) == L"block") {
 					MemSelectType = MemorySelectionType::Block;
 				}
-				else if (*(i + 1) == L"process") {
-					MemSelectType = MemorySelectionType::Process;
+				else if (*(i + 1) == L"*") {
+					MemSelectType = MemorySelectionType::All;
 				}
 				else if (*(i + 1) == L"suspicious") {
 					MemSelectType = MemorySelectionType::Suspicious;
@@ -304,7 +304,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				if (Process32FirstW(hSnapshot, &ProcEntry)) {
 					do
 					{
-						//Process* TargetProc;
 #ifdef DEBUG
 						if (ProcEntry.th32ProcessID == GetCurrentProcessId()) {
 							continue;

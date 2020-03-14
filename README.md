@@ -8,7 +8,7 @@ Target process: -p [PID, "*" or "self"]
   processes to search for selected memory. This operation requires
   read/query access to the specified process.
   
-Memory selection type: -m ["block", "process", or "suspicious"]
+Memory selection type: -m ["block", "*", or "suspicious"]
   + Block selection type:
     The block containing the specified memory address will be
     selected for enumeration and/or dumping.
@@ -19,7 +19,7 @@ Memory selection type: -m ["block", "process", or "suspicious"]
     Example:
       Moneta64.exe -p 312 -m block --address 0x00007FF662470000 -v detail
 	  
-  + Process selection type:
+  + * selection type:
     Selects all regions and the blocks that they contain from
     the entire selected process address space.
 	

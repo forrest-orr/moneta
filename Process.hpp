@@ -2,7 +2,7 @@ namespace Moneta {
 	enum class MemorySelectionType {
 		Invalid,
 		Block,
-		Process,
+		All,
 		Suspicious
 	};
 
