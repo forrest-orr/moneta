@@ -508,6 +508,7 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 				Interface::Log("  0x%p:0x%08x   | Mapped   | %ws", Itr->second->GetStartVa(), Itr->second->GetEntitySize(), dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
 			}
 			else {
+				//Interface::Log("  0x%p:0x%08x   | %ws", Itr->second->GetStartVa(), Itr->second->GetEntitySize(), SBlock::AttribDesc(Itr->second->GetSBlocks().front()->GetBasic())); // Free memory presents the only exception here, as it has a blank type. While such memory can paint a slightly more detailed picture of a process memory space, it has no allocation base and no type which makes it impossible to parse/enumerate in the style in which this program was written.
 				if (Itr->second->GetSBlocks().front()->GetBasic()->Type == MEM_PRIVATE) {
 					Interface::Log("  0x%p:0x%08x   | Private", Itr->second->GetStartVa(), Itr->second->GetEntitySize());
 				}

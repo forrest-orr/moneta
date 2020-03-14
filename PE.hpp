@@ -6,7 +6,7 @@ namespace PeFile
 		IMAGE_DOS_HEADER* DosHdr;
 		IMAGE_FILE_HEADER* FileHdr;
 		IMAGE_SECTION_HEADER* SectHdrs;
-		uint8_t* Base;
+		uint8_t* Data;
 		uint32_t Size;
 		uint16_t PeMagic;
 		uint16_t PeArch;
@@ -30,14 +30,17 @@ namespace PeFile
 		virtual uint16_t GetDllCharacteristics() = 0;
 		virtual void SetDllCharacteristics(uint16_t wDllCharacteristics) = 0;
 		virtual uint32_t GetImageSize() = 0;
-		uint8_t* GetBase();
+		uint8_t* GetData();
 		uint32_t GetSize();
 		PIMAGE_DOS_HEADER GetDosHdr();
 		IMAGE_FILE_HEADER* GetFileHdr();
 		IMAGE_SECTION_HEADER* GetSectHdrs();
 		~PeBase();
-
-		static PeBase* Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize); // Factory method for derived 32/64-bit classes
+		//
+		// Factory methods for derived 32/64-bit classes
+		//
+		static PeBase* Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize);
+		static PeBase* Load(const std::wstring PeFilePath);
 	};
 
 	//

@@ -3,6 +3,7 @@
 
 #pragma comment (lib, "Imagehlp.lib")
 
+using namespace std;
 using namespace PeFile;
 
 // PeBase
@@ -10,20 +11,19 @@ using namespace PeFile;
 PeBase::PeBase(
 	uint8_t* pPeFileBuf,
 	uint32_t dwPeFileSize) :
-	Base(new uint8_t[dwPeFileSize]),
+	Data(new uint8_t[dwPeFileSize]),
 	Size(dwPeFileSize)
 {
-	memcpy(this->Base, pPeFileBuf, dwPeFileSize);
-	this->DosHdr = (IMAGE_DOS_HEADER*)this->Base;
+	memcpy(this->Data, pPeFileBuf, dwPeFileSize);
+	this->DosHdr = (IMAGE_DOS_HEADER*)this->Data;
 	this->FileHdr = (IMAGE_FILE_HEADER*)((uint8_t*)this->DosHdr + this->DosHdr->e_lfanew + sizeof(LONG));
 }
 
 PeBase::~PeBase() {
-	delete this->Base;
+	delete this->Data;
 }
 
-PeBase* PeBase::Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) // Factory method for derived 32/64-bit classes
-{
+PeBase* PeBase::Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) { // Factory method for derived 32/64-bit classes
 	assert(pPeFileBuf != nullptr);
 	assert(dwPeFileSize);
 
@@ -55,8 +55,23 @@ PeBase* PeBase::Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) // Factory meth
 	return NewPe;
 }
 
-uint8_t* PeBase::GetBase() {
-	return this->Base;
+
+PeBase* PeBase::Load(const wstring PeFilePath) {
+	HANDLE hFile;
+
+	if ((hFile = CreateFileW(PeFilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE) {
+		uint32_t dwBytesRead;
+		IMAGE_DOS_HEADER DosHdr = { 0 };
+		if (ReadFile(hFile, this->FileData, this->FileSize, (PDWORD)&dwBytesRead, 0)) {
+			//
+		}
+
+		CloseHandle(hFile);
+	}
+}
+
+uint8_t* PeBase::GetData() {
+	return this->Data;
 }
 
 uint32_t PeBase::GetSize() {
@@ -137,7 +152,7 @@ template<typename NtHdrType> void  PeArch<NtHdrType>::SetCrc32(uint32_t dwCrc32)
 template<typename NtHdrType> uint32_t PeArch<NtHdrType>::RefreshCrc32() {
 	uint32_t dwOriginalCRC32 = 0, dwNewCRC32 = 0;
 
-	if (CheckSumMappedFile(this->Base, this->Size, (PDWORD)&dwOriginalCRC32, (PDWORD)&dwNewCRC32)) {
+	if (CheckSumMappedFile(this->Data, this->Size, (PDWORD)&dwOriginalCRC32, (PDWORD)&dwNewCRC32)) {
 		GetNtHdrs()->OptionalHeader.CheckSum = dwNewCRC32;
 	}
 	else {
