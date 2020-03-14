@@ -121,7 +121,7 @@ const wchar_t* TranslateRegionType() {
 uint32_t SBlock::QueryPrivateSize() {
 	uint32_t dwPrivateSize = 0;
 
-	if (this->Basic->State == MEM_COMMIT) {
+	if (this->Basic->State == MEM_COMMIT && this->Basic->Protect != PAGE_NOACCESS) {
 		PSAPI_WORKING_SET_EX_INFORMATION* pWorkingSets = new PSAPI_WORKING_SET_EX_INFORMATION;
 		uint32_t dwWorkingSetsSize = sizeof(PSAPI_WORKING_SET_EX_INFORMATION);
 

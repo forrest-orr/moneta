@@ -67,7 +67,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	this->Handle = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
 
 	if (this->Handle != nullptr) {
-		Interface::Log("* Generating region and subregion blocks.\r\n");
+		//Interface::Log("* Generating region and subregion blocks.\r\n");
 
 		//
 		//
