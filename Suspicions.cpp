@@ -11,42 +11,6 @@
 using namespace std;
 using namespace Moneta;
 
-wstring UnsignedModule::GetDescription() {
-	return L"Unsigned module";
-}
-
-wstring MissingPebModule::GetDescription() {
-	return L"Missing PEB module";
-}
-
-wstring MismatchingPebModule::GetDescription() {
-	return L"Mismatching PEB module";
-}
-
-wstring ModifiedPeHeader::GetDescription() {
-	return L"Modified PE header";
-}
-
-wstring DiskPermissionMismatch::GetDescription() {
-	return L"Inconsistent +x between disk and memory";
-}
-
-wstring ModifiedCode::GetDescription() {
-	return L"Modified code";
-}
-
-wstring MappedExecPermission::GetDescription() {
-	return L"Abnormal executable memory type";
-}
-
-wstring PhantomImage::GetDescription() {
-	return L"Phantom image";
-}
-
-wstring PrivateExecPermission::GetDescription() {
-	return L"Abnormal executable memory type";
-}
-
 Entity* Suspicion::GetParentObject() {
 	return this->ParentObject;
 }
@@ -94,16 +58,22 @@ bool Suspicion::IsFullEntitySuspicion() {
 	return (this->Block == nullptr ? true : false);
 }
 
-Suspicion::Suspicion(Process* ParentProc, Entity* ParentObj, SBlock* Block) : ParentProcess(ParentProc), ParentObject(ParentObj), Block(Block) {}
-UnsignedModule::UnsignedModule(Process* ParentProc, Entity* ParentObj) : Suspicion(ParentProc, ParentObj, nullptr) {}
-MissingPebModule::MissingPebModule(Process* ParentProc, Entity* ParentObj) : Suspicion(ParentProc, ParentObj, nullptr) {}
-MismatchingPebModule::MismatchingPebModule(Process* ParentProc, Entity* ParentObj) : Suspicion(ParentProc, ParentObj, nullptr) {}
-ModifiedPeHeader::ModifiedPeHeader(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
-DiskPermissionMismatch::DiskPermissionMismatch(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
-ModifiedCode::ModifiedCode(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
-PhantomImage::PhantomImage(Process* ParentProc, Entity* ParentObj) : Suspicion(ParentProc, ParentObj, nullptr) {}
-MappedExecPermission::MappedExecPermission(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
-PrivateExecPermission::PrivateExecPermission(Process* ParentProc, Entity* ParentObj, SBlock* Block) : Suspicion(ParentProc, ParentObj, Block) {}
+wstring Suspicion::GetDescription(Suspicion::Type Type) {
+	switch (Type) {
+	case MODIFIED_CODE: return L"Modified code";
+	case UNSIGNED_MODULE: return L"Unsigned module";
+	case MISSING_PEB_MODULE: return L"Missing PEB module";
+	case MISMATCHING_PEB_MODULE: return L"Mismatching PEB module";
+	case MODIFIED_HEADER: return L"Modified PE header";
+	case DISK_PERMISSION_MISMATCH: return L"Inconsistent +x between disk and memory";
+	case XMAP: return L"Abnormal executable memory type";
+	case PHANTOM_IMAGE: return L"Phantom image";
+	case XPRV: return L"Abnormal executable memory type";
+	default: return L"?";
+	}
+}
+
+Suspicion::Suspicion(Process* ParentProc, Entity* ParentObj, SBlock* Block, Suspicion::Type Type) : ParentProcess(ParentProc), ParentObject(ParentObj), Block(Block), SspType(Type) {}
 
 void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>& SuspicionsMap) {
 	for (map <uint8_t*, map<uint8_t*, list<Suspicion *>>>::const_iterator AbMapItr = SuspicionsMap.begin(); AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
