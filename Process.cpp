@@ -13,14 +13,6 @@ using namespace std;
 using namespace PeFile;
 using namespace Moneta;
 
-uint32_t Thread::GetTid() {
-	return this->Id;
-}
-
-void* Thread::GetEntryPoint() {
-	return this->StartAddress;
-}
-
 void Thread::SetEntryPoint(void* pStartAddress) {
 	this->StartAddress = pStartAddress;
 }
@@ -47,14 +39,6 @@ Process::~Process() {
 			delete dynamic_cast<ABlock*>(Itr->second);;
 		}
 	}
-}
-
-HANDLE Process::GetHandle() {
-	return this->Handle;
-}
-
-BOOL Process::IsWow64() {
-	return this->Wow64;
 }
 
 #define ThreadQuerySetWin32StartAddress 9
@@ -207,12 +191,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		throw 1; // Not throwing a specific value crashes it
 	}
 
-	Interface::Log("* Finished generating region and subregion blocks\r\n");
-}
-
-
-uint32_t Process::GetPid() {
-	return this->Pid;
+	//Interface::Log("* Finished generating region and subregion blocks\r\n");
 }
 
 void AlignName(const wchar_t* pOriginalName, wchar_t* pAlignedName, int32_t nAlignTo) { // Make generic and move to interface?
@@ -257,14 +236,6 @@ C:\Program Files\example3\example.exe -> C:\Program Files (x86)\example3\example
 C:\Windows\system32\notepad.exe -> C:\Windows\syswow64\notepad.exe
 
 */
-
-wstring Process::GetImageFilePath() {
-	return this->ImageFilePath;
-}
-
-wstring Process::GetName() {
-	return this->Name;
-}
 
 void EnumerateThreads(const wstring Indent, vector<Thread*> Threads) {
 	for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
@@ -576,9 +547,11 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 																		   SubEntitySuspCount(pSbMap, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress) > 0))) {
 					wchar_t AlignedAttribDesc[9] = { 0 };
 
-					if (!(*SbItr)->GetPrivateSize()) {
+					/*
+					if (!(*SbItr)->GetPrivateSize()) { // Doing this here will not work since private size is needed for suspicion gathering
 						(*SbItr)->SetPrivateSize((*SbItr)->QueryPrivateSize()); //Performance optimization: only query the working set on selected regions/subregions. Doing it on every block of enumerated memory slows scans down substantially.
 					}
+					*/
 
 					AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
 

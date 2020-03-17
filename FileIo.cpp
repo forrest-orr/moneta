@@ -7,18 +7,6 @@ FileBase::FileBase(wstring DesiredPath, uint8_t* pDataBuf, uint32_t dwSize) : Pa
 	memcpy(this->FileData, pDataBuf, dwSize);
 }
 
-uint8_t* FileBase::GetFileBaseData() {
-	return this->FileData;
-}
-
-uint32_t FileBase::GetFileBaseSize() {
-	return this->FileSize;
-}
-
-wstring FileBase::GetPath() {
-	return this->Path;
-}
-
 bool FileBase::ToDisk(bool bAppend) {
 	assert(this->FileData != nullptr);
 
@@ -67,10 +55,6 @@ FileBase::~FileBase() {
 	if (this->FileData != nullptr) {
 		delete this->FileData;
 	}
-}
-
-bool FileBase::IsPhantom() {
-	return this->Phantom;
 }
 
 bool FileBase::TranslateDevicePath(const wchar_t* pDevicePath, wchar_t* pTranslatedPath) {

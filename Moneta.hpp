@@ -10,11 +10,11 @@ namespace Moneta {
 		MEMORY_REGION_INFORMATION *RegionInfo;
 	public:
 		enum Type { UNKNOWN, PE_FILE, MAPPED_FILE, PE_SECTION };
-		std::vector<SBlock*> GetSBlocks();
+		std::vector<SBlock*> GetSBlocks() { return this->SBlocks; }
 		MEMORY_REGION_INFORMATION* GetRegionInfo() { return RegionInfo; }
-		uint8_t* GetStartVa();
-		uint8_t* GetEndVa();
-		uint32_t GetEntitySize();
+		uint8_t* GetStartVa() { return this->StartVa; }
+		uint8_t* GetEndVa() { return this->EndVa; }
+		uint32_t GetEntitySize() { return this->EntitySize; }
 		static Entity* Create(HANDLE hProcess, std::vector<SBlock*> SBlocks); // Factory method for derived PE images, mapped files, unknown memory ranges.
 		static bool Dump(MemDump& ProcDmp, Entity& Target);
 		void SetSBlocks(std::vector<SBlock*>);
@@ -37,7 +37,7 @@ namespace Moneta {
 	namespace PeVm {
 		class Component : virtual public ABlock {
 		public:
-			uint8_t* GetPeBase();
+			uint8_t* GetPeBase() { return this->PeBase; }
 			Component(HANDLE hProcess, std::vector<SBlock*> SBlocks, uint8_t* pPeBase);
 		protected:
 			uint8_t* PeBase;
@@ -55,13 +55,13 @@ namespace Moneta {
 			uint32_t SigningLevel;
 			class PebModule {
 			public:
-				uint8_t* GetBase();
-				uint8_t* GetEntryPoint();
-				std::wstring GetPath();
-				std::wstring GetName();
-				uint32_t GetSize();
+				uint8_t* GetBase() { return (uint8_t*)this->Info.lpBaseOfDll; }
+				uint8_t* GetEntryPoint() { return (uint8_t*)this->Info.EntryPoint; }
+				std::wstring GetPath() { return this->Path; }
+				std::wstring GetName() { return this->Name; }
+				uint32_t GetSize() { return this->Info.SizeOfImage; }
 				PebModule(HANDLE hProcess, uint8_t* pModBase);
-				bool Exists();
+				bool Exists() { return (this->Missing ? false : true); }
 			protected:
 				MODULEINFO Info;
 				std::wstring Name;
@@ -70,15 +70,15 @@ namespace Moneta {
 			} PebMod;
 		public:
 			Entity::Type GetType() { return Entity::Type::PE_FILE; }
-			uint8_t* GetPeBase();
-			PeFile::PeBase* GetPe();
-			bool IsSigned();
-			bool IsNonExecutableImage();
-			bool IsPartiallyMapped();
-			std::vector<Section*> GetSections();
-			PebModule &GetPebModule();
+			//uint8_t* GetPeBase() { return this->PeBase; }
+			PeFile::PeBase* GetPe() { return this->Pe; }
+			bool IsSigned() { return this->Signed; }
+			bool IsNonExecutableImage() { return this->NonExecutableImage; }
+			bool IsPartiallyMapped() { return this->PartiallyMapped; }
+			std::vector<Section*> GetSections() { return Sections; }
+			PebModule& GetPebModule() { return PebMod; }
 			std::vector<Section*> FindOverlapSect(SBlock& Address);
-			uint32_t GetImageSize();
+			uint32_t GetImageSize() { return this->ImageSize; }
 			uint32_t GetSigningLevel() { return this->SigningLevel; }
 			Body(HANDLE hProcess, std::vector<SBlock*> SBlocks, const wchar_t* pFilePath);
 			~Body();
@@ -87,7 +87,7 @@ namespace Moneta {
 		class Section : public Component {
 		public:
 			Section(HANDLE hProcess, std::vector<SBlock*> SBlocks, IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeBase);
-			IMAGE_SECTION_HEADER* GetHeader();
+			IMAGE_SECTION_HEADER* GetHeader() { return &this->Hdr; }
 			Entity::Type GetType() { return Entity::Type::PE_SECTION; }
 		protected:
 			IMAGE_SECTION_HEADER Hdr;

@@ -11,18 +11,6 @@
 using namespace std;
 using namespace Moneta;
 
-Entity* Suspicion::GetParentObject() {
-	return this->ParentObject;
-}
-
-SBlock* Suspicion::GetBlock() {
-	return this->Block;
-}
-
-Process* Suspicion::GetProcess() {
-	return this->ParentProcess;
-}
-
 void EnumerateAll(list<Suspicion *> &SuspicionsList) {
 	for (list<Suspicion *>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
 		Interface::Log("~ ");
@@ -58,8 +46,8 @@ bool Suspicion::IsFullEntitySuspicion() {
 	return (this->Block == nullptr ? true : false);
 }
 
-wstring Suspicion::GetDescription(Suspicion::Type Type) {
-	switch (Type) {
+wstring Suspicion::GetDescription() {
+	switch (this->SspType) {
 	case MODIFIED_CODE: return L"Modified code";
 	case UNSIGNED_MODULE: return L"Unsigned module";
 	case MISSING_PEB_MODULE: return L"Missing PEB module";
@@ -91,6 +79,7 @@ void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>& S
 		}
 	}
 }
+
 /*
 
 Generates a list of suspicions for either an ablock or sblock.
@@ -106,6 +95,7 @@ It is important to ensure that all new suspicions are added to the list of the e
 ~ In the event that no new lists were added to the secondary map, erase the primary map entry. Otherwise, preserve both the primary and secondary map entries.
 
 */
+//MODIFIED_CODE, MODIFIED_HEADER, XMAP, XPRV, UNSIGNED_MODULE, MISSING_PEB_MODULE, MISMATCHING_PEB_MODULE, DISK_PERMISSION_MISMATCH, PHANTOM_IMAGE
 bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, map<uint8_t*, list<Suspicion *>>> &SuspicionsMap) { // Generate suspicions for an entity
 	list<Suspicion *> AbSuspList;
 	SuspicionsMap.insert(make_pair(ParentObj.GetStartVa(), map<uint8_t*, list<Suspicion *>>()));
@@ -117,11 +107,11 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 
 			if (!PeEntity->IsNonExecutableImage()) {
 				if (!PeEntity->IsSigned()) {
-					AbSuspList.push_back(new UnsignedModule(&ParentProc, &ParentObj));
+					AbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, nullptr, UNSIGNED_MODULE));
 				}
 
 				if (!PeEntity->GetPebModule().Exists()) {
-					AbSuspList.push_back(new MissingPebModule(&ParentProc, &ParentObj));
+					AbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, nullptr, MISSING_PEB_MODULE));
 				}
 				else {
 					if (_wcsicmp(PeEntity->GetPebModule().GetPath().c_str(), PeEntity->GetPath().c_str()) != 0) { // Since the PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx, there may be a PEB link with a base address matching this image region but with a misleading name/path
@@ -130,12 +120,12 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 
 							if (FileBase::ArchWow64PathExpand(PeEntity->GetPebModule().GetPath().c_str(), ReFormattedPath, MAX_PATH + 1)) {
 								if (_wcsicmp(ReFormattedPath, PeEntity->GetPath().c_str()) != 0) {
-									AbSuspList.push_back(new MismatchingPebModule(&ParentProc, &ParentObj));
+									AbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, nullptr, MISMATCHING_PEB_MODULE));
 								}
 							}
 						}
 						else {
-							AbSuspList.push_back(new MismatchingPebModule(&ParentProc, &ParentObj));
+							AbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, nullptr, MISMATCHING_PEB_MODULE));
 						}
 					}
 				}
@@ -149,12 +139,16 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 							list<Suspicion *> SbSuspList;
 							list<Suspicion *>& TargetSuspList = (*SbItr)->GetBasic()->BaseAddress == ParentObj.GetStartVa() ? AbSuspList : SbSuspList;
 
+							if (!(*SbItr)->GetPrivateSize()) {
+								(*SbItr)->SetPrivateSize((*SbItr)->QueryPrivateSize()); //Performance optimization: only query the working set on selected regions/subregions. Doing it on every block of enumerated memory slows scans down substantially.
+							}
+
 							//
 							// Headers with private pages
 							//
 
 							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && (*SbItr)->GetPrivateSize()) {
-								TargetSuspList.push_back(new ModifiedPeHeader(&ParentProc, &ParentObj, *SbItr));
+								TargetSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, MODIFIED_HEADER));
 							}
 
 							//
@@ -162,7 +156,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 							//
 
 							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
-								TargetSuspList.push_back(new DiskPermissionMismatch(&ParentProc, &ParentObj, *SbItr));
+								TargetSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, DISK_PERMISSION_MISMATCH));
 							}
 
 							//
@@ -170,7 +164,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 							//
 
 							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && (*SbItr)->GetPrivateSize()) {
-								TargetSuspList.push_back(new ModifiedCode(&ParentProc, &ParentObj, *SbItr));
+								TargetSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, MODIFIED_CODE));
 							}
 
 							if (SbSuspList.size()) { // Do not insert the list to the map if it overlaps with the ablock.
@@ -180,7 +174,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 					}
 				}
 				else {
-					AbSuspList.push_back(new PhantomImage(&ParentProc, &ParentObj));
+					AbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, nullptr, PHANTOM_IMAGE));
 				}
 			}
 
@@ -191,7 +185,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 			for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 				list<Suspicion *> SbSuspList;
 				if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect)) {
-					SbSuspList.push_back(new MappedExecPermission(&ParentProc, &ParentObj, *SbItr));
+					SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, XMAP));
 				}
 				if (SbSuspList.size()) {
 					RefSbMap.insert(make_pair((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, SbSuspList));
@@ -207,7 +201,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 				for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
 					list<Suspicion *> SbSuspList;
 					if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect)) {
-						SbSuspList.push_back(new PrivateExecPermission(&ParentProc, &ParentObj, *SbItr));
+						SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, XPRV));
 					}
 
 					if (SbSuspList.size()) {

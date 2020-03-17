@@ -55,11 +55,6 @@ PeBase* PeBase::Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) { // Factory me
 	return NewPe;
 }
 
-/* PE base factory :: initialize from path
-
-
-*/
-
 PeBase* PeBase::Load(const wstring PeFilePath) {
 	HANDLE hFile;
 	PeBase* NewPe = nullptr;
@@ -104,36 +99,11 @@ PeBase* PeBase::Load(const wstring PeFilePath) {
 	return NewPe;
 }
 
-uint8_t* PeBase::GetData() {
-	return this->Data;
-}
-
-uint32_t PeBase::GetSize() {
-	return this->Size;
-}
-
-PIMAGE_DOS_HEADER PeBase::GetDosHdr() {
-	return this->DosHdr;
-}
-
-IMAGE_FILE_HEADER* PeBase::GetFileHdr() {
-	return this->FileHdr;
-}
-
-IMAGE_SECTION_HEADER* PeBase::GetSectHdrs() {
-	return this->SectHdrs;
-}
-
 //
 // Primary derived architecture class
 //
 
-template<typename NtHdrType> PeArch<NtHdrType>::PeArch(
-	uint8_t* pPeFileBuf,
-	uint32_t dwPeFileSize) :
-	PeBase(pPeFileBuf, dwPeFileSize)
-{
-}
+template<typename NtHdrType> PeArch<NtHdrType>::PeArch(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) : PeBase(pPeFileBuf, dwPeFileSize) {}
 
 template<typename NtHdrType> NtHdrType* PeArch<NtHdrType>::GetNtHdrs() {
 	assert(this->DosHdr != nullptr);
@@ -228,26 +198,9 @@ PeArch32::PeArch32(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) :
 	PeArch<IMAGE_NT_HEADERS32>(pPeFileBuf, dwPeFileSize)
 {}
 
-uint16_t PeArch32::GetPeMagic() {
-	return IMAGE_NT_OPTIONAL_HDR32_MAGIC;
-}
-
-uint16_t PeArch32::GetPeArch() {
-	return IMAGE_FILE_MACHINE_I386;
-}
-
 //
 // Derived 64-bit
 //
 
 PeArch64::PeArch64(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) :
-	PeArch<IMAGE_NT_HEADERS64>(pPeFileBuf, dwPeFileSize)
-{}
-
-uint16_t PeArch64::GetPeMagic() {
-	return IMAGE_NT_OPTIONAL_HDR64_MAGIC;
-}
-
-uint16_t PeArch64::GetPeArch() {
-	return IMAGE_FILE_MACHINE_AMD64;
-}
+	PeArch<IMAGE_NT_HEADERS64>(pPeFileBuf, dwPeFileSize) {}

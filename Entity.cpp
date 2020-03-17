@@ -61,37 +61,6 @@ PeVm::Body::~Body() {
 	delete this->Pe;
 }
 
-uint8_t* PeVm::Component::GetPeBase() {
-	return this->PeBase;
-}
-PeBase* PeVm::Body::GetPe() {
-	return this->Pe;
-}
-
-std::vector<PeVm::Section*> PeVm::Body::GetSections() {
-	return this->Sections;
-}
-
-IMAGE_SECTION_HEADER * PeVm::Section::GetHeader() {
-	return &this->Hdr;
-}
-
-uint8_t* Entity::GetStartVa() {
-	return this->StartVa;
-}
-
-uint8_t* Entity::GetEndVa() {
-	return this->EndVa;
-}
-
-uint32_t Entity::GetEntitySize() {
-	return this->EntitySize;
-}
-
-uint8_t* PeVm::Body::GetPeBase() {
-	return this->PeBase;
-}
-
 PeVm::Component::Component(HANDLE hProcess, std::vector<SBlock*> SBlocks, uint8_t* pPeBase) : ABlock(hProcess, SBlocks), PeBase(pPeBase) {}
 
 void Entity::SetSBlocks(vector<SBlock*> SBlocks) {
@@ -101,8 +70,8 @@ void Entity::SetSBlocks(vector<SBlock*> SBlocks) {
 	this->EntitySize = ((uint8_t*)(SBlocks.back())->GetBasic()->BaseAddress + (SBlocks.back())->GetBasic()->RegionSize) - (SBlocks.front())->GetBasic()->BaseAddress;
 }
 
-ABlock::ABlock(HANDLE hProcess, vector<SBlock*> SBlocks) {
-	/* Removed as a temporary performance optimization since the region info is not being used during detailed enumeration
+ABlock::ABlock(HANDLE hProcess, vector<SBlock*> SBlocks) { // Removed as a temporary performance optimization since the region info is not being used during detailed enumeration
+	/*
 	if (SBlocks.front()->GetBasic()->State == MEM_COMMIT) {
 		static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory");
 		this->RegionInfo = new MEMORY_REGION_INFORMATION;
@@ -127,10 +96,6 @@ PeVm::Section::Section(HANDLE hProcess, vector<SBlock*> SBlocks, IMAGE_SECTION_H
 
 MappedFile::MappedFile(HANDLE hProcess, vector<SBlock*> SBlocks, const wchar_t* pFilePath, bool bMemStore) : ABlock(hProcess, SBlocks), FileBase(pFilePath, bMemStore, false) {}
 
-bool PeVm::Body::PebModule::Exists() {
-	return (this->Missing ? false : true);
-}
-
 PeVm::Body::PebModule::PebModule(HANDLE hProcess, uint8_t* pModBase) {
 	if (hProcess != nullptr) {
 		if (GetModuleInformation(hProcess, (HMODULE)pModBase, &this->Info, sizeof(this->Info))) {
@@ -150,46 +115,6 @@ PeVm::Body::PebModule::PebModule(HANDLE hProcess, uint8_t* pModBase) {
 			this->Missing = true;
 		}
 	}
-}
-
-wstring PeVm::Body::PebModule::GetPath() {
-	return this->Path;
-}
-
-wstring PeVm::Body::PebModule::GetName() {
-	return this->Name;
-}
-
-uint8_t *PeVm::Body::PebModule::GetBase() {
-	return (uint8_t *)this->Info.lpBaseOfDll;
-}
-
-uint8_t* PeVm::Body::PebModule::GetEntryPoint() {
-	return (uint8_t*)this->Info.EntryPoint;
-}
-
-uint32_t PeVm::Body::PebModule::GetSize() {
-	return this->Info.SizeOfImage;
-}
-
-PeVm::Body::PebModule &PeVm::Body::GetPebModule() {
-	return this->PebMod;
-}
-
-bool PeVm::Body::IsSigned() {
-	return this->Signed;
-}
-
-bool PeVm::Body::IsNonExecutableImage() {
-	return this->NonExecutableImage;
-}
-
-bool PeVm::Body::IsPartiallyMapped() {
-	return this->PartiallyMapped;
-}
-
-uint32_t PeVm::Body::GetImageSize() {
-	return this->ImageSize;
 }
 
 PeVm::Body::Body(HANDLE hProcess, vector<SBlock*> SBlocks, const wchar_t* pFilePath) : ABlock(hProcess, SBlocks), PeVm::Component(hProcess, SBlocks, (uint8_t*)(SBlocks.front())->GetBasic()->BaseAddress), MappedFile(hProcess, SBlocks, pFilePath, false), PebMod(hProcess, this->PeBase) {
@@ -303,10 +228,6 @@ Entity* Entity::Create(HANDLE hProcess, std::vector<SBlock*> SBlocks) {
 	}
 
 	return pNewEntity;
-}
-
-vector<SBlock*> Entity::GetSBlocks() {
-	return this->SBlocks;
 }
 
 bool Entity::Dump(MemDump & ProcDmp, Entity& Target) {

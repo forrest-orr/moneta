@@ -9,8 +9,8 @@ protected:
 public:
 	SBlock(HANDLE hProcess, MEMORY_BASIC_INFORMATION* pMbi, std::vector<Moneta::Thread*> Threads1);
 	~SBlock();
-	MEMORY_BASIC_INFORMATION* GetBasic();
-	std::vector<Moneta::Thread*> GetThreads();
+	MEMORY_BASIC_INFORMATION* GetBasic() { return this->Basic; }
+	std::vector<Moneta::Thread*> GetThreads() { return this->Threads; }
 	void SetPrivateSize(uint32_t dwPrivateSize);
 	uint32_t GetPrivateSize() { return this->PrivateSize;  }
 	uint32_t QueryPrivateSize();

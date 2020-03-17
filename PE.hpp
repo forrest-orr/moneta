@@ -1,7 +1,5 @@
-namespace PeFile
-{
-	class PeBase
-	{
+namespace PeFile {
+	class PeBase {
 	protected: // Allows inheritance from any derived class but no direct access from outside of base or derived classes.
 		IMAGE_DOS_HEADER* DosHdr;
 		IMAGE_FILE_HEADER* FileHdr;
@@ -13,7 +11,6 @@ namespace PeFile
 		PeBase(
 			uint8_t* pPeFileBuf,
 			uint32_t dwPeFileSize);
-
 	public:
 		virtual uint16_t GetPeArch() = 0;
 		virtual uint16_t GetPeMagic() = 0;
@@ -30,15 +27,17 @@ namespace PeFile
 		virtual uint16_t GetDllCharacteristics() = 0;
 		virtual void SetDllCharacteristics(uint16_t wDllCharacteristics) = 0;
 		virtual uint32_t GetImageSize() = 0;
-		uint8_t* GetData();
-		uint32_t GetSize();
-		PIMAGE_DOS_HEADER GetDosHdr();
-		IMAGE_FILE_HEADER* GetFileHdr();
-		IMAGE_SECTION_HEADER* GetSectHdrs();
+		uint8_t* GetData() { return this->Data; }
+		uint32_t GetSize() { return this->Size; }
+		PIMAGE_DOS_HEADER GetDosHdr() { return this->DosHdr; }
+		IMAGE_FILE_HEADER* GetFileHdr() { return this->FileHdr; }
+		IMAGE_SECTION_HEADER* GetSectHdrs() { return this->SectHdrs; }
 		~PeBase();
+
 		//
 		// Factory methods for derived 32/64-bit classes
 		//
+
 		static PeBase* Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize);
 		static PeBase* Load(const std::wstring PeFilePath);
 	};
@@ -50,14 +49,9 @@ namespace PeFile
 	// Note that a template function CANNOT be declared within a class unless its template matches that of its containing class.
 
 	template<typename NtHdrType> class PeArch : public PeBase { // Every method within this class must have the same template prototype as the class itself. Types used to initialize the template are inheritted by all methods as well.
-
 	protected:
 		NtHdrType* NtHdr;
-
-		PeArch(
-			uint8_t* pPeFileBuf,
-			uint32_t dwPeFileSize);
-
+		PeArch(uint8_t* pPeFileBuf, uint32_t dwPeFileSize);
 	public:
 		bool Validate();
 		NtHdrType* GetNtHdrs();
@@ -75,19 +69,17 @@ namespace PeFile
 		uint32_t GetImageSize();
 	};
 
-	class PeArch32 : public PeArch<IMAGE_NT_HEADERS32>
-	{
+	class PeArch32 : public PeArch<IMAGE_NT_HEADERS32> {
 	public:
-		uint16_t GetPeMagic();
-		uint16_t GetPeArch();
+		uint16_t GetPeMagic() { return IMAGE_NT_OPTIONAL_HDR32_MAGIC; }
+		uint16_t GetPeArch() { return IMAGE_FILE_MACHINE_I386; }
 		PeArch32(uint8_t* pPeFileBuf, uint32_t dwPeFileSize);
 	};
 
-	class PeArch64 : public PeArch<IMAGE_NT_HEADERS64>
-	{
+	class PeArch64 : public PeArch<IMAGE_NT_HEADERS64> {
 	public:
-		uint16_t GetPeMagic();
-		uint16_t GetPeArch();
+		uint16_t GetPeMagic() { return IMAGE_NT_OPTIONAL_HDR64_MAGIC; }
+		uint16_t GetPeArch() { return IMAGE_FILE_MACHINE_AMD64; }
 		PeArch64(uint8_t* pPeFileBuf, uint32_t dwPeFileSize);
 	};
 }

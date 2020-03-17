@@ -5,83 +5,19 @@ namespace Moneta {
 	class Suspicion {
 	public:
 		enum Type { MODIFIED_CODE, MODIFIED_HEADER, XMAP, XPRV, UNSIGNED_MODULE, MISSING_PEB_MODULE, MISMATCHING_PEB_MODULE, DISK_PERMISSION_MISMATCH, PHANTOM_IMAGE };
-		Suspicion::Type GetType();
-		std::wstring GetDescription(Suspicion::Type Type);
+		Suspicion::Type GetType() { return this->SspType; }
+		std::wstring GetDescription();
 		static bool InspectEntity(Process& ParentProc, Entity& ParentObj, std::map <uint8_t*, std::map<uint8_t*, std::list<Suspicion *>>>& SuspicionsMap);
 		static void EnumerateMap(std::map <uint8_t*, std::map<uint8_t*, std::list<Suspicion *>>>& SuspicionsMap);
 		bool IsFullEntitySuspicion();
 		Suspicion(Process* ParentProc, Entity* Parent, SBlock* Block, Suspicion::Type Type);
-		Entity* GetParentObject();
-		SBlock* GetBlock();
-		Process* GetProcess();
+		Entity* GetParentObject() { return this->ParentObject; }
+		SBlock* GetBlock() { return this->Block; }
+		Process* GetProcess() { return this->ParentProcess; }
 	protected:
 		Entity* ParentObject;
 		SBlock* Block;
 		Process* ParentProcess;
 		Suspicion::Type SspType;
 	};
-
-	/*
-	class ModifiedCode : public Suspicion {
-	public:
-		Suspicion::Type GetType() { return Suspicion::Type::MODIFIED_CODE; }
-		ModifiedCode(Process* ParentProc, Entity* Parent, SBlock* Block);
-		std::wstring GetDescription();
-	};
-
-	class UnsignedModule : public Suspicion {
-	public:
-		Suspicion::Type GetType() { return Suspicion::Type::UNSIGNED_MODULE; }
-		UnsignedModule(Process* ParentProc, Entity* Parent);
-		std::wstring GetDescription();
-	};
-
-	class MissingPebModule : public Suspicion {
-	public:
-		Suspicion::Type GetType() { return Suspicion::Type::MISSING_PEB_MODULE; }
-		MissingPebModule(Process* ParentProc, Entity* Parent);
-		std::wstring GetDescription();
-	};
-
-	class MismatchingPebModule : public Suspicion {
-	public:
-		Suspicion::Type GetType() { return Suspicion::Type::MISMATCHING_PEB_MODULE; }
-		MismatchingPebModule(Process* ParentProc, Entity* Parent);
-		std::wstring GetDescription();
-	};
-
-	class ModifiedPeHeader : public Suspicion {
-	public:
-		Suspicion::Type GetType() { return Suspicion::Type::MODIFIED_HEADER; }
-		ModifiedPeHeader(Process* ParentProc, Entity* Parent, SBlock* Block);
-		std::wstring GetDescription();
-	};
-
-	class DiskPermissionMismatch : public Suspicion {
-	public:
-		Suspicion::Type GetType() { return Suspicion::Type::DISK_PERMISSION_MISMATCH; }
-		DiskPermissionMismatch(Process* ParentProc, Entity* Parent, SBlock* Block);
-		std::wstring GetDescription();
-	};
-
-	class PhantomImage : public Suspicion {
-	public:
-		Suspicion::Type GetType() { return Suspicion::Type::PHANTOM_IMAGE; }
-		PhantomImage(Process* ParentProc, Entity* Parent);
-		std::wstring GetDescription();
-	};
-
-	class MappedExecPermission : public Suspicion {
-	public:
-		Suspicion::Type GetType() { return Suspicion::Type::XMAP; }
-		MappedExecPermission(Process* ParentProc, Entity* Parent, SBlock* Block);
-		std::wstring GetDescription();
-	};
-
-	class PrivateExecPermission : public Suspicion {
-	public:
-		Suspicion::Type GetType() { return Suspicion::Type::XPRV; }
-		PrivateExecPermission(Process* ParentProc, Entity* Parent, SBlock* Block);
-		std::wstring GetDescription();
-	};*/
 }

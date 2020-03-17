@@ -30,16 +30,8 @@ SBlock::~SBlock() {
 	}
 }
 
-std::vector<Thread*> SBlock::GetThreads() {
-	return this->Threads;
-}
-
 void SBlock::SetPrivateSize(uint32_t dwPrivateSize) {
 	this->PrivateSize = dwPrivateSize;
-}
-
-MEMORY_BASIC_INFORMATION* SBlock::GetBasic() {
-	return Basic;
 }
 
 const wchar_t* SBlock::ProtectSymbol(uint32_t dwProtect) {
@@ -112,10 +104,6 @@ const wchar_t* SBlock::TypeSymbol(uint32_t dwType) {
 	else {
 		return L"?";
 	}
-}
-
-const wchar_t* TranslateRegionType() {
-	//
 }
 
 uint32_t SBlock::QueryPrivateSize() {
