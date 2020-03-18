@@ -15,7 +15,6 @@
 #include <assert.h>
 #include <ImageHlp.h>
 #include <strsafe.h>
-//#include <ntdef.h>
 #include <list>
 #include <map>
 #include <string>
@@ -23,4 +22,4 @@
 #include <vector>
 #include <algorithm>
 #include <codecvt>
-#include "NtMem.h"
+//#include "NtMem.h"

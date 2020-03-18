@@ -11,21 +11,12 @@ enum class VerbosityLevel {
 };
 
 typedef class Suspicion;
-typedef class SBlock;
-typedef class Entity;
+namespace Memory {
+	typedef class Subregion;
+	typedef class Entity;
+}
 typedef class MemDump;
-
-class Thread {
-public:
-	uint32_t GetTid() { return this->Id; }
-	void* GetEntryPoint() { return this->StartAddress; }
-	void SetEntryPoint(void*);
-	Thread(uint32_t);
-	Thread(uint32_t dwTid, void* pStartAddress);
-protected:
-	uint32_t Id;
-	void* StartAddress;
-};
+typedef class Thread;
 
 class Process {
 protected:
@@ -35,7 +26,7 @@ protected:
 	std::wstring ImageFilePath;
 	BOOL Wow64; // bool and BOOL translate to different sizes, IsWow64Process pointed at a bool will corrupt memory.
 	std::vector<Thread *> Threads;
-	std::map<uint8_t*, Entity*> Entities; // An ablock can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
+	std::map<uint8_t*, Memory::Entity*> Entities; // An ablock can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
 public:
 	HANDLE GetHandle() { return this->Handle; }
 	uint32_t GetPid() { return this->Pid; }
@@ -44,6 +35,10 @@ public:
 	bool DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION* pMbi, std::wstring Indent);
 	BOOL IsWow64() { return this->Wow64; }
 	Process(uint32_t);
-	std::vector<SBlock*> Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl, uint8_t* pSelectSblock = nullptr);
+	std::vector<Memory::Subregion*> Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl, uint8_t* pSelectSblock = nullptr);
 	~Process();
 };
+
+#define MONETA_FLAG_MEMDUMP 0x1
+#define MONETA_FLAG_FROM_BASE 0x2
+#define MONETA_FLAG_STATISTICS 0x4

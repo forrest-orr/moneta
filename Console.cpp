@@ -28,14 +28,14 @@ ________________________________________________________________________________
 
 #include "StdAfx.h"
 #include "FileIo.hpp"
-#include "PE.hpp"
-#include "Moneta.hpp"
+#include "PeFile.hpp"
 #include "Process.hpp"
 #include "Memory.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
 
 using namespace std;
+using namespace Memory;
 
 enum class SelectedProcessType {
 	InvalidPid = 0,
@@ -43,12 +43,6 @@ enum class SelectedProcessType {
 	AllPids,
 	SelfPid
 };
-/*
-enum class SelectedOutputType {
-	InvalidOutput = 0,
-	Raw,
-	Statistics
-};*/
 
 BOOL SetPrivilege(
 	HANDLE hToken,          // token handle
@@ -284,7 +278,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		if (ProcType == SelectedProcessType::SelfPid || ProcType == SelectedProcessType::SpecificPid) {
 			try {
 				Process TargetProc(dwSelectedPid);
-				vector<SBlock*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl, pAddress);
+				vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl, pAddress);
 				if ((qwOptFlags & MONETA_FLAG_STATISTICS)) {
 					MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(SelectedSbrs);
 					MemPermRec->ShowRecords();
@@ -313,7 +307,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 						try {
 							//TargetProc = new Process(ProcEntry.th32ProcessID);
 							Process TargetProc(ProcEntry.th32ProcessID);
-							vector<SBlock*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl, pAddress);
+							vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl, pAddress);
 
 							if ((qwOptFlags & MONETA_FLAG_STATISTICS)) {
 								if (MemPermRec == nullptr) {

@@ -1,12 +1,12 @@
 #include "StdAfx.h"
 #include "MemDump.hpp"
 #include "FileIo.hpp"
-#include "PE.hpp"
-#include "Moneta.hpp"
+#include "PeFile.hpp"
 #include "Process.hpp"
 #include "Memory.hpp"
 
 using namespace std;
+using namespace Memory;
 
 wstring MemDump::Folder;
 
@@ -30,7 +30,7 @@ bool MemDump::Create(wstring Folder, MEMORY_BASIC_INFORMATION *pMbi, wchar_t* pD
 			TargetDmpFolder = MemDump::Folder;
 		}
 
-		swprintf_s(pDumpFilePath, ccDumpFilePathLen, L"%ws\\%d_%p_%ws_%ws.dat", TargetDmpFolder.c_str(), this->Pid, pMbi->BaseAddress, SBlock::AttribDesc(pMbi), SBlock::TypeSymbol(pMbi->Type));
+		swprintf_s(pDumpFilePath, ccDumpFilePathLen, L"%ws\\%d_%p_%ws_%ws.dat", TargetDmpFolder.c_str(), this->Pid, pMbi->BaseAddress, Subregion::AttribDesc(pMbi), Subregion::TypeSymbol(pMbi->Type));
 		FileBase DumpFile(pDumpFilePath, pBuf, cbBytesRead);
 		return DumpFile.ToDisk();
 	}

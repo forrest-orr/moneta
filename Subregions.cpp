@@ -1,20 +1,22 @@
 #include "StdAfx.h"
 #include "Memory.hpp"
 #include "Interface.hpp"
+#include "Thread.hpp"
 
 using namespace std;
+using namespace Memory;
 
-SBlock::SBlock(HANDLE hProcess, MEMORY_BASIC_INFORMATION* pMbi, vector<Thread*> Threads1) : ProcessHandle(hProcess), Basic(pMbi) {
+Subregion::Subregion(HANDLE hProcess, MEMORY_BASIC_INFORMATION* pMbi, vector<Thread*> Threads1) : ProcessHandle(hProcess), Basic(pMbi) {
 	for (vector<Thread*>::const_iterator ThItr = Threads1.begin(); ThItr != Threads1.end(); ++ThItr) {
 		if ((*ThItr)->GetEntryPoint() >= this->Basic->BaseAddress && (*ThItr)->GetEntryPoint() < ((uint8_t*)this->Basic->BaseAddress + this->Basic->RegionSize)) {
 			this->Threads.push_back(new Thread((*ThItr)->GetTid(), (*ThItr)->GetEntryPoint()));
 		}
 	}
 
-	//this->PrivateSize = SBlock::QueryPrivateSize(hProcess, static_cast<uint8_t*>(this->Basic->BaseAddress), (uint32_t)(this->Basic->RegionSize)); // This is the most thorough way to query this data however it is a major performance drain. Working set queries have been moved to only occur on selected subregion blocks.
+	//this->PrivateSize = Subregion::QueryPrivateSize(hProcess, static_cast<uint8_t*>(this->Basic->BaseAddress), (uint32_t)(this->Basic->RegionSize)); // This is the most thorough way to query this data however it is a major performance drain. Working set queries have been moved to only occur on selected subregion blocks.
 }
 
-SBlock::~SBlock() {
+Subregion::~Subregion() {
 	if (this->Basic != nullptr) {
 		delete Basic;
 	}
@@ -24,11 +26,11 @@ SBlock::~SBlock() {
 	}
 }
 
-void SBlock::SetPrivateSize(uint32_t dwPrivateSize) {
+void Subregion::SetPrivateSize(uint32_t dwPrivateSize) {
 	this->PrivateSize = dwPrivateSize;
 }
 
-const wchar_t* SBlock::ProtectSymbol(uint32_t dwProtect) {
+const wchar_t* Subregion::ProtectSymbol(uint32_t dwProtect) {
 	switch (dwProtect) {
 	case PAGE_READONLY:
 		return L"R";
@@ -56,7 +58,7 @@ const wchar_t* SBlock::ProtectSymbol(uint32_t dwProtect) {
 	}
 }
 
-const wchar_t* SBlock::StateSymbol(uint32_t dwState) {
+const wchar_t* Subregion::StateSymbol(uint32_t dwState) {
 	if (dwState == MEM_COMMIT) {
 		return L"Commit";
 	}
@@ -71,7 +73,7 @@ const wchar_t* SBlock::StateSymbol(uint32_t dwState) {
 	}
 }
 
-const wchar_t* SBlock::AttribDesc(MEMORY_BASIC_INFORMATION* pMbi) {
+const wchar_t* Subregion::AttribDesc(MEMORY_BASIC_INFORMATION* pMbi) {
 	if (pMbi->State == MEM_COMMIT) {
 		return ProtectSymbol(pMbi->Protect);
 	}
@@ -85,7 +87,7 @@ const wchar_t* SBlock::AttribDesc(MEMORY_BASIC_INFORMATION* pMbi) {
 	return L"?";
 }
 
-const wchar_t* SBlock::TypeSymbol(uint32_t dwType) {
+const wchar_t* Subregion::TypeSymbol(uint32_t dwType) {
 	if (dwType == MEM_IMAGE) {
 		return L"IMG";
 	}
@@ -100,7 +102,7 @@ const wchar_t* SBlock::TypeSymbol(uint32_t dwType) {
 	}
 }
 
-uint32_t SBlock::QueryPrivateSize() {
+uint32_t Subregion::QueryPrivateSize() {
 	uint32_t dwPrivateSize = 0;
 
 	if (this->Basic->State == MEM_COMMIT && this->Basic->Protect != PAGE_NOACCESS) {
@@ -125,6 +127,6 @@ uint32_t SBlock::QueryPrivateSize() {
 	return dwPrivateSize;
 }
 
-bool SBlock::PageExecutable(uint32_t dwProtect) {
+bool Subregion::PageExecutable(uint32_t dwProtect) {
 	return (dwProtect == PAGE_EXECUTE || dwProtect == PAGE_EXECUTE_READ || dwProtect == PAGE_EXECUTE_READWRITE);
 }

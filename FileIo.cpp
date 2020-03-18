@@ -61,14 +61,12 @@ bool FileBase::TranslateDevicePath(const wchar_t* pDevicePath, wchar_t* pTransla
 	wchar_t DriveLetters[MAX_PATH + 1] = { 0 };
 	bool bTranslated = false;
 
-	if (GetLogicalDriveStringsW(MAX_PATH + 1, DriveLetters))
-	{
+	if (GetLogicalDriveStringsW(MAX_PATH + 1, DriveLetters)) {
 		wchar_t DosPath[MAX_PATH + 1];
 		wchar_t szDrive[3] = L" :";
 		wchar_t* p = DriveLetters;
 
-		do
-		{
+		do {
 			*szDrive = *p;
 
 			if (QueryDosDeviceW(szDrive, DosPath, MAX_PATH + 1)) {

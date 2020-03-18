@@ -24,9 +24,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="PE.cpp">
-      <Filter>Source Files\Classes</Filter>
-    </ClCompile>
     <ClCompile Include="FileIo.cpp">
       <Filter>Source Files\Classes</Filter>
     </ClCompile>
@@ -36,16 +33,7 @@
     <ClCompile Include="Interface.cpp">
       <Filter>Source Files\Classes</Filter>
     </ClCompile>
-    <ClCompile Include="MemDump.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Signing.cpp">
-      <Filter>Source Files\Classes</Filter>
-    </ClCompile>
-    <ClCompile Include="Suspicions.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Process.cpp">
       <Filter>Source Files\Classes</Filter>
     </ClCompile>
     <ClCompile Include="Regions.cpp">
@@ -54,17 +42,26 @@
     <ClCompile Include="Statistics.cpp">
       <Filter>Source Files\Classes\Memory</Filter>
     </ClCompile>
+    <ClCompile Include="Subregions.cpp">
+      <Filter>Source Files\Classes\Memory</Filter>
+    </ClCompile>
+    <ClCompile Include="MemDump.cpp">
+      <Filter>Source Files\Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="Suspicions.cpp">
+      <Filter>Source Files\Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="Process.cpp">
+      <Filter>Source Files\Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="Thread.cpp">
+      <Filter>Source Files\Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="PeFile.cpp">
+      <Filter>Source Files\Classes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="NtMem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Moneta.hpp">
-      <Filter>Header Files\Classes</Filter>
-    </ClInclude>
-    <ClInclude Include="PE.hpp">
-      <Filter>Header Files\Classes</Filter>
-    </ClInclude>
     <ClInclude Include="FileIo.hpp">
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
@@ -77,9 +74,6 @@
     <ClInclude Include="Process.hpp">
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
-    <ClInclude Include="MemDump.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Signing.hpp">
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
@@ -87,6 +81,15 @@
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
     <ClInclude Include="Memory.hpp">
+      <Filter>Header Files\Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread.hpp">
+      <Filter>Header Files\Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="PeFile.hpp">
+      <Filter>Header Files\Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="MemDump.hpp">
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
   </ItemGroup>

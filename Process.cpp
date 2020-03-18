@@ -1,16 +1,16 @@
 #include "StdAfx.h"
 #include "FileIo.hpp"
-#include "PE.hpp"
-#include "Moneta.hpp"
+#include "PeFile.hpp"
 #include "Process.hpp"
 #include "Memory.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
 #include "Suspicions.hpp"
 #include "Signing.hpp"
+#include "Thread.hpp"
 
 using namespace std;
-using namespace PeFile;
+using namespace Memory;
 
 Process::~Process() {
 	if (this->Handle != nullptr) {
@@ -131,11 +131,11 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		Interface::Log(4, "* Scanning sblocks...\r\n");
 		//system("pause");
 		SIZE_T cbRegionSize = 0;
-		vector<SBlock*> SBlocks;
-		vector<SBlock*>::iterator ABlock;
+		vector<Subregion*> Subregions;
+		vector<Subregion*>::iterator ABlock;
 		//Entity* CurrentEntity = nullptr;
 
-		//Loop memory, building list of SBlocks. Once a block is found which does not match the "current" allocation base, create a new entity containing the corresponding sblock list, and insert it into the address space entities map using the ablock as the key.
+		//Loop memory, building list of Subregions. Once a block is found which does not match the "current" allocation base, create a new entity containing the corresponding sblock list, and insert it into the address space entities map using the ablock as the key.
 
 		//if (this->Pid == 3272) system("pause");
 
@@ -145,7 +145,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 			if (VirtualQueryEx(this->Handle, pBaseAddr, (MEMORY_BASIC_INFORMATION*)pMbi, sizeof(MEMORY_BASIC_INFORMATION)) == sizeof(MEMORY_BASIC_INFORMATION)) {
 				cbRegionSize = pMbi->RegionSize;
 
-				if (!SBlocks.empty()) { // If the sblock list is empty then there is no ablock for comparison
+				if (!Subregions.empty()) { // If the sblock list is empty then there is no ablock for comparison
 					//
 					// In the event that this is a new ablock, create a map pair and insert it into the entities map
 					//
@@ -154,22 +154,22 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 
 					if (pMbi->AllocationBase != (*ABlock)->GetBasic()->AllocationBase) {
 						Interface::Log(5, "Found a new ablock. Saving sblock list to new entity entry.\r\n");
-						this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, Entity::Create(this->Handle, SBlocks)));
-						SBlocks.clear();
+						this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, Entity::Create(this->Handle, Subregions)));
+						Subregions.clear();
 					}
 					//Interface::Log("done2\r\n");
 				}
 
 				Interface::Log(5, "Adding mew sblock to list\r\n");
-				SBlocks.push_back(new SBlock(this->Handle, (MEMORY_BASIC_INFORMATION*)pMbi, this->Threads));
-				ABlock = SBlocks.begin(); // This DOES fix a bug.
+				Subregions.push_back(new Subregion(this->Handle, (MEMORY_BASIC_INFORMATION*)pMbi, this->Threads));
+				ABlock = Subregions.begin(); // This DOES fix a bug.
 			}
 			else {
 				Interface::Log(5, "VirtualQuery failed\r\n");
 				//system("pause");
 				delete pMbi;
-				if (!SBlocks.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
-					this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, Entity::Create(this->Handle, SBlocks)));
+				if (!Subregions.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
+					this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, Entity::Create(this->Handle, Subregions)));
 				}
 				//Interface::Log("done\r\n");
 				break;
@@ -238,7 +238,7 @@ void EnumerateThreads(const wstring Indent, vector<Thread*> Threads) {
 
 /*
 Region map -> Key [Allocation base]
-				-> Suspicions map -> Key [SBlock address]
+				-> Suspicions map -> Key [Subregion address]
 									   -> Suspicions list
 */
 
@@ -307,7 +307,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 						if (PeEntity->IsSigned()) {
 							static const wchar_t* pWinmbExt = L".winmd";
 							//if (_wcsnicmp(PeEntity->GetPath().c_str(), Environment::MetadataPath.c_str(), Environment::MetadataPath.length()) == 0 && _wcsicmp(PeEntity->GetPath().c_str() + PeEntity->GetPath().length() - wcslen(pWinmbExt), pWinmbExt) == 0) {
-							if (_wcsicmp(PeEntity->GetPath().c_str() + PeEntity->GetPath().length() - wcslen(pWinmbExt), pWinmbExt) == 0) {
+							if (_wcsicmp(PeEntity->GetFileBase()->GetPath().c_str() + PeEntity->GetFileBase()->GetPath().length() - wcslen(pWinmbExt), pWinmbExt) == 0) {
 								if (PeEntity->GetPe() != nullptr && PeEntity->GetPe()->GetEntryPoint() == 0) {
 									//Interface::Log("* %ws is within metadata path\r\n", PeEntity->GetPath().c_str());
 									//system("pause");
@@ -410,12 +410,12 @@ bool Process::DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION *pMbi, wstrin
 10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
 */
 
-vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl, uint8_t *pSelectSblock) {
+vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl, uint8_t *pSelectSblock) {
 	bool bShownProc = false;
 	MemDump ProcDmp(this->Handle, this->Pid);
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
 	map <uint8_t*, map<uint8_t*, list<Suspicion *>>> SuspicionsMap; // More efficient to only filter this map once. Currently filtering it for every single entity
-	vector<SBlock*> SelectedSbrs;
+	vector<Subregion*> SelectedSbrs;
 
 	//
 	// Build suspicions list for following memory selection and apply filters to it.
@@ -462,18 +462,18 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
 				if (PeEntity->IsNonExecutableImage()) {
-					Interface::Log("  0x%p:0x%08x   | Unexecutable image  | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+					Interface::Log("  0x%p:0x%08x   | Unexecutable image  | %ws", PeEntity->GetPeFile(), PeEntity->GetEntitySize(), PeEntity->GetFileBase()->GetPath().c_str());
 				}
 				else {
-					Interface::Log("  0x%p:0x%08x   | Executable image    | %ws", PeEntity->GetPeBase(), PeEntity->GetEntitySize(), PeEntity->GetPath().c_str());
+					Interface::Log("  0x%p:0x%08x   | Executable image    | %ws", PeEntity->GetPeFile(), PeEntity->GetEntitySize(), PeEntity->GetFileBase()->GetPath().c_str());
 				}
 			}
 			else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
-				Interface::Log("  0x%p:0x%08x   | Mapped   | %ws", Itr->second->GetStartVa(), Itr->second->GetEntitySize(), dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
+				Interface::Log("  0x%p:0x%08x   | Mapped   | %ws", Itr->second->GetStartVa(), Itr->second->GetEntitySize(), dynamic_cast<MappedFile*>(Itr->second)->GetFileBase()->GetPath().c_str());
 			}
 			else {
-				//Interface::Log("  0x%p:0x%08x   | %ws", Itr->second->GetStartVa(), Itr->second->GetEntitySize(), SBlock::AttribDesc(Itr->second->GetSBlocks().front()->GetBasic())); // Free memory presents the only exception here, as it has a blank type. While such memory can paint a slightly more detailed picture of a process memory space, it has no allocation base and no type which makes it impossible to parse/enumerate in the style in which this program was written.
-				if (Itr->second->GetSBlocks().front()->GetBasic()->Type == MEM_PRIVATE) {
+				//Interface::Log("  0x%p:0x%08x   | %ws", Itr->second->GetStartVa(), Itr->second->GetEntitySize(), Subregion::AttribDesc(Itr->second->GetSubregions().front()->GetBasic())); // Free memory presents the only exception here, as it has a blank type. While such memory can paint a slightly more detailed picture of a process memory space, it has no allocation base and no type which makes it impossible to parse/enumerate in the style in which this program was written.
+				if (Itr->second->GetSubregions().front()->GetBasic()->Type == MEM_PRIVATE) {
 					Interface::Log("  0x%p:0x%08x   | Private", Itr->second->GetStartVa(), Itr->second->GetEntitySize());
 				}
 				else {
@@ -494,7 +494,7 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 
 					Interface::Log("  |__ Mapped file base: 0x%p\r\n", PeEntity->GetStartVa());
 					Interface::Log("    | Mapped file size: %d\r\n", PeEntity->GetEntitySize());
-					Interface::Log("    | Mapped file path: %ws\r\n", PeEntity->GetPath().c_str());
+					Interface::Log("    | Mapped file path: %ws\r\n", PeEntity->GetFileBase()->GetPath().c_str());
 					Interface::Log("    | Size of image: %d\r\n", PeEntity->GetImageSize());
 					Interface::Log("    | Non-executable: %ws\r\n", PeEntity->IsNonExecutableImage() ? L"yes" : L"no");
 					Interface::Log("    | Partially mapped: %ws\r\n", PeEntity->IsPartiallyMapped() ? L"yes" : L"no");
@@ -517,21 +517,23 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 				else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
 					Interface::Log("  |__ Mapped file base: 0x%p\r\n", Itr->second->GetStartVa());
 					Interface::Log("    | Mapped file size: %d\r\n", Itr->second->GetEntitySize());
-					Interface::Log("    | Mapped file path: %ws\r\n", dynamic_cast<MappedFile*>(Itr->second)->GetPath().c_str());
+					Interface::Log("    | Mapped file path: %ws\r\n", dynamic_cast<MappedFile*>(Itr->second)->GetFileBase()->GetPath().c_str());
 				}
 
+				/*
 				if (Itr->second->GetRegionInfo() != nullptr) {
 					// Due to flag inconsistency between architectures and different Windows version MEMORY_REGION_INFORMATION has been excluded
 				}
+				*/
 			}
 
 			//
 			// Display the section/sblock information associated with this eneity provided it meets the selection criteria
 			//
 
-			vector<SBlock*> SBlocks = Itr->second->GetSBlocks();
+			vector<Subregion*> Subregions = Itr->second->GetSubregions();
 
-			for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+			for (vector<Subregion*>::iterator SbItr = Subregions.begin(); SbItr != Subregions.end(); ++SbItr) {
 				if (MemSelectType == MemorySelectionType::All ||
 					(MemSelectType == MemorySelectionType::Block && (pSelectSblock == (*SbItr)->GetBasic()->BaseAddress || (qwOptFlags & MONETA_FLAG_FROM_BASE))) ||
 					(MemSelectType == MemorySelectionType::Suspicious && ((qwOptFlags & MONETA_FLAG_FROM_BASE) || 
@@ -546,9 +548,9 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 					}
 					*/
 
-					AlignName(SBlock::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
+					AlignName(Subregion::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
 
-					if (Itr->second->GetType() == Entity::Type::PE_FILE && !dynamic_cast<PeVm::Body*>(Itr->second)->IsPhantom()) {
+					if (Itr->second->GetType() == Entity::Type::PE_FILE && !dynamic_cast<PeVm::Body*>(Itr->second)->GetFileBase()->IsPhantom()) {
 						//
 						// Generate a list of all sections overlapping with this sblock and display them all. A typical example is a +r sblock at the end of the PE which encompasses all consecutive readonly sections ie. .rdata, .rsrc, .reloc
 						//
@@ -584,11 +586,11 @@ vector<SBlock*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemS
 					if (VLvl == VerbosityLevel::Detail) {
 						Interface::Log("    |__ Base address: 0x%p\r\n", (*SbItr)->GetBasic()->BaseAddress);
 						Interface::Log("      | Size: 0x%d\r\n", (*SbItr)->GetBasic()->RegionSize);
-						Interface::Log("      | Permissions: %ws\r\n", SBlock::ProtectSymbol((*SbItr)->GetBasic()->Protect));
-						Interface::Log("      | Type: %ws\r\n", SBlock::TypeSymbol((*SbItr)->GetBasic()->Type));
-						Interface::Log("      | State: %ws\r\n", SBlock::StateSymbol((*SbItr)->GetBasic()->State));
+						Interface::Log("      | Permissions: %ws\r\n", Subregion::ProtectSymbol((*SbItr)->GetBasic()->Protect));
+						Interface::Log("      | Type: %ws\r\n", Subregion::TypeSymbol((*SbItr)->GetBasic()->Type));
+						Interface::Log("      | State: %ws\r\n", Subregion::StateSymbol((*SbItr)->GetBasic()->State));
 						Interface::Log("      | Allocation base: 0x%p\r\n", (*SbItr)->GetBasic()->AllocationBase);
-						Interface::Log("      | Allocation permissions: %ws\r\n", SBlock::ProtectSymbol((*SbItr)->GetBasic()->AllocationProtect));
+						Interface::Log("      | Allocation permissions: %ws\r\n", Subregion::ProtectSymbol((*SbItr)->GetBasic()->AllocationProtect));
 						Interface::Log("      | Private size: %d [%d pages]\r\n", (*SbItr)->GetPrivateSize(), (*SbItr)->GetPrivateSize() / 0x1000);
 					}
 

@@ -1,7 +1,5 @@
 #include "StdAfx.h"
 #include "FileIo.hpp"
-#include "PE.hpp"
-#include "Moneta.hpp"
 #include "Process.hpp"
 #include "Memory.hpp"
 #include "Interface.hpp"
@@ -9,6 +7,7 @@
 #include "Suspicions.hpp"
 
 using namespace std;
+using namespace Memory;
 
 void EnumerateAll(list<Suspicion *> &SuspicionsList) {
 	for (list<Suspicion *>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
@@ -37,8 +36,6 @@ void EnumerateAll(list<Suspicion *> &SuspicionsList) {
 		//Interface::Log(" within %ws:%d [%ws]\r\n", (*SuspItr)->GetProcess()->GetName().c_str(), (*SuspItr)->GetProcess()->GetPid(), (*SuspItr)->GetProcess()->GetImageFilePath().c_str());
 		Interface::Log(" within %ws:%d\r\n", (*SuspItr)->GetProcess()->GetName().c_str(), (*SuspItr)->GetProcess()->GetPid());
 	}
-
-	//Interface::Log("\r\n");
 }
 
 bool Suspicion::IsFullEntitySuspicion() {
@@ -60,7 +57,7 @@ wstring Suspicion::GetDescription() {
 	}
 }
 
-Suspicion::Suspicion(Process* ParentProc, Entity* ParentObj, SBlock* Block, Suspicion::Type Type) : ParentProcess(ParentProc), ParentObject(ParentObj), Block(Block), SspType(Type) {}
+Suspicion::Suspicion(Process* ParentProc, Entity* ParentObj, Subregion* Block, Suspicion::Type Type) : ParentProcess(ParentProc), ParentObject(ParentObj), Block(Block), SspType(Type) {}
 
 void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>& SuspicionsMap) {
 	for (map <uint8_t*, map<uint8_t*, list<Suspicion *>>>::const_iterator AbMapItr = SuspicionsMap.begin(); AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
@@ -84,7 +81,7 @@ void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>& S
 Generates a list of suspicions for either an ablock or sblock.
 
 Region map -> Key [Allocation base]
-                -> Suspicions map -> Key [SBlock address]
+                -> Suspicions map -> Key [Subregion address]
 				                       -> Suspicions list
 
 It is important to ensure that all new suspicions are added to the list of the existing map entry even if they share the same base address. This allows the ablock map entry to also hold sblock suspicions such as modified hdr.
@@ -113,12 +110,12 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 					AbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, nullptr, MISSING_PEB_MODULE));
 				}
 				else {
-					if (_wcsicmp(PeEntity->GetPebModule().GetPath().c_str(), PeEntity->GetPath().c_str()) != 0) { // Since the PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx, there may be a PEB link with a base address matching this image region but with a misleading name/path
+					if (_wcsicmp(PeEntity->GetPebModule().GetPath().c_str(), PeEntity->GetFileBase()->GetPath().c_str()) != 0) { // Since the PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx, there may be a PEB link with a base address matching this image region but with a misleading name/path
 						if (ParentProc.IsWow64()) { // This is an edge case in which in Wow64 a module may appear as C:\Windows\System32\kernel32.dll although the true path is C:\Windows\SysWOW64\kernel32.dll due to Wow64 FS redirection.
 							wchar_t ReFormattedPath[MAX_PATH + 1] = { 0 };
 
 							if (FileBase::ArchWow64PathExpand(PeEntity->GetPebModule().GetPath().c_str(), ReFormattedPath, MAX_PATH + 1)) {
-								if (_wcsicmp(ReFormattedPath, PeEntity->GetPath().c_str()) != 0) {
+								if (_wcsicmp(ReFormattedPath, PeEntity->GetFileBase()->GetPath().c_str()) != 0) {
 									AbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, nullptr, MISMATCHING_PEB_MODULE));
 								}
 							}
@@ -132,9 +129,9 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 				if (PeEntity->GetPe() != nullptr) {
 					vector<PeVm::Section*> Sections = PeEntity->GetSections();
 					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
-						vector<SBlock*> SBlocks = (*SectItr)->GetSBlocks();
+						vector<Subregion*> Subregions = (*SectItr)->GetSubregions();
 
-						for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+						for (vector<Subregion*>::iterator SbItr = Subregions.begin(); SbItr != Subregions.end(); ++SbItr) {
 							list<Suspicion *> SbSuspList;
 							list<Suspicion *>& TargetSuspList = (*SbItr)->GetBasic()->BaseAddress == ParentObj.GetStartVa() ? AbSuspList : SbSuspList;
 
@@ -154,7 +151,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 							// Executable regions within sections that are not marked as executable on disk. For example: data is +rw on disk but has +x sblock
 							//
 
-							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
+							if (Subregion::PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
 								TargetSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, DISK_PERMISSION_MISMATCH));
 							}
 
@@ -162,7 +159,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 							// Executable regions in memory with private pages. Whether their +x is consistent with their section on disk is examined as well.
 							//
 
-							if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect) && (*SbItr)->GetPrivateSize()) {
+							if (Subregion::PageExecutable((*SbItr)->GetBasic()->Protect) && (*SbItr)->GetPrivateSize()) {
 								TargetSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, MODIFIED_CODE));
 							}
 
@@ -180,10 +177,10 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 			break;
 		}
 		case Entity::Type::MAPPED_FILE: {
-			vector<SBlock*> SBlocks = ParentObj.GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
-			for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+			vector<Subregion*> Subregions = ParentObj.GetSubregions(); // This must be done explicitly, otherwise each time GetSubregions is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
+			for (vector<Subregion*>::iterator SbItr = Subregions.begin(); SbItr != Subregions.end(); ++SbItr) {
 				list<Suspicion *> SbSuspList;
-				if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect)) {
+				if (Subregion::PageExecutable((*SbItr)->GetBasic()->Protect)) {
 					SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, XMAP));
 				}
 				if (SbSuspList.size()) {
@@ -194,12 +191,12 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 			break;
 		}
 		case Entity::Type::UNKNOWN: {
-			vector<SBlock*> SBlocks = ParentObj.GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
+			vector<Subregion*> Subregions = ParentObj.GetSubregions(); // This must be done explicitly, otherwise each time GetSubregions is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 
-			if (SBlocks.front()->GetBasic()->Type == MEM_PRIVATE) {
-				for (vector<SBlock*>::iterator SbItr = SBlocks.begin(); SbItr != SBlocks.end(); ++SbItr) {
+			if (Subregions.front()->GetBasic()->Type == MEM_PRIVATE) {
+				for (vector<Subregion*>::iterator SbItr = Subregions.begin(); SbItr != Subregions.end(); ++SbItr) {
 					list<Suspicion *> SbSuspList;
-					if (SBlock::PageExecutable((*SbItr)->GetBasic()->Protect)) {
+					if (Subregion::PageExecutable((*SbItr)->GetBasic()->Protect)) {
 						SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, XPRV));
 					}
 

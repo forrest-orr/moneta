@@ -31,9 +31,10 @@ ________________________________________________________________________________
 #include "Interface.hpp"
 
 using namespace std;
+using namespace Memory;
 
-void MemoryPermissionRecord::UpdateMap(vector<SBlock*> MemBasicRecords) {
-	for (vector<SBlock*>::const_iterator RecordItr = MemBasicRecords.begin(); RecordItr != MemBasicRecords.end(); ++RecordItr) {
+void MemoryPermissionRecord::UpdateMap(vector<Subregion*> MemBasicRecords) {
+	for (vector<Subregion*>::const_iterator RecordItr = MemBasicRecords.begin(); RecordItr != MemBasicRecords.end(); ++RecordItr) {
 		if (!MemPermMap->count((*RecordItr)->GetBasic()->Type)) {
 			MemPermMap->insert(make_pair((*RecordItr)->GetBasic()->Type, map<uint32_t, uint32_t>()));
 		}
@@ -48,7 +49,7 @@ void MemoryPermissionRecord::UpdateMap(vector<SBlock*> MemBasicRecords) {
 	}
 }
 
-MemoryPermissionRecord::MemoryPermissionRecord(vector<SBlock*> MemBasicRecords) {
+MemoryPermissionRecord::MemoryPermissionRecord(vector<Subregion*> MemBasicRecords) {
 	MemPermMap = new map<uint32_t, map<uint32_t, uint32_t>>();
 	UpdateMap(MemBasicRecords);
 }
@@ -62,7 +63,7 @@ void MemoryPermissionRecord::ShowRecords() {
 			nTotalRegions += Itr2->second;
 		}
 
-		Interface::Log("  %ws [%d total]\r\n", SBlock::TypeSymbol(Itr->first), nTotalRegions);
+		Interface::Log("  %ws [%d total]\r\n", Subregion::TypeSymbol(Itr->first), nTotalRegions);
 
 		for (map<uint32_t, uint32_t>::const_iterator Itr2 = Itr->second.begin(); Itr2 != Itr->second.end(); ++Itr2, nX++) {
 			if (!nX) {

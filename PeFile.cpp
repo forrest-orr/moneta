@@ -1,14 +1,13 @@
 #include "StdAfx.h"
-#include "PE.hpp"
+#include "PeFile.hpp"
 
 #pragma comment (lib, "Imagehlp.lib")
 
 using namespace std;
-using namespace PeFile;
 
-// PeBase
+// PeFile
 
-PeBase::PeBase(
+PeFile::PeFile(
 	uint8_t* pPeFileBuf,
 	uint32_t dwPeFileSize) :
 	Data(new uint8_t[dwPeFileSize]),
@@ -19,15 +18,15 @@ PeBase::PeBase(
 	this->FileHdr = (IMAGE_FILE_HEADER*)((uint8_t*)this->DosHdr + this->DosHdr->e_lfanew + sizeof(LONG));
 }
 
-PeBase::~PeBase() {
+PeFile::~PeFile() {
 	delete this->Data;
 }
 
-PeBase* PeBase::Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) { // Factory method for derived 32/64-bit classes
+PeFile* PeFile::Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) { // Factory method for derived 32/64-bit classes
 	assert(pPeFileBuf != nullptr);
 	assert(dwPeFileSize);
 
-	PeBase* NewPe = nullptr;
+	PeFile* NewPe = nullptr;
 
 	if (*(uint16_t*)&pPeFileBuf[0] == 'ZM') {
 		PIMAGE_DOS_HEADER pDosHdr = (PIMAGE_DOS_HEADER)pPeFileBuf;
@@ -55,9 +54,9 @@ PeBase* PeBase::Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) { // Factory me
 	return NewPe;
 }
 
-PeBase* PeBase::Load(const wstring PeFilePath) {
+PeFile* PeFile::Load(const wstring PeFilePath) {
 	HANDLE hFile;
-	PeBase* NewPe = nullptr;
+	PeFile* NewPe = nullptr;
 
 	// Obtain the size of the region from where the DOS header begins and where the optional/section headers end
 
@@ -87,7 +86,7 @@ PeBase* PeBase::Load(const wstring PeFilePath) {
 					SetFilePointer(hFile, 0, nullptr, FILE_BEGIN);
 
 					if (ReadFile(hFile, HdrData, dwHdrSize, (PDWORD)&dwBytesRead, 0)) {
-						NewPe = PeBase::Load(HdrData, dwHdrSize);
+						NewPe = PeFile::Load(HdrData, dwHdrSize);
 					}
 				}
 			}
@@ -103,7 +102,7 @@ PeBase* PeBase::Load(const wstring PeFilePath) {
 // Primary derived architecture class
 //
 
-template<typename NtHdrType> PeArch<NtHdrType>::PeArch(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) : PeBase(pPeFileBuf, dwPeFileSize) {}
+template<typename NtHdrType> PeArch<NtHdrType>::PeArch(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) : PeFile(pPeFileBuf, dwPeFileSize) {}
 
 template<typename NtHdrType> NtHdrType* PeArch<NtHdrType>::GetNtHdrs() {
 	assert(this->DosHdr != nullptr);
