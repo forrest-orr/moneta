@@ -19,7 +19,7 @@
     <Filter Include="Header Files\Classes">
       <UniqueIdentifier>{99d0197e-6354-4645-b4c2-edc2420d44ee}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Classes\Moneta">
+    <Filter Include="Source Files\Classes\Memory">
       <UniqueIdentifier>{12f263ff-349e-4eb0-87ba-8e1042e59bd1}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -30,20 +30,11 @@
     <ClCompile Include="FileIo.cpp">
       <Filter>Source Files\Classes</Filter>
     </ClCompile>
-    <ClCompile Include="Blocks.cpp">
-      <Filter>Source Files\Classes\Moneta</Filter>
-    </ClCompile>
-    <ClCompile Include="Entity.cpp">
-      <Filter>Source Files\Classes\Moneta</Filter>
-    </ClCompile>
     <ClCompile Include="Console.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Interface.cpp">
       <Filter>Source Files\Classes</Filter>
-    </ClCompile>
-    <ClCompile Include="Process.cpp">
-      <Filter>Source Files\Classes\Moneta</Filter>
     </ClCompile>
     <ClCompile Include="MemDump.cpp">
       <Filter>Source Files</Filter>
@@ -53,6 +44,15 @@
     </ClCompile>
     <ClCompile Include="Suspicions.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Process.cpp">
+      <Filter>Source Files\Classes</Filter>
+    </ClCompile>
+    <ClCompile Include="Regions.cpp">
+      <Filter>Source Files\Classes\Memory</Filter>
+    </ClCompile>
+    <ClCompile Include="Statistics.cpp">
+      <Filter>Source Files\Classes\Memory</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -77,9 +77,6 @@
     <ClInclude Include="Process.hpp">
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
-    <ClInclude Include="Blocks.hpp">
-      <Filter>Header Files\Classes</Filter>
-    </ClInclude>
     <ClInclude Include="MemDump.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -87,6 +84,9 @@
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
     <ClInclude Include="Suspicions.hpp">
+      <Filter>Header Files\Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory.hpp">
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
   </ItemGroup>

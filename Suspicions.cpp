@@ -3,13 +3,12 @@
 #include "PE.hpp"
 #include "Moneta.hpp"
 #include "Process.hpp"
-#include "Blocks.hpp"
+#include "Memory.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
 #include "Suspicions.hpp"
 
 using namespace std;
-using namespace Moneta;
 
 void EnumerateAll(list<Suspicion *> &SuspicionsList) {
 	for (list<Suspicion *>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {

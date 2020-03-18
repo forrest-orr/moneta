@@ -4,7 +4,7 @@
 #include "PE.hpp"
 #include "Moneta.hpp"
 #include "Process.hpp"
-#include "Blocks.hpp"
+#include "Memory.hpp"
 
 using namespace std;
 

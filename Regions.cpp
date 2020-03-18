@@ -1,50 +1,20 @@
-/*
-____________________________________________________________________________________
-| _______  _____  __   _ _______ _______ _______                                   |
-| |  |  | |     | | \  | |______    |    |_____|                                   |
-| |  |  | |_____| |  \_| |______    |    |     |                                   |
-|__________________________________________________________________________________|
-| Moneta ~ Usermode memory scanner & malware hunter                                |
-|----------------------------------------------------------------------------------|
-| https://www.forrest-orr.net/post/malicious-memory-artifacts-part-i-dll-hollowing |
-|----------------------------------------------------------------------------------|
-| Author: Forrest Orr - 2019                                                       |
-|----------------------------------------------------------------------------------|
-| Contact: forrest.orr@protonmail.com                                              |
-|----------------------------------------------------------------------------------|
-| Licensed under GNU GPLv3                                                         |
-|__________________________________________________________________________________|
-| ## Features                                                                      |
-|                                                                                  |
-| ~ Query the memory attributes of any accessible process(es).                     |
-| ~ Identify private, mapped and image memory.                                     |
-| ~ Correlate regions of memory to their underlying file on disks.                 |
-| ~ Identify PE headers and sections corresponding to image memory.                |
-| ~ Identify modified regions of mapped image memory.                              |
-| ~ Identify abnormal memory attributes indicative of malware.                     |
-|__________________________________________________________________________________|
-
-*/
-
 #include "StdAfx.h"
 #include "FileIo.hpp"
 #include "PE.hpp"
-#include "Moneta.hpp"
 #include "Process.hpp"
-#include "Blocks.hpp"
+#include "Memory.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
 #include "Signing.hpp"
 
 using namespace std;
 using namespace PeFile;
-using namespace Moneta;
 
 Entity::~Entity() {
 	//Interface::Log("Entity destructor\r\n");
 	for (vector<SBlock*>::const_iterator Itr = this->SBlocks.begin(); Itr != this->SBlocks.end(); ++Itr) {
 		//if(!(*Itr)) Interface::Log("null itr\r\n");
-		delete * Itr;
+		delete* Itr;
 	}
 
 	if (RegionInfo != nullptr) {
@@ -136,10 +106,10 @@ PeVm::Body::Body(HANDLE hProcess, vector<SBlock*> SBlocks, const wchar_t* pFileP
 		this->Signed = CheckSigning(pFilePath);
 
 		if ((this->Pe = PeBase::Load(pFilePath)) != nullptr) {
-		//if ((this->Pe = PeBase::Load(this->GetFileBaseData(), this->GetFileBaseSize())) != nullptr) {
-			//
-			// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
-			//
+			//if ((this->Pe = PeBase::Load(this->GetFileBaseData(), this->GetFileBaseSize())) != nullptr) {
+				//
+				// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
+				//
 
 			for (int32_t nX = -1; nX < this->Pe->GetFileHdr()->NumberOfSections; nX++) {
 				IMAGE_SECTION_HEADER ArtificialPeHdr = { 0 }; // This will initialize other relevant fields such as VirtualAddress to 0 for the PE header edge case.
@@ -230,7 +200,7 @@ Entity* Entity::Create(HANDLE hProcess, std::vector<SBlock*> SBlocks) {
 	return pNewEntity;
 }
 
-bool Entity::Dump(MemDump & ProcDmp, Entity& Target) {
+bool Entity::Dump(MemDump& ProcDmp, Entity& Target) {
 	vector<SBlock*> SBlocks = Target.GetSBlocks(); // This must be done explicitly, otherwise each time GetSBlocks is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 	wchar_t DumpFolder[MAX_PATH + 1] = { 0 };
 	int32_t nDumpCount = 0;

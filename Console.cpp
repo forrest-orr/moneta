@@ -31,12 +31,11 @@ ________________________________________________________________________________
 #include "PE.hpp"
 #include "Moneta.hpp"
 #include "Process.hpp"
-#include "Blocks.hpp"
+#include "Memory.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
 
 using namespace std;
-using namespace Moneta;
 
 enum class SelectedProcessType {
 	InvalidPid = 0,

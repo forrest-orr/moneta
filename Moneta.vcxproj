@@ -129,10 +129,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Blocks.cpp" />
+    <ClCompile Include="Regions.cpp" />
     <ClCompile Include="FileIo.cpp" />
     <ClCompile Include="Console.cpp" />
-    <ClCompile Include="Entity.cpp" />
+    <ClCompile Include="Statistics.cpp" />
     <ClCompile Include="Interface.cpp" />
     <ClCompile Include="MemDump.cpp" />
     <ClCompile Include="PE.cpp" />
@@ -141,7 +141,7 @@
     <ClCompile Include="Suspicions.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Blocks.hpp" />
+    <ClInclude Include="Memory.hpp" />
     <ClInclude Include="FileIo.hpp" />
     <ClInclude Include="Interface.hpp" />
     <ClInclude Include="MemDump.hpp" />
