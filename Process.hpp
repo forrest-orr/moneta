@@ -31,7 +31,7 @@ public:
 	bool DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION* pMbi, std::wstring Indent);
 	BOOL IsWow64() { return this->Wow64; }
 	Process(uint32_t);
-	std::vector<Memory::Subregion*> Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl, uint8_t* pSelectSblock = nullptr);
+	std::vector<Memory::Subregion*> Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, uint8_t* pSelectSblock = nullptr);
 	~Process();
 };
 

@@ -141,20 +141,11 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	vector<wstring> Args(&pArgv[0], &pArgv[0 + nArgc]);
 	Interface::Initialize(Args);
 
-	CONSOLE_SCREEN_BUFFER_INFOEX OriginalScrnInfo = { 0 }, NewScrnInfo = { 0 };
-	OriginalScrnInfo.cbSize = sizeof(OriginalScrnInfo);
-	NewScrnInfo.cbSize = sizeof(NewScrnInfo);
-	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-	GetConsoleScreenBufferInfoEx(hConsole, &OriginalScrnInfo);
-	GetConsoleScreenBufferInfoEx(hConsole, &NewScrnInfo);
-	//memcpy(&NewScrnInfo, &OriginalScrnInfo, sizeof(OriginalScrnInfo));
-	OriginalScrnInfo.ColorTable[14] = RGB(255, 128, 0);  // Replace yellow
-	SetConsoleScreenBufferInfoEx(hConsole, &OriginalScrnInfo);
-	SetConsoleTextAttribute(hConsole, FOREGROUND_INTENSITY | FOREGROUND_RED | FOREGROUND_GREEN);
-	printf("abc123\r\n");
-	Interface::Log("Test 123\r\n");
-	SetConsoleScreenBufferInfoEx(hConsole, &OriginalScrnInfo);
+	for (WORD wX = 0; wX < 200; wX++) {
+		//Interface::Log(wX, "%d ", wX);
+	}
 
+	Interface::Log("\r\n");
 	SYSTEM_INFO SystemInfo = { 0 };
 	typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
 	static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
@@ -179,7 +170,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	else {
 		SelectedProcessType ProcType = SelectedProcessType::InvalidPid;
 		MemorySelectionType MemSelectType = MemorySelectionType::Invalid;
-		VerbosityLevel VLvl = VerbosityLevel::Surface;
 		uint32_t dwSelectedPid = 0;
 		uint8_t* pAddress = nullptr;
 
@@ -213,14 +203,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			}
 			else if (Arg == L"--address") {
 				pAddress = (uint8_t*)wcstoull((*(i + 1)).c_str(), NULL, 0);
-			}
-			else if (Arg == L"-v") {
-				if (*(i + 1) == L"surface") {
-					VLvl = VerbosityLevel::Surface;
-				}
-				else if (*(i + 1) == L"detail") {
-					VLvl = VerbosityLevel::Detail;
-				}
 			}
 			else if (Arg == L"-d") {
 				qwOptFlags |= MONETA_FLAG_MEMDUMP;
@@ -278,7 +260,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		if (ProcType == SelectedProcessType::SelfPid || ProcType == SelectedProcessType::SpecificPid) {
 			try {
 				Process TargetProc(dwSelectedPid);
-				vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl, pAddress);
+				vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, pAddress);
 				if ((qwOptFlags & MONETA_FLAG_STATISTICS)) {
 					MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(SelectedSbrs);
 					MemPermRec->ShowRecords();
@@ -307,7 +289,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 						try {
 							//TargetProc = new Process(ProcEntry.th32ProcessID);
 							Process TargetProc(ProcEntry.th32ProcessID);
-							vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, VLvl, pAddress);
+							vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, pAddress);
 
 							if ((qwOptFlags & MONETA_FLAG_STATISTICS)) {
 								if (MemPermRec == nullptr) {

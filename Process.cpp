@@ -350,7 +350,8 @@ int32_t AppendOverlapSuspicion(map<uint8_t*, list<Suspicion *>>* pSbMap, uint8_t
 
 		for (list<Suspicion *>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
 			if (bEntityTop == (*SuspItr)->IsFullEntitySuspicion()) {
-				Interface::Log(" | %ws", (*SuspItr)->GetDescription().c_str());
+				Interface::Log(" | ");
+				Interface::Log(12, "%ws", (*SuspItr)->GetDescription().c_str());
 			}
 		}
 	}
@@ -410,7 +411,7 @@ bool Process::DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION *pMbi, wstrin
 10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
 */
 
-vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, VerbosityLevel VLvl, uint8_t *pSelectSblock) {
+vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, uint8_t *pSelectSblock) {
 	bool bShownProc = false;
 	MemDump ProcDmp(this->Handle, this->Pid);
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
@@ -454,27 +455,47 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType M
 			//
 
 			if (!bShownProc) {
-				Interface::Log("\r\n%ws [%ws] : %d : %ws\r\n", this->Name.c_str(), this->ImageFilePath.c_str(), this->GetPid(), this->IsWow64() ? L"Wow64" : L"x64");
+				Interface::Log("\r\n");
+				Interface::Log(11, "%ws", this->Name.c_str()); // 13
+				Interface::Log(" : ");
+				Interface::Log(11, "%d", this->GetPid());
+				Interface::Log(" : ");
+				Interface::Log(11, "%ws", this->IsWow64() ? L"Wow64" : L"x64");
+				Interface::Log(" : ");
+				Interface::Log(11, "%ws\r\n", this->ImageFilePath.c_str());
+				//Interface::Log("]\r\n");
 				bShownProc = true;
 			}
 
+			if(Itr->second->GetSubregions().front()->GetBasic()->State != MEM_FREE)
+			Interface::Log("  0x%p:0x%08x   ", Itr->second->GetStartVa(), Itr->second->GetEntitySize()); // 13
 			if (Itr->second->GetType() == Entity::Type::PE_FILE) {
 				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
+				//Interface::Log(13, "  0x%p:0x%08x", PeEntity->GetPeFile(), PeEntity->GetEntitySize());
+				//Interface::Log("   | ");
+				Interface::Log("| ");
 				if (PeEntity->IsNonExecutableImage()) {
-					Interface::Log("  0x%p:0x%08x   | Unexecutable image  | %ws", PeEntity->GetPeFile(), PeEntity->GetEntitySize(), PeEntity->GetFileBase()->GetPath().c_str());
+					Interface::Log(6, "Unexecutable image  "); //11
+					//Interface::Log("  0x%p:0x%08x   | Unexecutable image  | %ws", PeEntity->GetPeFile(), PeEntity->GetEntitySize(), PeEntity->GetFileBase()->GetPath().c_str());
 				}
 				else {
-					Interface::Log("  0x%p:0x%08x   | Executable image    | %ws", PeEntity->GetPeFile(), PeEntity->GetEntitySize(), PeEntity->GetFileBase()->GetPath().c_str());
+					Interface::Log(6, "Executable image    ");
+					//Interface::Log("  0x%p:0x%08x   | Executable image    | %ws", PeEntity->GetPeFile(), PeEntity->GetEntitySize(), PeEntity->GetFileBase()->GetPath().c_str());
 				}
+				Interface::Log("| %ws", PeEntity->GetFileBase()->GetPath().c_str());
 			}
 			else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
-				Interface::Log("  0x%p:0x%08x   | Mapped   | %ws", Itr->second->GetStartVa(), Itr->second->GetEntitySize(), dynamic_cast<MappedFile*>(Itr->second)->GetFileBase()->GetPath().c_str());
+				Interface::Log("| ");
+				Interface::Log(6, "Mapped");
+				Interface::Log("   | %ws", dynamic_cast<MappedFile*>(Itr->second)->GetFileBase()->GetPath().c_str());
 			}
 			else {
 				//Interface::Log("  0x%p:0x%08x   | %ws", Itr->second->GetStartVa(), Itr->second->GetEntitySize(), Subregion::AttribDesc(Itr->second->GetSubregions().front()->GetBasic())); // Free memory presents the only exception here, as it has a blank type. While such memory can paint a slightly more detailed picture of a process memory space, it has no allocation base and no type which makes it impossible to parse/enumerate in the style in which this program was written.
 				if (Itr->second->GetSubregions().front()->GetBasic()->Type == MEM_PRIVATE) {
-					Interface::Log("  0x%p:0x%08x   | Private", Itr->second->GetStartVa(), Itr->second->GetEntitySize());
+					//Interface::Log(13, "  0x%p:0x%08x   ");
+					Interface::Log("| ");
+					Interface::Log(6, "Private");
 				}
 				else {
 					continue;
@@ -488,7 +509,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType M
 			AppendOverlapSuspicion(pSbMap, (uint8_t*)Itr->second->GetStartVa(), true);
 			Interface::Log("\r\n");
 
-			if (VLvl == VerbosityLevel::Detail) {
+			if (Interface::GetVerbosity() == VerbosityLevel::Detail) {
 				if (Itr->second->GetType() == Entity::Type::PE_FILE) {
 					PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
@@ -583,7 +604,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType M
 						Interface::Log("\r\n");
 					}
 
-					if (VLvl == VerbosityLevel::Detail) {
+					if (Interface::GetVerbosity() == VerbosityLevel::Detail) {
 						Interface::Log("    |__ Base address: 0x%p\r\n", (*SbItr)->GetBasic()->BaseAddress);
 						Interface::Log("      | Size: 0x%d\r\n", (*SbItr)->GetBasic()->RegionSize);
 						Interface::Log("      | Permissions: %ws\r\n", Subregion::ProtectSymbol((*SbItr)->GetBasic()->Protect));

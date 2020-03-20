@@ -38,7 +38,15 @@ void Interface::Initialize(vector<wstring> &Args) {
 
 	for (vector<wstring>::const_iterator i = Args.begin(); i != Args.end(); ++i) {
 		if (*i == L"-v") {
-			VLvl = (VerbosityLevel)stoi(*(i + 1));
+			if (*(i + 1) == L"surface") {
+				VLvl = VerbosityLevel::Surface;
+			}
+			else if (*(i + 1) == L"detail") {
+				VLvl = VerbosityLevel::Detail;
+			}
+			else if (*(i + 1) == L"debug") {
+				VLvl = VerbosityLevel::Debug;
+			}
 		}
 		else if (*i == L"--log-file") {
 			LogFilePath = *(i + 1);
@@ -84,7 +92,7 @@ bool Interface::Log(const char *pLogFormat, ...) {
 	return WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), (PDWORD)&dwBytesWritten, NULL);
 }
 
-bool Interface::Log(VerbosityLevel MsgVlvl, WORD wColorAttribute, const char* pLogFormat, ...) {
+bool Interface::Log(WORD wColorAttribute, const char* pLogFormat, ...) {
 	char LogBuffer[4000] = { 0 };
 	char* pVarList;
 	uint32_t dwBytesWritten = 0;

@@ -12,7 +12,7 @@ public:
 	static void Initialize(std::vector<std::wstring> &Args);
 	static bool Log(VerbosityLevel MsgVlvl, const char *pLogFormat, ...);
 	static bool Log(const char *pLogFormat, ...);
-	static bool Log(VerbosityLevel MsgVlvl, WORD wColorAttribute, const char* pLogFormat, ...);
+	static bool Log(WORD wColorAttribute, const char* pLogFormat, ...);
 	static HANDLE GetOutputHandle() { return Interface::Handle; }
 	static VerbosityLevel GetVerbosity() { return Interface::VerbosityLvl; }
 private:
