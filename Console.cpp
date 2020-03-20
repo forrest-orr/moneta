@@ -319,7 +319,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 							}
 						}
 						catch (int32_t nError) {
-							Interface::Log(3, "- Failed to map address space of %d:%ws (error %d)\r\n", ProcEntry.th32ProcessID, ProcEntry.szExeFile, nError);
+							Interface::Log(VerbosityLevel::Debug, "- Failed to map address space of %d:%ws (error %d)\r\n", ProcEntry.th32ProcessID, ProcEntry.szExeFile, nError);
 							continue;
 						}
 					} while (Process32NextW(hSnapshot, &ProcEntry));

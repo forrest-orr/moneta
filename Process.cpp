@@ -101,7 +101,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				//printf("Translated %ws to %ws\r\n", DevFilePath, ImageFilePath);
 				this->Name = wstring(ImageName);
 				this->ImageFilePath = wstring(ImageFilePath);
-				Interface::Log(4, "* Mapping address space of PID %d [%ws]\r\n", this->Pid, this->Name.c_str());
+				Interface::Log(VerbosityLevel::Debug, "* Mapping address space of PID %d [%ws]\r\n", this->Pid, this->Name.c_str());
 				typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
 				static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
 
@@ -112,13 +112,13 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 						if (IsWow64Process(this->Handle, (PBOOL)&this->Wow64)) {
 							if (this->IsWow64()) {
 								//CloseHandle(this->Handle);
-								Interface::Log(4, "* PID %d is Wow64\r\n", this->Pid);
+								Interface::Log(VerbosityLevel::Debug, "* PID %d is Wow64\r\n", this->Pid);
 								//system("pause");
 								//throw 2;
 							}
 							else {
 								if (bSelfWow64) {
-									Interface::Log(4, "* Cannot scan non-Wow64 process from Wow64 Moneta instance\r\n");
+									Interface::Log(VerbosityLevel::Debug, "* Cannot scan non-Wow64 process from Wow64 Moneta instance\r\n");
 									throw 2;
 								}
 							}
@@ -128,7 +128,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 			}
 		}
 
-		Interface::Log(4, "* Scanning sblocks...\r\n");
+		Interface::Log(VerbosityLevel::Debug, "* Scanning sblocks...\r\n");
 		//system("pause");
 		SIZE_T cbRegionSize = 0;
 		vector<Subregion*> Subregions;
@@ -150,22 +150,22 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 					// In the event that this is a new ablock, create a map pair and insert it into the entities map
 					//
 
-					Interface::Log(5, "Sblock list not empty\r\n");
+					Interface::Log(VerbosityLevel::Debug, "Sblock list not empty\r\n");
 
 					if (pMbi->AllocationBase != (*ABlock)->GetBasic()->AllocationBase) {
-						Interface::Log(5, "Found a new ablock. Saving sblock list to new entity entry.\r\n");
+						Interface::Log(VerbosityLevel::Debug, "Found a new ablock. Saving sblock list to new entity entry.\r\n");
 						this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, Entity::Create(this->Handle, Subregions)));
 						Subregions.clear();
 					}
 					//Interface::Log("done2\r\n");
 				}
 
-				Interface::Log(5, "Adding mew sblock to list\r\n");
+				Interface::Log(VerbosityLevel::Debug, "Adding mew sblock to list\r\n");
 				Subregions.push_back(new Subregion(this->Handle, (MEMORY_BASIC_INFORMATION*)pMbi, this->Threads));
 				ABlock = Subregions.begin(); // This DOES fix a bug.
 			}
 			else {
-				Interface::Log(5, "VirtualQuery failed\r\n");
+				Interface::Log(VerbosityLevel::Debug, "VirtualQuery failed\r\n");
 				//system("pause");
 				delete pMbi;
 				if (!Subregions.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
@@ -180,7 +180,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		//CloseHandle(hProcess);
 	}
 	else {
-		Interface::Log(4, "- Failed to open handle to PID %d\r\n", this->Pid);
+		Interface::Log(VerbosityLevel::Debug, "- Failed to open handle to PID %d\r\n", this->Pid);
 		throw 1; // Not throwing a specific value crashes it
 	}
 

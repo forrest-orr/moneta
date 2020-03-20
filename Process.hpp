@@ -5,11 +5,7 @@ enum class MemorySelectionType {
 	Suspicious
 };
 
-enum class VerbosityLevel {
-	Surface,
-	Detail
-};
-
+typedef enum class VerbosityLevel;
 typedef class Suspicion;
 namespace Memory {
 	typedef class Subregion;

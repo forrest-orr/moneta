@@ -1,5 +1,5 @@
 class PeFile {
-protected: // Allows inheritance from any derived class but no direct access from outside of base or derived classes.
+protected:
 	IMAGE_DOS_HEADER* DosHdr;
 	IMAGE_FILE_HEADER* FileHdr;
 	IMAGE_SECTION_HEADER* SectHdrs;
