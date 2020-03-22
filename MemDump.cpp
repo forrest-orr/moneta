@@ -12,12 +12,12 @@ wstring MemDump::Folder;
 
 MemDump::MemDump(HANDLE hProcess, uint32_t dwPid) : Handle(hProcess), Pid(dwPid) {}
 
-bool MemDump::Create(wstring Folder, MEMORY_BASIC_INFORMATION *pMbi, wchar_t* pDumpFilePath, size_t ccDumpFilePathLen) {
+bool MemDump::Create(wstring Folder, MEMORY_BASIC_INFORMATION *Mbi, wchar_t* DumFilePath, size_t ccDumFilePathLen) {
 	SIZE_T cbBytesRead = 0;
-	uint8_t* pBuf = new uint8_t[pMbi->RegionSize];
+	uint8_t* pBuf = new uint8_t[Mbi->RegionSize];
 	wstring TargetDmpFolder;
 
-	if (ReadProcessMemory(this->Handle, pMbi->BaseAddress, pBuf, pMbi->RegionSize, (SIZE_T*)&cbBytesRead)) {
+	if (ReadProcessMemory(this->Handle, Mbi->BaseAddress, pBuf, Mbi->RegionSize, (SIZE_T*)&cbBytesRead)) {
 		if (!Folder.empty()) {
 			TargetDmpFolder = MemDump::Folder + L"\\" + Folder;
 
@@ -30,8 +30,8 @@ bool MemDump::Create(wstring Folder, MEMORY_BASIC_INFORMATION *pMbi, wchar_t* pD
 			TargetDmpFolder = MemDump::Folder;
 		}
 
-		swprintf_s(pDumpFilePath, ccDumpFilePathLen, L"%ws\\%d_%p_%ws_%ws.dat", TargetDmpFolder.c_str(), this->Pid, pMbi->BaseAddress, Subregion::AttribDesc(pMbi), Subregion::TypeSymbol(pMbi->Type));
-		FileBase DumpFile(pDumpFilePath, pBuf, cbBytesRead);
+		swprintf_s(DumFilePath, ccDumFilePathLen, L"%ws\\%d_%p_%ws_%ws.dat", TargetDmpFolder.c_str(), this->Pid, Mbi->BaseAddress, Subregion::AttribDesc(Mbi), Subregion::TypeSymbol(Mbi->Type));
+		FileBase DumpFile(DumFilePath, pBuf, cbBytesRead);
 		return DumpFile.ToDisk();
 	}
 	else {
@@ -39,8 +39,8 @@ bool MemDump::Create(wstring Folder, MEMORY_BASIC_INFORMATION *pMbi, wchar_t* pD
 	}
 }
 
-bool MemDump::Create(MEMORY_BASIC_INFORMATION* pMbi, wchar_t* pDumpFilePath, size_t ccDumpFilePathLen) {
-	return Create(L"", pMbi, pDumpFilePath, ccDumpFilePathLen);
+bool MemDump::Create(MEMORY_BASIC_INFORMATION* Mbi, wchar_t* DumFilePath, size_t ccDumFilePathLen) {
+	return Create(L"", Mbi, DumFilePath, ccDumFilePathLen);
 }
 
 bool MemDump::Initialize() {

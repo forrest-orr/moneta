@@ -1,10 +1,9 @@
-enum class MemorySelectionType {
+enum class MemorySelection_t {
 	Invalid,
 	Block,
 	All,
 	Suspicious
 };
-
 typedef enum class VerbosityLevel;
 typedef class Suspicion;
 namespace Memory {
@@ -22,19 +21,19 @@ protected:
 	std::wstring ImageFilePath;
 	BOOL Wow64; // bool and BOOL translate to different sizes, IsWow64Process pointed at a bool will corrupt memory.
 	std::vector<Thread *> Threads;
-	std::map<uint8_t*, Memory::Entity*> Entities; // An ablock can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
+	std::map<uint8_t*, Memory::Entity*> Entities; // A region can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
 public:
 	HANDLE GetHandle() { return this->Handle; }
 	uint32_t GetPid() { return this->Pid; }
 	std::wstring GetName() { return this->Name; }
 	std::wstring GetImageFilePath() { return this->ImageFilePath; }
-	bool DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION* pMbi, std::wstring Indent);
+	bool DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION* Mbi, std::wstring Indent);
 	BOOL IsWow64() { return this->Wow64; }
 	Process(uint32_t);
-	std::vector<Memory::Subregion*> Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, uint8_t* pSelectSblock = nullptr);
+	std::vector<Memory::Subregion*> Enumerate(uint64_t qwOptFlags, MemorySelection_t MemSelectType, uint8_t* pSelectAddress = nullptr);
 	~Process();
 };
 
-#define MONETA_FLAG_MEMDUMP 0x1
-#define MONETA_FLAG_FROM_BASE 0x2
-#define MONETA_FLAG_STATISTICS 0x4
+#define PROCESS_ENUM_FLAG_MEMDUMP 0x1
+#define PROCESS_ENUM_FLAG_FROM_BASE 0x2
+#define PROCESS_ENUM_FLAG_STATISTICS 0x4

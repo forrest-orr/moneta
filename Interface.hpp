@@ -13,12 +13,12 @@ enum class ConsoleColor {
 class Interface
 {
 public:
-	static void Initialize(std::wstring LogFilePath2, VerbosityLevel Vlvl = VerbosityLevel::Surface);
+	static void Initialize(std::wstring LogFilePath, VerbosityLevel Vlvl = VerbosityLevel::Surface);
 	static void Initialize(VerbosityLevel Vlvl = VerbosityLevel::Surface);
 	static void Initialize(std::vector<std::wstring> &Args);
-	static bool Log(VerbosityLevel MsgVlvl, const char *pLogFormat, ...);
-	static bool Log(const char *pLogFormat, ...);
-	static bool Log(ConsoleColor Color, const char* pLogFormat, ...);
+	static bool Log(VerbosityLevel MsgVlvl, const char *LogFormat, ...);
+	static bool Log(const char *LogFormat, ...);
+	static bool Log(ConsoleColor Color, const char* LogFormat, ...);
 	static HANDLE GetOutputHandle() { return Interface::Handle; }
 	static VerbosityLevel GetVerbosity() { return Interface::VerbosityLvl; }
 private:

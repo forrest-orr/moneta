@@ -11,7 +11,7 @@ namespace Memory {
 		uint32_t PrivateSize;
 		HANDLE ProcessHandle;
 	public:
-		Subregion(HANDLE hProcess, MEMORY_BASIC_INFORMATION* pMbi, std::vector<Thread*> Threads1);
+		Subregion(HANDLE hProcess, MEMORY_BASIC_INFORMATION* Mbi, std::vector<Thread*> Threads);
 		~Subregion();
 		MEMORY_BASIC_INFORMATION* GetBasic() { return this->Basic; }
 		std::vector<Thread*> GetThreads() { return this->Threads; }
@@ -19,18 +19,18 @@ namespace Memory {
 		uint32_t GetPrivateSize() { return this->PrivateSize; }
 		uint32_t QueryPrivateSize();
 		static const wchar_t* ProtectSymbol(uint32_t dwProtect);
-		static const wchar_t* AttribDesc(MEMORY_BASIC_INFORMATION* pMbi);
+		static const wchar_t* AttribDesc(MEMORY_BASIC_INFORMATION* Mbi);
 		static const wchar_t* TypeSymbol(uint32_t dwType);
 		static const wchar_t* StateSymbol(uint32_t dwState);
 		static bool PageExecutable(uint32_t dwProtect);
 	};
 
-	class MemoryPermissionRecord { // Record takes basic/region memory structures, and sorts them into a map. Class can be used to show the map.
+	class PermissionRecord {
 	protected:
-		std::map<uint32_t, std::map<uint32_t, uint32_t>>* MemPermMap; // Primary key is the memory type, secondary map key is the permission attribute (and its pair value is the count).
+		std::map<uint32_t, std::map<uint32_t, uint32_t>>* PermissionMap; // Primary key is the memory type, secondary map key is the permission attribute (and its pair value is the count).
 	public:
-		void UpdateMap(std::vector<Subregion*> MemBasicRecords);
-		MemoryPermissionRecord(std::vector<Subregion*> MemBasicRecords);
+		void UpdateMap(std::vector<Subregion*> SubregionRecords);
+		PermissionRecord(std::vector<Subregion*> SubregionRecords);
 		void ShowRecords();
 	};
 
@@ -54,27 +54,27 @@ namespace Memory {
 		virtual Entity::Type GetType() = 0;
 	};
 
-	class ABlock : public Entity { // This is essential, since a parameterized constructor of the base entity class is impossible (since it is an abstract base class with a deferred method). new Entity() is impossible for this reason: only derived classes can be initialized.
+	class Region : public Entity { // This is essential, since a parameterized constructor of the base entity class is impossible (since it is an abstract base class with a deferred method). new Entity() is impossible for this reason: only derived classes can be initialized.
 	public:
-		ABlock(HANDLE hProcess, std::vector<Subregion*> Subregions);
+		Region(HANDLE hProcess, std::vector<Subregion*> Subregions);
 		Entity::Type GetType() { return Entity::Type::UNKNOWN; }
 	};
 
-	class MappedFile : virtual public ABlock { // Virtual inheritance from entity prevents classes derived from entity from having ambiguous/conflicting content.
+	class MappedFile : virtual public Region { // Virtual inheritance from entity prevents classes derived from entity from having ambiguous/conflicting content.
 	protected:
 		FileBase* MapFileBase;
 	public:
-		MappedFile(HANDLE hProcess, std::vector<Subregion*> Subregions, const wchar_t* pFilePath, bool bMemStore = false);
+		MappedFile(HANDLE hProcess, std::vector<Subregion*> Subregions, const wchar_t* FilePath, bool bMemStore = false);
 		Entity::Type GetType() { return Entity::Type::MAPPED_FILE; }
 		FileBase* GetFileBase() { return this->MapFileBase; }
 		~MappedFile();
 	};
 
 	namespace PeVm {
-		class Component : virtual public ABlock {
+		class Component : virtual public Region {
 		public:
 			uint8_t* GetPeFile() { return this->PeFile; }
-			Component(HANDLE hProcess, std::vector<Subregion*> Subregions, uint8_t* pPeFile);
+			Component(HANDLE hProcess, std::vector<Subregion*> Subregions, uint8_t* pPeBuf);
 		protected:
 			uint8_t* PeFile;
 		};
@@ -115,13 +115,13 @@ namespace Memory {
 			std::vector<Section*> FindOverlapSect(Subregion& Address);
 			uint32_t GetImageSize() { return this->ImageSize; }
 			uint32_t GetSigningLevel() { return this->SigningLevel; }
-			Body(HANDLE hProcess, std::vector<Subregion*> Subregions, const wchar_t* pFilePath);
+			Body(HANDLE hProcess, std::vector<Subregion*> Subregions, const wchar_t* FilePath);
 			~Body();
 		};
 
 		class Section : public Component {
 		public:
-			Section(HANDLE hProcess, std::vector<Subregion*> Subregions, IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeFile);
+			Section(HANDLE hProcess, std::vector<Subregion*> Subregions, IMAGE_SECTION_HEADER* SectHdr, uint8_t* pPeBuf);
 			IMAGE_SECTION_HEADER* GetHeader() { return &this->Hdr; }
 			Entity::Type GetType() { return Entity::Type::PE_SECTION; }
 		protected:

@@ -8,7 +8,7 @@ ________________________________________________________________________________
 |----------------------------------------------------------------------------------|
 | https://www.forrest-orr.net/post/malicious-memory-artifacts-part-i-dll-hollowing |
 |----------------------------------------------------------------------------------|
-| Author: Forrest Orr - 2019                                                       |
+| Author: Forrest Orr - 2020                                                       |
 |----------------------------------------------------------------------------------|
 | Contact: forrest.orr@protonmail.com                                              |
 |----------------------------------------------------------------------------------|
@@ -22,6 +22,8 @@ ________________________________________________________________________________
 | ~ Identify PE headers and sections corresponding to image memory.                |
 | ~ Identify modified regions of mapped image memory.                              |
 | ~ Identify abnormal memory attributes indicative of malware.                     |
+| ~ Create memory dumps of user-specified memory ranges                            |
+| ~ Calculate memory permission/type statistics                                    |
 |__________________________________________________________________________________|
 
 */
@@ -33,13 +35,13 @@ ________________________________________________________________________________
 using namespace std;
 using namespace Memory;
 
-void MemoryPermissionRecord::UpdateMap(vector<Subregion*> MemBasicRecords) {
-	for (vector<Subregion*>::const_iterator RecordItr = MemBasicRecords.begin(); RecordItr != MemBasicRecords.end(); ++RecordItr) {
-		if (!MemPermMap->count((*RecordItr)->GetBasic()->Type)) {
-			MemPermMap->insert(make_pair((*RecordItr)->GetBasic()->Type, map<uint32_t, uint32_t>()));
+void PermissionRecord::UpdateMap(vector<Subregion*> SubregionRecords) {
+	for (vector<Subregion*>::const_iterator RecordItr = SubregionRecords.begin(); RecordItr != SubregionRecords.end(); ++RecordItr) {
+		if (!PermissionMap->count((*RecordItr)->GetBasic()->Type)) {
+			PermissionMap->insert(make_pair((*RecordItr)->GetBasic()->Type, map<uint32_t, uint32_t>()));
 		}
 
-		map<uint32_t, uint32_t>& CountMap = MemPermMap->at((*RecordItr)->GetBasic()->Type);
+		map<uint32_t, uint32_t>& CountMap = PermissionMap->at((*RecordItr)->GetBasic()->Type);
 
 		if (!CountMap.count((*RecordItr)->GetBasic()->Protect)) {
 			CountMap.insert(make_pair((*RecordItr)->GetBasic()->Protect, 0));
@@ -49,14 +51,14 @@ void MemoryPermissionRecord::UpdateMap(vector<Subregion*> MemBasicRecords) {
 	}
 }
 
-MemoryPermissionRecord::MemoryPermissionRecord(vector<Subregion*> MemBasicRecords) {
-	MemPermMap = new map<uint32_t, map<uint32_t, uint32_t>>();
-	UpdateMap(MemBasicRecords);
+PermissionRecord::PermissionRecord(vector<Subregion*> SubregionRecords) {
+	PermissionMap = new map<uint32_t, map<uint32_t, uint32_t>>();
+	UpdateMap(SubregionRecords);
 }
 
-void MemoryPermissionRecord::ShowRecords() {
+void PermissionRecord::ShowRecords() {
 	Interface::Log("\r\nMemory statistics\r\n");
-	for (map<uint32_t, map<uint32_t, uint32_t>>::const_iterator Itr = MemPermMap->begin(); Itr != MemPermMap->end(); ++Itr) {
+	for (map<uint32_t, map<uint32_t, uint32_t>>::const_iterator Itr = PermissionMap->begin(); Itr != PermissionMap->end(); ++Itr) {
 		int32_t nTotalRegions = 0, nX = 0;
 
 		for (map<uint32_t, uint32_t>::const_iterator Itr2 = Itr->second.begin(); Itr2 != Itr->second.end(); ++Itr2) {

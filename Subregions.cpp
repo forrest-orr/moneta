@@ -6,14 +6,14 @@
 using namespace std;
 using namespace Memory;
 
-Subregion::Subregion(HANDLE hProcess, MEMORY_BASIC_INFORMATION* pMbi, vector<Thread*> Threads1) : ProcessHandle(hProcess), Basic(pMbi) {
+Subregion::Subregion(HANDLE hProcess, MEMORY_BASIC_INFORMATION* Mbi, vector<Thread*> Threads1) : ProcessHandle(hProcess), Basic(Mbi) {
 	for (vector<Thread*>::const_iterator ThItr = Threads1.begin(); ThItr != Threads1.end(); ++ThItr) {
 		if ((*ThItr)->GetEntryPoint() >= this->Basic->BaseAddress && (*ThItr)->GetEntryPoint() < ((uint8_t*)this->Basic->BaseAddress + this->Basic->RegionSize)) {
 			this->Threads.push_back(new Thread((*ThItr)->GetTid(), (*ThItr)->GetEntryPoint()));
 		}
 	}
 
-	if (pMbi->State == MEM_COMMIT && pMbi->Type != MEM_PRIVATE) {
+	if (Mbi->State == MEM_COMMIT && Mbi->Type != MEM_PRIVATE) {
 		this->PrivateSize = this->QueryPrivateSize(); // This is the most thorough way to query this data however it is a major performance drain. Working set queries have been moved to only occur on selected subregion blocks.
 	}
 }
@@ -75,14 +75,14 @@ const wchar_t* Subregion::StateSymbol(uint32_t dwState) {
 	}
 }
 
-const wchar_t* Subregion::AttribDesc(MEMORY_BASIC_INFORMATION* pMbi) {
-	if (pMbi->State == MEM_COMMIT) {
-		return ProtectSymbol(pMbi->Protect);
+const wchar_t* Subregion::AttribDesc(MEMORY_BASIC_INFORMATION* Mbi) {
+	if (Mbi->State == MEM_COMMIT) {
+		return ProtectSymbol(Mbi->Protect);
 	}
-	else if (pMbi->State == MEM_FREE) {
+	else if (Mbi->State == MEM_FREE) {
 		return L"Free";
 	}
-	else if (pMbi->State == MEM_RESERVE) {
+	else if (Mbi->State == MEM_RESERVE) {
 		return L"Reserve";
 	}
 

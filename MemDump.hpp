@@ -4,8 +4,8 @@
 class MemDump {
 public:
 	MemDump(HANDLE hProcess, uint32_t dwPid);
-	bool Create(MEMORY_BASIC_INFORMATION *, wchar_t* pDumpFilePath, size_t ccDumpFilePathLen);
-	bool Create(std::wstring Folder, MEMORY_BASIC_INFORMATION *, wchar_t* pDumpFilePath, size_t ccDumpFilePathLen);
+	bool Create(MEMORY_BASIC_INFORMATION *, wchar_t* DumFilePath, size_t ccDumFilePathLen);
+	bool Create(std::wstring Folder, MEMORY_BASIC_INFORMATION *, wchar_t* DumFilePath, size_t ccDumFilePathLen);
 	uint32_t GetPid();
 	static bool Initialize();
 protected:

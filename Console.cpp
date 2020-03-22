@@ -176,7 +176,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	}
 	else {
 		SelectedProcessType ProcType = SelectedProcessType::InvalidPid;
-		MemorySelectionType MemSelectType = MemorySelectionType::Invalid;
+		MemorySelection_t MemSelectType = MemorySelection_t::Invalid;
 		uint32_t dwSelectedPid = 0;
 		uint8_t* pAddress = nullptr;
 
@@ -199,20 +199,20 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			}
 			else if (Arg == L"-m") {
 				if (*(i + 1) == L"block") {
-					MemSelectType = MemorySelectionType::Block;
+					MemSelectType = MemorySelection_t::Block;
 				}
 				else if (*(i + 1) == L"*") {
-					MemSelectType = MemorySelectionType::All;
+					MemSelectType = MemorySelection_t::All;
 				}
 				else if (*(i + 1) == L"suspicious") {
-					MemSelectType = MemorySelectionType::Suspicious;
+					MemSelectType = MemorySelection_t::Suspicious;
 				}
 			}
 			else if (Arg == L"--address") {
 				pAddress = (uint8_t*)wcstoull((*(i + 1)).c_str(), NULL, 0);
 			}
 			else if (Arg == L"-d") {
-				qwOptFlags |= MONETA_FLAG_MEMDUMP;
+				qwOptFlags |= PROCESS_ENUM_FLAG_MEMDUMP;
 			}
 			else if (Arg == L"--option") {
 				for (vector<wstring>::const_iterator OptZtr = i; OptZtr != Args.end(); ++OptZtr) {
@@ -220,10 +220,10 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 					transform(OptArg.begin(), OptArg.end(), OptArg.begin(), ::tolower);
 
 					if (OptArg == L"from-base") {
-						qwOptFlags |= MONETA_FLAG_FROM_BASE;
+						qwOptFlags |= PROCESS_ENUM_FLAG_FROM_BASE;
 					}
 					else if (OptArg == L"statistics") {
-						qwOptFlags |= MONETA_FLAG_STATISTICS;
+						qwOptFlags |= PROCESS_ENUM_FLAG_STATISTICS;
 					}
 				}
 			}
@@ -238,7 +238,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			return 0;
 		}
 
-		if (MemSelectType == MemorySelectionType::Invalid) {
+		if (MemSelectType == MemorySelection_t::Invalid) {
 			Interface::Log("- Invalid memory selection type\r\n");
 			return 0;
 		}
@@ -254,7 +254,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			Interface::Log("- Failed to grant SeDebug privilege to self. Certain processes will be inaccessible.\r\n");
 		}
 
-		if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {
+		if ((qwOptFlags & PROCESS_ENUM_FLAG_MEMDUMP)) {
 			MemDump::Initialize();
 		}
 
@@ -268,8 +268,8 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			try {
 				Process TargetProc(dwSelectedPid);
 				vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, pAddress);
-				if ((qwOptFlags & MONETA_FLAG_STATISTICS)) {
-					MemoryPermissionRecord* MemPermRec = new MemoryPermissionRecord(SelectedSbrs);
+				if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
+					PermissionRecord* MemPermRec = new PermissionRecord(SelectedSbrs);
 					MemPermRec->ShowRecords();
 				}
 			}
@@ -280,7 +280,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		else {
 			PROCESSENTRY32W ProcEntry = { 0 };
 			HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-			MemoryPermissionRecord* MemPermRec = nullptr;
+			PermissionRecord* MemPermRec = nullptr;
 
 			if (hSnapshot != nullptr) {
 				ProcEntry.dwSize = sizeof(PROCESSENTRY32W);
@@ -298,9 +298,9 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 							Process TargetProc(ProcEntry.th32ProcessID);
 							vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, pAddress);
 
-							if ((qwOptFlags & MONETA_FLAG_STATISTICS)) {
+							if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
 								if (MemPermRec == nullptr) {
-									MemPermRec = new MemoryPermissionRecord(SelectedSbrs);
+									MemPermRec = new PermissionRecord(SelectedSbrs);
 								}
 								else {
 									MemPermRec->UpdateMap(SelectedSbrs);

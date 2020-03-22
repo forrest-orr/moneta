@@ -56,15 +56,15 @@ void Interface::Initialize(vector<wstring> &Args) {
 	Initialize(LogFilePath, VLvl);
 }
 
-bool Interface::Log(VerbosityLevel MsgVlvl, const char *pLogFormat, ...) {
+bool Interface::Log(VerbosityLevel MsgVlvl, const char *LogFormat, ...) {
 	if (MsgVlvl <= Interface::VerbosityLvl) {
 		char LogBuffer[4000] = { 0 };
 		char *pVarList;
 		uint32_t dwBytesWritten = 0;
 
-		va_start(pVarList, pLogFormat);
+		va_start(pVarList, LogFormat);
 
-		if (_vsnprintf_s(LogBuffer, sizeof(LogBuffer), _TRUNCATE, pLogFormat, pVarList) == -1) {
+		if (_vsnprintf_s(LogBuffer, sizeof(LogBuffer), _TRUNCATE, LogFormat, pVarList) == -1) {
 			LogBuffer[sizeof(LogBuffer) - 1] = '\0';
 		}
 
@@ -76,14 +76,14 @@ bool Interface::Log(VerbosityLevel MsgVlvl, const char *pLogFormat, ...) {
 	return FALSE;
 }
 
-bool Interface::Log(const char *pLogFormat, ...) {
+bool Interface::Log(const char *LogFormat, ...) {
 	char LogBuffer[4000] = { 0 };
 	char *pVarList;
 	uint32_t dwBytesWritten = 0;
 
-	va_start(pVarList, pLogFormat);
+	va_start(pVarList, LogFormat);
 
-	if (_vsnprintf_s(LogBuffer, sizeof(LogBuffer), _TRUNCATE, pLogFormat, pVarList) == -1) {
+	if (_vsnprintf_s(LogBuffer, sizeof(LogBuffer), _TRUNCATE, LogFormat, pVarList) == -1) {
 		LogBuffer[sizeof(LogBuffer) - 1] = '\0';
 	}
 
@@ -92,7 +92,7 @@ bool Interface::Log(const char *pLogFormat, ...) {
 	return WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), (PDWORD)&dwBytesWritten, NULL);
 }
 
-bool Interface::Log(ConsoleColor Color, const char* pLogFormat, ...) {
+bool Interface::Log(ConsoleColor Color, const char* LogFormat, ...) {
 	char LogBuffer[4000] = { 0 };
 	char* pVarList;
 	uint32_t dwBytesWritten = 0;
@@ -106,9 +106,9 @@ bool Interface::Log(ConsoleColor Color, const char* pLogFormat, ...) {
 		SetConsoleTextAttribute(Interface::Handle, (WORD)Color);
 	}
 
-	va_start(pVarList, pLogFormat);
+	va_start(pVarList, LogFormat);
 
-	if (_vsnprintf_s(LogBuffer, sizeof(LogBuffer), _TRUNCATE, pLogFormat, pVarList) == -1) {
+	if (_vsnprintf_s(LogBuffer, sizeof(LogBuffer), _TRUNCATE, LogFormat, pVarList) == -1) {
 		LogBuffer[sizeof(LogBuffer) - 1] = '\0';
 	}
 

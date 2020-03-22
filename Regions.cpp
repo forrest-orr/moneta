@@ -10,85 +10,6 @@
 using namespace std;
 using namespace Memory;
 
-Entity::~Entity() {
-	for (vector<Subregion*>::const_iterator Itr = this->Subregions.begin(); Itr != this->Subregions.end(); ++Itr) {
-		delete* Itr;
-	}
-	/*
-	if (RegionInfo != nullptr) {
-		delete this->RegionInfo;
-	}
-	*/
-}
-
-PeVm::Body::~Body() {
-	for (vector<Section*>::const_iterator Itr = this->Sections.begin(); Itr != this->Sections.end(); ++Itr) {
-		delete* Itr;
-	}
-
-	delete this->Pe;
-}
-
-PeVm::Component::Component(HANDLE hProcess, std::vector<Subregion*> Subregions, uint8_t* pPeFile) : ABlock(hProcess, Subregions), PeFile(pPeFile) {}
-
-void Entity::SetSubregions(vector<Subregion*> Subregions) {
-	this->Subregions = Subregions;
-	this->StartVa = (uint8_t*)(Subregions.front())->GetBasic()->BaseAddress;
-	this->EndVa = ((uint8_t*)(Subregions.back())->GetBasic()->BaseAddress + (Subregions.back())->GetBasic()->RegionSize);
-	this->EntitySize = ((uint8_t*)(Subregions.back())->GetBasic()->BaseAddress + (Subregions.back())->GetBasic()->RegionSize) - (Subregions.front())->GetBasic()->BaseAddress;
-}
-
-ABlock::ABlock(HANDLE hProcess, vector<Subregion*> Subregions) { // Removed as a temporary performance optimization since the region info is not being used during detailed enumeration
-	/*
-	if (Subregions.front()->GetBasic()->State == MEM_COMMIT) {
-		static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory");
-		this->RegionInfo = new MEMORY_REGION_INFORMATION;
-		NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, Subregions.front()->GetBasic()->AllocationBase, MemoryRegionInformation, this->RegionInfo, sizeof(MEMORY_REGION_INFORMATION), nullptr);
-
-		if (!NT_SUCCESS(NtStatus)) {
-			delete this->RegionInfo;
-			this->RegionInfo = nullptr;
-			printf("- Failed to query region information at 0x%p (0x%08x)\r\n", Subregions.front()->GetBasic()->AllocationBase, NtStatus);
-			system("pause");
-		}
-	}
-	*/
-
-	SetSubregions(Subregions);
-}
-
-PeVm::Section::Section(HANDLE hProcess, vector<Subregion*> Subregions, IMAGE_SECTION_HEADER* pHdr, uint8_t* pPeFile) : ABlock(hProcess, Subregions), PeVm::Component(hProcess, Subregions, pPeFile) {
-	memcpy(&this->Hdr, pHdr, sizeof(IMAGE_SECTION_HEADER));
-	this->EntitySize = this->Hdr.SizeOfRawData == 0 ? this->Hdr.Misc.VirtualSize : this->Hdr.SizeOfRawData; // Overwrite default size determined by sblocks. Verified correct order.
-}
-
-MappedFile::MappedFile(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* pFilePath, bool bMemStore) : ABlock(hProcess, Subregions), MapFileBase(new FileBase(pFilePath, bMemStore, false)) {}
-
-MappedFile::~MappedFile() {
-	delete this->MapFileBase;
-}
-
-PeVm::Body::PebModule::PebModule(HANDLE hProcess, uint8_t* pModBase) {
-	if (hProcess != nullptr) {
-		if (GetModuleInformation(hProcess, (HMODULE)pModBase, &this->Info, sizeof(this->Info))) {
-			wchar_t ModuleName[MAX_PATH + 1] = { 0 }, ModulePath[MAX_PATH + 1] = { 0 };
-
-			if (GetModuleBaseNameW(hProcess, (HMODULE)pModBase, ModuleName, MAX_PATH + 1)) {
-				this->Name = ModuleName;
-			}
-
-			if (GetModuleFileNameExW(hProcess, (HMODULE)pModBase, ModulePath, MAX_PATH + 1)) {
-				this->Path = ModulePath;
-			}
-
-			this->Missing = false;
-		}
-		else {
-			this->Missing = true;
-		}
-	}
-}
-
 typedef enum _MEMORY_INFORMATION_CLASS {
 	MemoryBasicInformation, // MEMORY_BASIC_INFORMATION
 	MemoryWorkingSetInformation, // MEMORY_WORKING_SET_INFORMATION
@@ -119,7 +40,7 @@ typedef struct _MEMORY_IMAGE_INFORMATION {
 
 typedef NTSTATUS(__stdcall* NtQueryVirtualMemory_t)(HANDLE, void*, MEMORY_INFORMATION_CLASS, void*, SIZE_T, SIZE_T*);
 
-PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* pFilePath) : ABlock(hProcess, Subregions), PeVm::Component(hProcess, Subregions, (uint8_t*)(Subregions.front())->GetBasic()->BaseAddress), MappedFile(hProcess, Subregions, pFilePath, false), PebMod(hProcess, this->PeFile) {
+PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* FilePath) : Region(hProcess, Subregions), PeVm::Component(hProcess, Subregions, (uint8_t*)(Subregions.front())->GetBasic()->BaseAddress), MappedFile(hProcess, Subregions, FilePath, false), PebMod(hProcess, this->PeFile) {
 	static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory");
 	MEMORY_IMAGE_INFORMATION Mii = { 0 };
 	NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, this->PeFile, MemoryImageInformation, &Mii, sizeof(MEMORY_IMAGE_INFORMATION), nullptr);
@@ -135,10 +56,10 @@ PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* 
 	}
 
 	if (!this->GetFileBase()->IsPhantom()) {
-		this->Signed = CheckSigning(pFilePath);
+		this->Signed = CheckSigning(FilePath);
 
-		if ((this->Pe = PeFile::Load(pFilePath)) != nullptr) {
-		//if ((this->Pe = PeFile::Load(this->GetFileBaseData(), this->GetFileBaseSize())) != nullptr) {
+		if ((this->Pe = PeFile::Load(FilePath)) != nullptr) {
+			//if ((this->Pe = PeFile::Load(this->GetData(), this->GetSize())) != nullptr) {
 				//
 				// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
 				//
@@ -158,9 +79,6 @@ PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* 
 				uint8_t* pSectStartVa = this->PeFile + ArtificialPeHdr.VirtualAddress;
 				uint8_t* pSectEndVa = this->PeFile + ArtificialPeHdr.VirtualAddress + dwSectionSize;
 
-				//Interface::Log("%s [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa, pSectEndVa);
-				//Interface::Log("%s [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa - (uint8_t*)Subregions.front()->GetBasic()->AllocationBase, pSectEndVa - (uint8_t*)Subregions.front()->GetBasic()->AllocationBase);
-
 				//
 				// Calculate the sblocks overlapping between this PE entity and the current section.
 				//
@@ -173,9 +91,9 @@ PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* 
 
 					if ((pSubregionStartVa >= pSectStartVa && pSubregionStartVa < pSectEndVa) || (pSubregionEndVa > pSectStartVa&& pSubregionEndVa <= pSectEndVa) || (pSubregionStartVa < pSectStartVa && pSubregionEndVa > pSectEndVa)) {
 						//Interface::Log("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, pSectStartVa, pSectEndVa, pSubregionStartVa, pSubregionEndVa);
-						MEMORY_BASIC_INFORMATION* pMbi = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
-						memcpy(pMbi, (*SbItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
-						OverlapSubregion.push_back(new Subregion(hProcess, pMbi, (*SbItr)->GetThreads()));
+						MEMORY_BASIC_INFORMATION* Mbi = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
+						memcpy(Mbi, (*SbItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
+						OverlapSubregion.push_back(new Subregion(hProcess, Mbi, (*SbItr)->GetThreads()));
 					}
 				}
 
@@ -188,45 +106,114 @@ PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* 
 	}
 }
 
-/*
-Entity factory
+PeVm::Body::~Body() {
+	for (vector<Section*>::const_iterator Itr = this->Sections.begin(); Itr != this->Sections.end(); ++Itr) {
+		delete* Itr;
+	}
 
-Given a set of sblocks with a common allocation base, determine what type of entity they represent in memory
+	delete this->Pe;
+}
 
-*/
+vector<PeVm::Section*> PeVm::Body::FindOverlapSect(Subregion& Address) {
+	vector<PeVm::Section*> OverlappingSections;
+
+	for (vector<Section*>::const_iterator SectItr = this->Sections.begin(); SectItr != this->Sections.end(); ++SectItr) {
+		vector<Subregion*> SbList = (*SectItr)->GetSubregions();
+		for (vector<Subregion*>::const_iterator SbItr = SbList.begin(); SbItr != SbList.end(); ++SbItr) {
+			if (Address.GetBasic()->BaseAddress == (*SbItr)->GetBasic()->BaseAddress) {
+				OverlappingSections.push_back(*SectItr);
+			}
+		}
+	}
+
+	return OverlappingSections;
+}
+
+PeVm::Body::PebModule::PebModule(HANDLE hProcess, uint8_t* pModBase) {
+	if (hProcess != nullptr) {
+		if (GetModuleInformation(hProcess, (HMODULE)pModBase, &this->Info, sizeof(this->Info))) {
+			wchar_t ModuleName[MAX_PATH + 1] = { 0 }, ModulePath[MAX_PATH + 1] = { 0 };
+
+			if (GetModuleBaseNameW(hProcess, (HMODULE)pModBase, ModuleName, MAX_PATH + 1)) {
+				this->Name = ModuleName;
+			}
+
+			if (GetModuleFileNameExW(hProcess, (HMODULE)pModBase, ModulePath, MAX_PATH + 1)) {
+				this->Path = ModulePath;
+			}
+
+			this->Missing = false;
+		}
+		else {
+			this->Missing = true;
+		}
+	}
+}
+
+PeVm::Component::Component(HANDLE hProcess, std::vector<Subregion*> Subregions, uint8_t* pPeBuf) : Region(hProcess, Subregions), PeFile(pPeBuf) {}
+
+PeVm::Section::Section(HANDLE hProcess, vector<Subregion*> Subregions, IMAGE_SECTION_HEADER* SectHdr, uint8_t* pPeBuf) : Region(hProcess, Subregions), PeVm::Component(hProcess, Subregions, pPeBuf) {
+	memcpy(&this->Hdr, SectHdr, sizeof(IMAGE_SECTION_HEADER));
+	this->EntitySize = this->Hdr.SizeOfRawData == 0 ? this->Hdr.Misc.VirtualSize : this->Hdr.SizeOfRawData; // Overwrite default size determined by sblocks. Verified correct order.
+}
+
+MappedFile::MappedFile(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* FilePath, bool bMemStore) : Region(hProcess, Subregions), MapFileBase(new FileBase(FilePath, bMemStore, false)) {}
+
+MappedFile::~MappedFile() {
+	delete this->MapFileBase;
+}
+
+Region::Region(HANDLE hProcess, vector<Subregion*> Subregions) { // Removed as a temporary performance optimization since the region info is not being used during detailed enumeration
+	/*
+	if (Subregions.front()->GetBasic()->State == MEM_COMMIT) {
+		static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory");
+		this->RegionInfo = new MEMORY_REGION_INFORMATION;
+		NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, Subregions.front()->GetBasic()->AllocationBase, MemoryRegionInformation, this->RegionInfo, sizeof(MEMORY_REGION_INFORMATION), nullptr);
+
+		if (!NT_SUCCESS(NtStatus)) {
+			delete this->RegionInfo;
+			this->RegionInfo = nullptr;
+			printf("- Failed to query region information at 0x%p (0x%08x)\r\n", Subregions.front()->GetBasic()->AllocationBase, NtStatus);
+			system("pause");
+		}
+	}
+	*/
+
+	SetSubregions(Subregions);
+}
 
 Entity* Entity::Create(HANDLE hProcess, std::vector<Subregion*> Subregions) {
 	Entity* pNewEntity = nullptr;
 
 	if (Subregions.front()->GetBasic()->Type == MEM_MAPPED || Subregions.front()->GetBasic()->Type == MEM_IMAGE) {
 		wchar_t DevFilePath[MAX_PATH + 1] = { 0 };
-		wchar_t MapFilePath[MAX_PATH + 1] = { 0 };
+		wchar_t MaFilePath[MAX_PATH + 1] = { 0 };
 
 		if (GetMappedFileNameW(hProcess, (HMODULE)Subregions.front()->GetBasic()->BaseAddress, DevFilePath, MAX_PATH)) {
-			if (!FileBase::TranslateDevicePath(DevFilePath, MapFilePath)) {
-				Interface::Log("! Failed to translate device path: %ws\r\n", DevFilePath);
-				wcscpy_s(MapFilePath, MAX_PATH + 1, L"?");
+			if (!FileBase::TranslateDevicePath(DevFilePath, MaFilePath)) {
+				Interface::Log(VerbosityLevel::Debug, "! Failed to translate device path: %ws\r\n", DevFilePath);
+				wcscpy_s(MaFilePath, MAX_PATH + 1, L"?");
 			}
 		}
 		else {
 			if (Subregions.front()->GetBasic()->Type == MEM_MAPPED) {
-				wcscpy_s(MapFilePath, MAX_PATH + 1, L"Page File");
+				wcscpy_s(MaFilePath, MAX_PATH + 1, L"Page File");
 			}
 			else {
 				//Interface::Log("! Phantom image section detected.\r\n");
-				wcscpy_s(MapFilePath, MAX_PATH + 1, L"?");
+				wcscpy_s(MaFilePath, MAX_PATH + 1, L"?");
 			}
 		}
 
 		if (Subregions.front()->GetBasic()->Type == MEM_MAPPED) {
-			pNewEntity = new MappedFile(hProcess, Subregions, MapFilePath);
+			pNewEntity = new MappedFile(hProcess, Subregions, MaFilePath);
 		}
 		else if (Subregions.front()->GetBasic()->Type == MEM_IMAGE) {
-			pNewEntity = new PeVm::Body(hProcess, Subregions, MapFilePath);
+			pNewEntity = new PeVm::Body(hProcess, Subregions, MaFilePath);
 		}
 	}
 	else {
-		pNewEntity = new ABlock(hProcess, Subregions);
+		pNewEntity = new Region(hProcess, Subregions);
 	}
 
 	return pNewEntity;
@@ -241,8 +228,8 @@ bool Entity::Dump(MemDump& ProcDmp, Entity& Target) {
 
 	for (vector<Subregion*>::iterator SbItr = Subregions.begin(); SbItr != Subregions.end(); ++SbItr) {
 		if ((*SbItr)->GetBasic()->State == MEM_COMMIT) {
-			wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
-			if (ProcDmp.Create(DumpFolder, (*SbItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
+			wchar_t DumFilePath[MAX_PATH + 1] = { 0 };
+			if (ProcDmp.Create(DumpFolder, (*SbItr)->GetBasic(), DumFilePath, MAX_PATH + 1)) {
 				nDumpCount++;
 			}
 		}
@@ -251,18 +238,20 @@ bool Entity::Dump(MemDump& ProcDmp, Entity& Target) {
 	return nDumpCount ? true : false;
 }
 
-vector<PeVm::Section*> PeVm::Body::FindOverlapSect(Subregion& Address) {
-	vector<PeVm::Section*> OverlappingSections;
-
-	for (vector<Section*>::const_iterator SectItr = this->Sections.begin(); SectItr != this->Sections.end(); ++SectItr) {
-		vector<Subregion*> SbList = (*SectItr)->GetSubregions();
-		for (vector<Subregion*>::const_iterator SbItr = SbList.begin(); SbItr != SbList.end(); ++SbItr) {
-			//if (Address.GetBasic()->BaseAddress >= (*SbItr)->GetBasic()->BaseAddress && reinterpret_cast<uint8_t *>(Address.GetBasic()->BaseAddress) < (reinterpret_cast<uint8_t*>((*SbItr)->GetBasic()->BaseAddress) + (*SbItr)->GetBasic()->RegionSize)) {
-			if (Address.GetBasic()->BaseAddress == (*SbItr)->GetBasic()->BaseAddress) {
-				OverlappingSections.push_back(*SectItr);
-			}
-		}
+Entity::~Entity() {
+	for (vector<Subregion*>::const_iterator Itr = this->Subregions.begin(); Itr != this->Subregions.end(); ++Itr) {
+		delete* Itr;
 	}
+	/*
+	if (RegionInfo != nullptr) {
+		delete this->RegionInfo;
+	}
+	*/
+}
 
-	return OverlappingSections;
+void Entity::SetSubregions(vector<Subregion*> Subregions) {
+	this->Subregions = Subregions;
+	this->StartVa = (uint8_t*)(Subregions.front())->GetBasic()->BaseAddress;
+	this->EndVa = ((uint8_t*)(Subregions.back())->GetBasic()->BaseAddress + (Subregions.back())->GetBasic()->RegionSize);
+	this->EntitySize = ((uint8_t*)(Subregions.back())->GetBasic()->BaseAddress + (Subregions.back())->GetBasic()->RegionSize) - (Subregions.front())->GetBasic()->BaseAddress;
 }

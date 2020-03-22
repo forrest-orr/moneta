@@ -43,7 +43,7 @@ bool Suspicion::IsFullEntitySuspicion() {
 }
 
 wstring Suspicion::GetDescription() {
-	switch (this->SspType) {
+	switch (this->SuspicionType) {
 	case MODIFIED_CODE: return L"Modified code";
 	case UNSIGNED_MODULE: return L"Unsigned module";
 	case MISSING_PEB_MODULE: return L"Missing PEB module";
@@ -57,7 +57,7 @@ wstring Suspicion::GetDescription() {
 	}
 }
 
-Suspicion::Suspicion(Process* ParentProc, Entity* ParentObj, Subregion* Block, Suspicion::Type Type) : ParentProcess(ParentProc), ParentObject(ParentObj), Block(Block), SspType(Type) {}
+Suspicion::Suspicion(Process* ParentProc, Entity* ParentObj, Subregion* Block, Suspicion::Type Type) : ParentProcess(ParentProc), ParentObject(ParentObj), Block(Block), SuspicionType(Type) {}
 
 void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>& SuspicionsMap) {
 	for (map <uint8_t*, map<uint8_t*, list<Suspicion *>>>::const_iterator AbMapItr = SuspicionsMap.begin(); AbMapItr != SuspicionsMap.end(); ++AbMapItr) {

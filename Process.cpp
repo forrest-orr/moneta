@@ -29,7 +29,7 @@ Process::~Process() {
 			delete dynamic_cast<MappedFile*>(Itr->second);
 		}
 		else {
-			delete dynamic_cast<ABlock*>(Itr->second);;
+			delete dynamic_cast<Region*>(Itr->second);;
 		}
 	}
 }
@@ -132,7 +132,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		//system("pause");
 		SIZE_T cbRegionSize = 0;
 		vector<Subregion*> Subregions;
-		vector<Subregion*>::iterator ABlock;
+		vector<Subregion*>::iterator Region;
 		//Entity* CurrentEntity = nullptr;
 
 		//Loop memory, building list of Subregions. Once a block is found which does not match the "current" allocation base, create a new entity containing the corresponding sblock list, and insert it into the address space entities map using the ablock as the key.
@@ -140,10 +140,10 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		//if (this->Pid == 3272) system("pause");
 
 		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += cbRegionSize) {
-			MEMORY_BASIC_INFORMATION* pMbi = new MEMORY_BASIC_INFORMATION;
+			MEMORY_BASIC_INFORMATION* Mbi = new MEMORY_BASIC_INFORMATION;
 
-			if (VirtualQueryEx(this->Handle, pBaseAddr, (MEMORY_BASIC_INFORMATION*)pMbi, sizeof(MEMORY_BASIC_INFORMATION)) == sizeof(MEMORY_BASIC_INFORMATION)) {
-				cbRegionSize = pMbi->RegionSize;
+			if (VirtualQueryEx(this->Handle, pBaseAddr, (MEMORY_BASIC_INFORMATION*)Mbi, sizeof(MEMORY_BASIC_INFORMATION)) == sizeof(MEMORY_BASIC_INFORMATION)) {
+				cbRegionSize = Mbi->RegionSize;
 
 				if (!Subregions.empty()) { // If the sblock list is empty then there is no ablock for comparison
 					//
@@ -152,31 +152,31 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 
 					Interface::Log(VerbosityLevel::Debug, "Sblock list not empty\r\n");
 
-					if (pMbi->AllocationBase != (*ABlock)->GetBasic()->AllocationBase) {
+					if (Mbi->AllocationBase != (*Region)->GetBasic()->AllocationBase) {
 						Interface::Log(VerbosityLevel::Debug, "Found a new ablock. Saving sblock list to new entity entry.\r\n");
-						this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, Entity::Create(this->Handle, Subregions)));
+						this->Entities.insert(make_pair((uint8_t*)(*Region)->GetBasic()->AllocationBase, Entity::Create(this->Handle, Subregions)));
 						Subregions.clear();
 					}
 					//Interface::Log("done2\r\n");
 				}
 
 				Interface::Log(VerbosityLevel::Debug, "Adding mew sblock to list\r\n");
-				Subregions.push_back(new Subregion(this->Handle, (MEMORY_BASIC_INFORMATION*)pMbi, this->Threads));
-				ABlock = Subregions.begin(); // This DOES fix a bug.
+				Subregions.push_back(new Subregion(this->Handle, (MEMORY_BASIC_INFORMATION*)Mbi, this->Threads));
+				Region = Subregions.begin(); // This DOES fix a bug.
 			}
 			else {
 				Interface::Log(VerbosityLevel::Debug, "VirtualQuery failed\r\n");
 				//system("pause");
-				delete pMbi;
+				delete Mbi;
 				if (!Subregions.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
-					this->Entities.insert(make_pair((uint8_t*)(*ABlock)->GetBasic()->AllocationBase, Entity::Create(this->Handle, Subregions)));
+					this->Entities.insert(make_pair((uint8_t*)(*Region)->GetBasic()->AllocationBase, Entity::Create(this->Handle, Subregions)));
 				}
 				//Interface::Log("done\r\n");
 				break;
 			}
 		}
 
-		//this->PermissionRecords = new MemoryPermissionRecord(this->Blocks); // Initialize 
+		//this->PermissionRecords = new PermissionRecord(this->Blocks); // Initialize 
 		//CloseHandle(hProcess);
 	}
 	else {
@@ -373,12 +373,12 @@ int32_t SubEntitySuspCount(map<uint8_t*, list<Suspicion*>>* pSbMap, uint8_t* pSb
 	return nCount;
 }
 
-bool Process::DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION *pMbi, wstring Indent) {
-	wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
+bool Process::DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION *Mbi, wstring Indent) {
+	wchar_t DumFilePath[MAX_PATH + 1] = { 0 };
 
-	if (pMbi->State == MEM_COMMIT) {
-		if (ProcDmp.Create(pMbi, DumpFilePath, MAX_PATH + 1)) {
-			Interface::Log("%ws~ Memory dumped to %ws\r\n", Indent.c_str(), DumpFilePath);
+	if (Mbi->State == MEM_COMMIT) {
+		if (ProcDmp.Create(Mbi, DumFilePath, MAX_PATH + 1)) {
+			Interface::Log("%ws~ Memory dumped to %ws\r\n", Indent.c_str(), DumFilePath);
 			return true;
 		}
 		else {
@@ -411,7 +411,7 @@ bool Process::DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION *pMbi, wstrin
 10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
 */
 
-vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType MemSelectType, uint8_t *pSelectSblock) {
+vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t MemSelectType, uint8_t *pSelectAddress) {
 	bool bShownProc = false;
 	MemDump ProcDmp(this->Handle, this->Pid);
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
@@ -446,9 +446,9 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType M
 			pSbMap = &SuspicionsMap.at(Itr->second->GetStartVa());
 		}
 
-		if (MemSelectType == MemorySelectionType::All ||
-			(MemSelectType == MemorySelectionType::Block && ((pSelectSblock >= Itr->second->GetStartVa()) && (pSelectSblock < Itr->second->GetEndVa()))) ||
-			(MemSelectType == MemorySelectionType::Suspicious && AbMapItr != SuspicionsMap.end())) {
+		if (MemSelectType == MemorySelection_t::All ||
+			(MemSelectType == MemorySelection_t::Block && ((pSelectAddress >= Itr->second->GetStartVa()) && (pSelectAddress < Itr->second->GetEndVa()))) ||
+			(MemSelectType == MemorySelection_t::Suspicious && AbMapItr != SuspicionsMap.end())) {
 
 			//
 			// Display process and/or entity information: the criteria has already been met for this to be done without further checks
@@ -555,9 +555,9 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType M
 			vector<Subregion*> Subregions = Itr->second->GetSubregions();
 
 			for (vector<Subregion*>::iterator SbItr = Subregions.begin(); SbItr != Subregions.end(); ++SbItr) {
-				if (MemSelectType == MemorySelectionType::All ||
-					(MemSelectType == MemorySelectionType::Block && (pSelectSblock == (*SbItr)->GetBasic()->BaseAddress || (qwOptFlags & MONETA_FLAG_FROM_BASE))) ||
-					(MemSelectType == MemorySelectionType::Suspicious && ((qwOptFlags & MONETA_FLAG_FROM_BASE) || 
+				if (MemSelectType == MemorySelection_t::All ||
+					(MemSelectType == MemorySelection_t::Block && (pSelectAddress == (*SbItr)->GetBasic()->BaseAddress || (qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE))) ||
+					(MemSelectType == MemorySelection_t::Suspicious && ((qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE) || 
 																		  (pSbMap != nullptr &&
 																		   pSbMap->count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) &&
 																		   SubEntitySuspCount(pSbMap, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress) > 0))) {
@@ -617,8 +617,8 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType M
 
 					EnumerateThreads(L"      ", (*SbItr)->GetThreads());
 
-					if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {
-						if (!(qwOptFlags & MONETA_FLAG_FROM_BASE)) {
+					if ((qwOptFlags & PROCESS_ENUM_FLAG_MEMDUMP)) {
+						if (!(qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE)) {
 							this->DumpBlock(ProcDmp, (*SbItr)->GetBasic(), L"      ");
 						}
 					}
@@ -627,8 +627,8 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType M
 				}
 			}
 
-			if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {
-				if ((qwOptFlags & MONETA_FLAG_FROM_BASE)) {
+			if ((qwOptFlags & PROCESS_ENUM_FLAG_MEMDUMP)) {
+				if ((qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE)) {
 					if (Entity::Dump(ProcDmp, *Itr->second)) {
 						Interface::Log("      ~ Generated full region dump at 0x%p\r\n", Itr->second->GetStartVa());
 					}

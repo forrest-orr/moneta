@@ -167,7 +167,7 @@ bool VerifyEmbeddedSignature(LPCWSTR pwszSourceFile) {
     return bSigned;
 }
 
-wchar_t* GetWindowsPECatalogIssuer(const wchar_t* pTargetFilePath)
+wchar_t* GetWindowsPECatalogIssuer(const wchar_t* TargetFilePath)
 {
     uint32_t dwEncoding = 0, dwContentType = 0, dwFormatType = 0, dwHashSize = 0, dwSignerInfoSize, dwCertNameLength;
     HCERTSTORE hCertStore = NULL;
@@ -185,7 +185,7 @@ wchar_t* GetWindowsPECatalogIssuer(const wchar_t* pTargetFilePath)
 
     if (CryptCATAdminAcquireContext(&hCatalogContext, NULL, 0))
     {
-        if ((hFile = CreateFileW(pTargetFilePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE)
+        if ((hFile = CreateFileW(TargetFilePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE)
         {
             if (CryptCATAdminCalcHashFromFileHandle(hFile, (PDWORD)&dwHashSize, NULL, 0) && dwHashSize != 0)
             {
@@ -256,12 +256,12 @@ wchar_t* GetWindowsPECatalogIssuer(const wchar_t* pTargetFilePath)
     return pCerificateIssuer;
 }
 
-BOOL IsCatalogSigned(const wchar_t* pTargetFilePath)
+BOOL IsCatalogSigned(const wchar_t* TargetFilePath)
 {
     wchar_t* pCerificateIssuer;
     BOOL bIsSigned = FALSE;
 
-    if ((pCerificateIssuer = GetWindowsPECatalogIssuer(pTargetFilePath)) != NULL)
+    if ((pCerificateIssuer = GetWindowsPECatalogIssuer(TargetFilePath)) != NULL)
     {
         bIsSigned = TRUE;
         delete pCerificateIssuer;
@@ -270,9 +270,9 @@ BOOL IsCatalogSigned(const wchar_t* pTargetFilePath)
     return bIsSigned;
 }
 
-bool CheckSigning(const wchar_t* pTargetFilePath) {
-    if (!VerifyEmbeddedSignature(pTargetFilePath)) {
-        return IsCatalogSigned(pTargetFilePath);
+bool CheckSigning(const wchar_t* TargetFilePath) {
+    if (!VerifyEmbeddedSignature(TargetFilePath)) {
+        return IsCatalogSigned(TargetFilePath);
     }
     else {
         return true;

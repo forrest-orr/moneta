@@ -3,8 +3,8 @@
 
 using namespace std;
 
-FileBase::FileBase(wstring DesiredPath, uint8_t* pDataBuf, uint32_t dwSize) : Path(DesiredPath), FileData(new uint8_t[dwSize]), FileSize(dwSize) {
-	memcpy(this->FileData, pDataBuf, dwSize);
+FileBase::FileBase(wstring DesiredPath, uint8_t* DataBuf, uint32_t dwSize) : Path(DesiredPath), FileData(new uint8_t[dwSize]), FileSize(dwSize) {
+	memcpy(this->FileData, DataBuf, dwSize);
 }
 
 bool FileBase::ToDisk(bool bAppend) {
@@ -15,7 +15,7 @@ bool FileBase::ToDisk(bool bAppend) {
 
 	if ((hFile = CreateFileW(this->Path.c_str(), bAppend ? FILE_APPEND_DATA : GENERIC_WRITE, bAppend ? FILE_SHARE_READ : 0, NULL, bAppend ? OPEN_ALWAYS : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)) != INVALID_HANDLE_VALUE) {
 		uint32_t dwBytesWritten;
-		if (WriteFile(hFile, this->GetFileBaseData(), this->GetFileBaseSize(), (PDWORD)&dwBytesWritten, 0)) {
+		if (WriteFile(hFile, this->GetData(), this->GetSize(), (PDWORD)&dwBytesWritten, 0)) {
 			bWritten = true;
 		}
 
@@ -57,7 +57,7 @@ FileBase::~FileBase() {
 	}
 }
 
-bool FileBase::TranslateDevicePath(const wchar_t* pDevicePath, wchar_t* pTranslatedPath) {
+bool FileBase::TranslateDevicePath(const wchar_t* DevicePath, wchar_t* TranslatedPath) {
 	wchar_t DriveLetters[MAX_PATH + 1] = { 0 };
 	bool bTranslated = false;
 
@@ -70,10 +70,10 @@ bool FileBase::TranslateDevicePath(const wchar_t* pDevicePath, wchar_t* pTransla
 			*szDrive = *p;
 
 			if (QueryDosDeviceW(szDrive, DosPath, MAX_PATH + 1)) {
-				if (_wcsnicmp(pDevicePath, DosPath, wcslen(DosPath)) == 0) {
-					wcscpy_s(pTranslatedPath, MAX_PATH + 1, szDrive);
-					//wcscat_s(pTranslatedPath, MAX_PATH + 1, L"\\");
-					wcscat_s(pTranslatedPath, MAX_PATH + 1, pDevicePath + wcslen(DosPath));
+				if (_wcsnicmp(DevicePath, DosPath, wcslen(DosPath)) == 0) {
+					wcscpy_s(TranslatedPath, MAX_PATH + 1, szDrive);
+					//wcscat_s(TranslatedPath, MAX_PATH + 1, L"\\");
+					wcscat_s(TranslatedPath, MAX_PATH + 1, DevicePath + wcslen(DosPath));
 					bTranslated = true;
 				}
 			}
@@ -87,16 +87,16 @@ bool FileBase::TranslateDevicePath(const wchar_t* pDevicePath, wchar_t* pTransla
 
 #define MAX_ENV_VAR_SIZE 32767
 
-bool FileBase::ArchWow64PathExpand(const wchar_t* pTargetFilePath, wchar_t* pOutputPath, size_t OutputPathLength) {
+bool FileBase::ArchWow64PathExpand(const wchar_t* TargetFilePath, wchar_t* OutputPath, size_t ccOutputPathLength) {
 	bool bExpandedPath = false;
 	uint64_t qwPathLength;
-	wchar_t* pProgFilePath64, * pProgFilePathWow64;
+	wchar_t* ProgFilePath64, * ProgFilePathWow64;
 	wchar_t SystemDirectory[MAX_PATH + 1] = { 0 }, SysWow64Directory[MAX_PATH + 1] = { 0 }, ExpandedTargetPath[MAX_PATH + 1] = { 0 };
 	SYSTEM_INFO SystemInfo = { 0 };
 
-	if (ExpandEnvironmentStringsW(pTargetFilePath, ExpandedTargetPath, MAX_PATH + 1)) {
+	if (ExpandEnvironmentStringsW(TargetFilePath, ExpandedTargetPath, MAX_PATH + 1)) {
 		bExpandedPath = true;
-		wcscpy_s(pOutputPath, OutputPathLength, ExpandedTargetPath);
+		wcscpy_s(OutputPath, ccOutputPathLength, ExpandedTargetPath);
 
 		GetNativeSystemInfo(&SystemInfo); // Native version of this call works on both Wow64 and x64 as opposed to just x64 for GetSystemInfo. Works on XP+
 
@@ -107,36 +107,36 @@ bool FileBase::ArchWow64PathExpand(const wchar_t* pTargetFilePath, wchar_t* pOut
 
 			if ((qwPathLength = GetSystemWow64DirectoryW(SysWow64Directory, MAX_PATH + 1))) {
 				if ((qwPathLength = GetSystemDirectoryW(SystemDirectory, MAX_PATH + 1))) {
-					pProgFilePath64 = (wchar_t*)new uint8_t[MAX_ENV_VAR_SIZE]; // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
+					ProgFilePath64 = (wchar_t*)new uint8_t[MAX_ENV_VAR_SIZE]; // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
 
-					if ((qwPathLength = GetEnvironmentVariableW(L"ProgramW6432", pProgFilePath64, MAX_ENV_VAR_SIZE))) {
-						pProgFilePathWow64 = (wchar_t*)new uint8_t[MAX_ENV_VAR_SIZE]; // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
+					if ((qwPathLength = GetEnvironmentVariableW(L"ProgramW6432", ProgFilePath64, MAX_ENV_VAR_SIZE))) {
+						ProgFilePathWow64 = (wchar_t*)new uint8_t[MAX_ENV_VAR_SIZE]; // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
 
-						if ((qwPathLength = GetEnvironmentVariableW(L"ProgramFiles(x86)", pProgFilePathWow64, MAX_ENV_VAR_SIZE))) {
+						if ((qwPathLength = GetEnvironmentVariableW(L"ProgramFiles(x86)", ProgFilePathWow64, MAX_ENV_VAR_SIZE))) {
 							//
 							// Is the target path within one of the two ambiguous architecture directories?
 							//
 
-							if (_wcsnicmp(pProgFilePathWow64, ExpandedTargetPath, wcslen(pProgFilePathWow64)) == 0) {
+							if (_wcsnicmp(ProgFilePathWow64, ExpandedTargetPath, wcslen(ProgFilePathWow64)) == 0) {
 								// The target path is already within the Wow64 program files path. Do nothing.
 							}
 							else if (_wcsnicmp(SysWow64Directory, ExpandedTargetPath, wcslen(SysWow64Directory)) == 0) {
 								// The target path is already within the Wow64 system path. Do nothing.
 							}
 							else if (_wcsnicmp(SystemDirectory, ExpandedTargetPath, wcslen(SystemDirectory)) == 0) {
-								wcscpy_s(pOutputPath, OutputPathLength, SysWow64Directory);
-								wcscat_s(pOutputPath, OutputPathLength, ExpandedTargetPath + wcslen(SystemDirectory));
+								wcscpy_s(OutputPath, ccOutputPathLength, SysWow64Directory);
+								wcscat_s(OutputPath, ccOutputPathLength, ExpandedTargetPath + wcslen(SystemDirectory));
 							}
-							else if (_wcsnicmp(pProgFilePath64, ExpandedTargetPath, wcslen(pProgFilePath64)) == 0) {
-								wcscpy_s(pOutputPath, OutputPathLength, pProgFilePathWow64);
-								wcscat_s(pOutputPath, OutputPathLength, ExpandedTargetPath + wcslen(pProgFilePath64));
+							else if (_wcsnicmp(ProgFilePath64, ExpandedTargetPath, wcslen(ProgFilePath64)) == 0) {
+								wcscpy_s(OutputPath, ccOutputPathLength, ProgFilePathWow64);
+								wcscat_s(OutputPath, ccOutputPathLength, ExpandedTargetPath + wcslen(ProgFilePath64));
 							}
 						}
 
-						delete[] pProgFilePathWow64;
+						delete[] ProgFilePathWow64;
 					}
 
-					delete[] pProgFilePath64;
+					delete[] ProgFilePath64;
 				}
 			}
 		}

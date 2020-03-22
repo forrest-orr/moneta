@@ -6,12 +6,12 @@
 using namespace std;
 
 PeFile::PeFile(
-	uint8_t* pPeFileBuf,
+	uint8_t* pPeBuf,
 	uint32_t dwPeFileSize) :
 	Data(new uint8_t[dwPeFileSize]),
 	Size(dwPeFileSize)
 {
-	memcpy(this->Data, pPeFileBuf, dwPeFileSize);
+	memcpy(this->Data, pPeBuf, dwPeFileSize);
 	this->DosHdr = (IMAGE_DOS_HEADER*)this->Data;
 	this->FileHdr = (IMAGE_FILE_HEADER*)((uint8_t*)this->DosHdr + this->DosHdr->e_lfanew + sizeof(LONG));
 }
@@ -20,21 +20,21 @@ PeFile::~PeFile() {
 	delete this->Data;
 }
 
-PeFile* PeFile::Load(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) { // Factory method for derived 32/64-bit classes
-	assert(pPeFileBuf != nullptr);
+PeFile* PeFile::Load(uint8_t* pPeBuf, uint32_t dwPeFileSize) { // Factory method for derived 32/64-bit classes
+	assert(pPeBuf != nullptr);
 	assert(dwPeFileSize);
 
 	PeFile* NewPe = nullptr;
 
-	if (*(uint16_t*)&pPeFileBuf[0] == 'ZM') {
-		PIMAGE_DOS_HEADER pDosHdr = (PIMAGE_DOS_HEADER)pPeFileBuf;
-		IMAGE_FILE_HEADER* pFileHdr = (IMAGE_FILE_HEADER*)(pPeFileBuf + pDosHdr->e_lfanew + sizeof(LONG));
+	if (*(uint16_t*)&pPeBuf[0] == 'ZM') {
+		PIMAGE_DOS_HEADER pDosHdr = (PIMAGE_DOS_HEADER)pPeBuf;
+		IMAGE_FILE_HEADER* pFileHdr = (IMAGE_FILE_HEADER*)(pPeBuf + pDosHdr->e_lfanew + sizeof(LONG));
 
 		if (pFileHdr->Machine == IMAGE_FILE_MACHINE_I386) {
-			NewPe = new PeArch32(pPeFileBuf, dwPeFileSize);
+			NewPe = new PeArch32(pPeBuf, dwPeFileSize);
 		}
 		else if (pFileHdr->Machine == IMAGE_FILE_MACHINE_AMD64) {
-			NewPe = new PeArch64(pPeFileBuf, dwPeFileSize);
+			NewPe = new PeArch64(pPeBuf, dwPeFileSize);
 		}
 
 		if (NewPe != nullptr) {
@@ -100,7 +100,7 @@ PeFile* PeFile::Load(const wstring PeFilePath) {
 // Primary derived architecture class
 //
 
-template<typename NtHdrType> PeArch<NtHdrType>::PeArch(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) : PeFile(pPeFileBuf, dwPeFileSize) {}
+template<typename NtHdrType> PeArch<NtHdrType>::PeArch(uint8_t* pPeBuf, uint32_t dwPeFileSize) : PeFile(pPeBuf, dwPeFileSize) {}
 
 template<typename NtHdrType> NtHdrType* PeArch<NtHdrType>::GetNtHdrs() {
 	assert(this->DosHdr != nullptr);
@@ -191,13 +191,13 @@ template<typename NtHdrType> uint8_t* PeArch<NtHdrType>::GetEntryPoint() {
 // Derived 32-bit
 //
 
-PeArch32::PeArch32(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) :
-	PeArch<IMAGE_NT_HEADERS32>(pPeFileBuf, dwPeFileSize)
+PeArch32::PeArch32(uint8_t* pPeBuf, uint32_t dwPeFileSize) :
+	PeArch<IMAGE_NT_HEADERS32>(pPeBuf, dwPeFileSize)
 {}
 
 //
 // Derived 64-bit
 //
 
-PeArch64::PeArch64(uint8_t* pPeFileBuf, uint32_t dwPeFileSize) :
-	PeArch<IMAGE_NT_HEADERS64>(pPeFileBuf, dwPeFileSize) {}
+PeArch64::PeArch64(uint8_t* pPeBuf, uint32_t dwPeFileSize) :
+	PeArch<IMAGE_NT_HEADERS64>(pPeBuf, dwPeFileSize) {}
