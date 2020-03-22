@@ -13,7 +13,9 @@ Subregion::Subregion(HANDLE hProcess, MEMORY_BASIC_INFORMATION* pMbi, vector<Thr
 		}
 	}
 
-	//this->PrivateSize = Subregion::QueryPrivateSize(hProcess, static_cast<uint8_t*>(this->Basic->BaseAddress), (uint32_t)(this->Basic->RegionSize)); // This is the most thorough way to query this data however it is a major performance drain. Working set queries have been moved to only occur on selected subregion blocks.
+	if (pMbi->State == MEM_COMMIT && pMbi->Type != MEM_PRIVATE) {
+		this->PrivateSize = this->QueryPrivateSize(); // This is the most thorough way to query this data however it is a major performance drain. Working set queries have been moved to only occur on selected subregion blocks.
+	}
 }
 
 Subregion::~Subregion() {

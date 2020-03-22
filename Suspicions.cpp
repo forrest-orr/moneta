@@ -134,11 +134,11 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 						for (vector<Subregion*>::iterator SbItr = Subregions.begin(); SbItr != Subregions.end(); ++SbItr) {
 							list<Suspicion *> SbSuspList;
 							list<Suspicion *>& TargetSuspList = (*SbItr)->GetBasic()->BaseAddress == ParentObj.GetStartVa() ? AbSuspList : SbSuspList;
-
+							/*
 							if (!(*SbItr)->GetPrivateSize()) {
 								(*SbItr)->SetPrivateSize((*SbItr)->QueryPrivateSize()); //Performance optimization: only query the working set on selected regions/subregions. Doing it on every block of enumerated memory slows scans down substantially.
 							}
-
+							*/
 							//
 							// Headers with private pages
 							//

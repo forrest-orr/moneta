@@ -456,7 +456,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType M
 
 			if (!bShownProc) {
 				Interface::Log("\r\n");
-				Interface::Log(ConsoleColor::Turquoise, "%ws", this->Name.c_str()); // 13
+				Interface::Log(ConsoleColor::Turquoise, "%ws", this->Name.c_str());
 				Interface::Log(" : ");
 				Interface::Log(ConsoleColor::Turquoise, "%d", this->GetPid());
 				Interface::Log(" : ");
@@ -467,14 +467,14 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType M
 				bShownProc = true;
 			}
 
-			if(Itr->second->GetSubregions().front()->GetBasic()->State != MEM_FREE)
-			Interface::Log("  0x%p:0x%08x   ", Itr->second->GetStartVa(), Itr->second->GetEntitySize()); // 13
+			if (Itr->second->GetSubregions().front()->GetBasic()->State != MEM_FREE) {
+				Interface::Log("  0x%p:0x%08x   ", Itr->second->GetStartVa(), Itr->second->GetEntitySize());
+			}
+
 			if (Itr->second->GetType() == Entity::Type::PE_FILE) {
 				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
-
-				//Interface::Log(13, "  0x%p:0x%08x", PeEntity->GetPeFile(), PeEntity->GetEntitySize());
-				//Interface::Log("   | ");
 				Interface::Log("| ");
+
 				if (PeEntity->IsNonExecutableImage()) {
 					Interface::Log(ConsoleColor::Gold, "Unexecutable image  "); //11
 					//Interface::Log("  0x%p:0x%08x   | Unexecutable image  | %ws", PeEntity->GetPeFile(), PeEntity->GetEntitySize(), PeEntity->GetFileBase()->GetPath().c_str());
