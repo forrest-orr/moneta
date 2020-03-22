@@ -5,8 +5,6 @@
 
 using namespace std;
 
-// PeFile
-
 PeFile::PeFile(
 	uint8_t* pPeFileBuf,
 	uint32_t dwPeFileSize) :

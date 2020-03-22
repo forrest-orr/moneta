@@ -351,7 +351,7 @@ int32_t AppendOverlapSuspicion(map<uint8_t*, list<Suspicion *>>* pSbMap, uint8_t
 		for (list<Suspicion *>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
 			if (bEntityTop == (*SuspItr)->IsFullEntitySuspicion()) {
 				Interface::Log(" | ");
-				Interface::Log(12, "%ws", (*SuspItr)->GetDescription().c_str());
+				Interface::Log(ConsoleColor::Red, "%ws", (*SuspItr)->GetDescription().c_str());
 			}
 		}
 	}
@@ -456,13 +456,13 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType M
 
 			if (!bShownProc) {
 				Interface::Log("\r\n");
-				Interface::Log(11, "%ws", this->Name.c_str()); // 13
+				Interface::Log(ConsoleColor::Turquoise, "%ws", this->Name.c_str()); // 13
 				Interface::Log(" : ");
-				Interface::Log(11, "%d", this->GetPid());
+				Interface::Log(ConsoleColor::Turquoise, "%d", this->GetPid());
 				Interface::Log(" : ");
-				Interface::Log(11, "%ws", this->IsWow64() ? L"Wow64" : L"x64");
+				Interface::Log(ConsoleColor::Turquoise, "%ws", this->IsWow64() ? L"Wow64" : L"x64");
 				Interface::Log(" : ");
-				Interface::Log(11, "%ws\r\n", this->ImageFilePath.c_str());
+				Interface::Log(ConsoleColor::Turquoise, "%ws\r\n", this->ImageFilePath.c_str());
 				//Interface::Log("]\r\n");
 				bShownProc = true;
 			}
@@ -476,18 +476,18 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType M
 				//Interface::Log("   | ");
 				Interface::Log("| ");
 				if (PeEntity->IsNonExecutableImage()) {
-					Interface::Log(6, "Unexecutable image  "); //11
+					Interface::Log(ConsoleColor::Gold, "Unexecutable image  "); //11
 					//Interface::Log("  0x%p:0x%08x   | Unexecutable image  | %ws", PeEntity->GetPeFile(), PeEntity->GetEntitySize(), PeEntity->GetFileBase()->GetPath().c_str());
 				}
 				else {
-					Interface::Log(6, "Executable image    ");
+					Interface::Log(ConsoleColor::Gold, "Executable image    ");
 					//Interface::Log("  0x%p:0x%08x   | Executable image    | %ws", PeEntity->GetPeFile(), PeEntity->GetEntitySize(), PeEntity->GetFileBase()->GetPath().c_str());
 				}
 				Interface::Log("| %ws", PeEntity->GetFileBase()->GetPath().c_str());
 			}
 			else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
 				Interface::Log("| ");
-				Interface::Log(6, "Mapped");
+				Interface::Log(ConsoleColor::Gold, "Mapped");
 				Interface::Log("   | %ws", dynamic_cast<MappedFile*>(Itr->second)->GetFileBase()->GetPath().c_str());
 			}
 			else {
@@ -495,7 +495,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelectionType M
 				if (Itr->second->GetSubregions().front()->GetBasic()->Type == MEM_PRIVATE) {
 					//Interface::Log(13, "  0x%p:0x%08x   ");
 					Interface::Log("| ");
-					Interface::Log(6, "Private");
+					Interface::Log(ConsoleColor::Gold, "Private");
 				}
 				else {
 					continue;

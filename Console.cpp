@@ -2,7 +2,7 @@
 ____________________________________________________________________________________
 | _______  _____  __   _ _______ _______ _______                                   |
 | |  |  | |     | | \  | |______    |    |_____|                                   |
-| |  |  | |_____| |  \_| |______    |    |     |                                   |                                                               |
+| |  |  | |_____| |  \_| |______    |    |     |                                   |                                                               
 |__________________________________________________________________________________|
 | Moneta ~ Usermode memory scanner & malware hunter                                |
 |----------------------------------------------------------------------------------|
@@ -145,7 +145,14 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		//Interface::Log(wX, "%d ", wX);
 	}
 
-	Interface::Log("\r\n");
+	//Interface::Log("\r\n");
+	Interface::Log(
+		" _______  _____  __   _ _______ _______ _______\r\n"
+		" |  |  | |     | | \\  | |______    |    |_____|\r\n"
+		" |  |  | |_____| |  \\_| |______    |    |     |\r\n"
+		"\r\n"
+		"Moneta v1.0 | Forrest Orr | 2020\r\n"
+	);
 	SYSTEM_INFO SystemInfo = { 0 };
 	typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
 	static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
@@ -241,10 +248,10 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		//
 
 		if (GrantSelfSeDebug()) {
-			Interface::Log("+ Successfully granted SeDebug privilege to self\r\n");
+			Interface::Log(VerbosityLevel::Debug, "+ Successfully granted SeDebug privilege to self\r\n");
 		}
 		else {
-			Interface::Log("- Failed to grant SeDebug privilege to self.\r\n");
+			Interface::Log("- Failed to grant SeDebug privilege to self. Certain processes will be inaccessible.\r\n");
 		}
 
 		if ((qwOptFlags & MONETA_FLAG_MEMDUMP)) {

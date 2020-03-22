@@ -4,6 +4,12 @@ enum class VerbosityLevel {
 	Debug
 };
 
+enum class ConsoleColor {
+	Turquoise = 11,
+	Red = 12,
+	Gold = 6
+};
+
 class Interface
 {
 public:
@@ -12,7 +18,7 @@ public:
 	static void Initialize(std::vector<std::wstring> &Args);
 	static bool Log(VerbosityLevel MsgVlvl, const char *pLogFormat, ...);
 	static bool Log(const char *pLogFormat, ...);
-	static bool Log(WORD wColorAttribute, const char* pLogFormat, ...);
+	static bool Log(ConsoleColor Color, const char* pLogFormat, ...);
 	static HANDLE GetOutputHandle() { return Interface::Handle; }
 	static VerbosityLevel GetVerbosity() { return Interface::VerbosityLvl; }
 private:

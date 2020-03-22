@@ -27,7 +27,7 @@ Memory selection type: -m ["block", "*", or "suspicious"]
 	Selects only the blocks of memory which show suspicious
 	attributes, potential malware artifacts.
 	
-Verbosity level: -v ["detail" or "surface"]
+Verbosity level: -v ["detail", "debug" or "surface"]
   The verbosity level determines how much information about
   selected memory blocks/regions will be displayed.
   
@@ -48,5 +48,5 @@ Memory selection options: --option ["from-base", "statistics"]
 Examples:
 
 Moneta64.exe -p self -m block --address 0x00007FF662470000 -v detail --m-opt from-base
-Moneta64.exe -p * -m process -v surface
+Moneta64.exe -p * -m * -v surface
 Moneta64.exe -p 400 -m suspicious -v surface --m-opt from-base
