@@ -1,28 +1,30 @@
 /*
-____________________________________________________________________________________
-| _______  _____  __   _ _______ _______ _______                                   |
-| |  |  | |     | | \  | |______    |    |_____|                                   |
-| |  |  | |_____| |  \_| |______    |    |     |                                   |                                                               
-|__________________________________________________________________________________|
-| Moneta ~ Usermode memory scanner & malware hunter                                |
-|----------------------------------------------------------------------------------|
-| https://www.forrest-orr.net/post/malicious-memory-artifacts-part-i-dll-hollowing |
-|----------------------------------------------------------------------------------|
-| Author: Forrest Orr - 2019                                                       |
-|----------------------------------------------------------------------------------|
-| Contact: forrest.orr@protonmail.com                                              |
-|----------------------------------------------------------------------------------|
-| Licensed under GNU GPLv3                                                         |
-|__________________________________________________________________________________|
-| ## Features                                                                      |
-|                                                                                  |
-| ~ Query the memory attributes of any accessible process(es).                     |
-| ~ Identify private, mapped and image memory.                                     |
-| ~ Correlate regions of memory to their underlying file on disks.                 |
-| ~ Identify PE headers and sections corresponding to image memory.                |
-| ~ Identify modified regions of mapped image memory.                              |
-| ~ Identify abnormal memory attributes indicative of malware.                     |
-|__________________________________________________________________________________|
+__________________________________________________________________________________________
+| _______  _____  __   _ _______ _______ _______                                         |
+| |  |  | |     | | \  | |______    |    |_____|                                         |
+| |  |  | |_____| |  \_| |______    |    |     |                                         |
+|________________________________________________________________________________________|
+| Moneta ~ Usermode memory scanner & malware hunter                                      |
+|----------------------------------------------------------------------------------------|
+| https://www.forrest-orr.net/post/malicious-memory-artifacts-part-ii-bypassing-scanners |
+|----------------------------------------------------------------------------------------|
+| Author: Forrest Orr - 2020                                                             |
+|----------------------------------------------------------------------------------------|
+| Contact: forrest.orr@protonmail.com                                                    |
+|----------------------------------------------------------------------------------------|
+| Licensed under GNU GPLv3                                                               |
+|________________________________________________________________________________________|
+| ## Features                                                                            |
+|                                                                                        |
+| ~ Query the memory attributes of any accessible process(es).                           |
+| ~ Identify private, mapped and image memory.                                           |
+| ~ Correlate regions of memory to their underlying file on disks.                       |
+| ~ Identify PE headers and sections corresponding to image memory.                      |
+| ~ Identify modified regions of mapped image memory.                                    |
+| ~ Identify abnormal memory attributes indicative of malware.                           |
+| ~ Create memory dumps of user-specified memory ranges                                  |
+| ~ Calculate memory permission/type statistics                                          |
+|________________________________________________________________________________________|
 
 */
 
@@ -37,7 +39,7 @@ ________________________________________________________________________________
 using namespace std;
 using namespace Memory;
 
-enum class SelectedProcessType {
+enum class SelectedProcess_t {
 	InvalidPid = 0,
 	SpecificPid,
 	AllPids,
@@ -175,7 +177,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		Interface::Log("* Usage: %ws see README.md\r\n", pArgv[0]);
 	}
 	else {
-		SelectedProcessType ProcType = SelectedProcessType::InvalidPid;
+		SelectedProcess_t ProcType = SelectedProcess_t::InvalidPid;
 		MemorySelection_t MemSelectType = MemorySelection_t::Invalid;
 		uint32_t dwSelectedPid = 0;
 		uint8_t* pAddress = nullptr;
@@ -186,14 +188,14 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 
 			if (Arg == L"-p") {
 				if (*(i + 1) == L"self") {
-					ProcType = SelectedProcessType::SelfPid;
+					ProcType = SelectedProcess_t::SelfPid;
 					dwSelectedPid = GetCurrentProcessId();
 				}
 				else if (*(i + 1) == L"*") {
-					ProcType = SelectedProcessType::AllPids;
+					ProcType = SelectedProcess_t::AllPids;
 				}
 				else {
-					ProcType = SelectedProcessType::SpecificPid;
+					ProcType = SelectedProcess_t::SpecificPid;
 					dwSelectedPid = _wtoi((*(i + 1)).c_str());
 				}
 			}
@@ -233,7 +235,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		// Validate user input
 		//
 
-		if (ProcType == SelectedProcessType::InvalidPid) {
+		if (ProcType == SelectedProcess_t::InvalidPid) {
 			Interface::Log("- Invalid target process type selected\r\n");
 			return 0;
 		}
@@ -264,7 +266,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 
 		uint64_t qwStartTick = GetTickCount64();
 
-		if (ProcType == SelectedProcessType::SelfPid || ProcType == SelectedProcessType::SpecificPid) {
+		if (ProcType == SelectedProcess_t::SelfPid || ProcType == SelectedProcess_t::SpecificPid) {
 			try {
 				Process TargetProc(dwSelectedPid);
 				vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, pAddress);
