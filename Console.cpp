@@ -149,11 +149,14 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 
 	//Interface::Log("\r\n");
 	Interface::Log(
-		" _______  _____  __   _ _______ _______ _______\r\n"
-		" |  |  | |     | | \\  | |______    |    |_____|\r\n"
-		" |  |  | |_____| |  \\_| |______    |    |     |\r\n"
+		"   _____                        __          \r\n"
+		"  /     \\   ____   ____   _____/  |______   \r\n"
+		" /  \\ /  \\ /  _ \\ /    \\_/ __ \\   __\\__  \\  \r\n"
+		"/    Y    (  <_> )   |  \\  ___/|  |  / __ \\_\r\n"
+		"\\____|__  /\\____/|___|  /\\___  >__| (____  /\r\n"
+		"        \\/            \\/     \\/          \\/ \r\n"
 		"\r\n"
-		"Moneta v1.0 | Forrest Orr | 2020\r\n"
+		"Moneta v1.0 | Forrest Orr | 2020\r\n\r\n"
 	);
 	SYSTEM_INFO SystemInfo = { 0 };
 	typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
@@ -167,14 +170,14 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			GetNativeSystemInfo(&SystemInfo); // Native version of this call works on both Wow64 and x64 as opposed to just x64 for GetSystemInfo. Works on XP+
 
 			if (SystemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 && bSelfWow64) {
-				Interface::Log("- Moneta 32-bit should not be used on a 64-bit OS. Use the x64 version of this tool.\r\n");
+				Interface::Log("... Moneta 32-bit should not be used on a 64-bit OS. Use the x64 version of this tool.\r\n");
 				return 0;
 			}
 		}
 	}
 
 	if (nArgc < 5) {
-		Interface::Log("* Usage: %ws see README.md\r\n", pArgv[0]);
+		Interface::Log("... usage: %ws see README.md\r\n", pArgv[0]);
 	}
 	else {
 		SelectedProcess_t ProcType = SelectedProcess_t::InvalidPid;
@@ -253,7 +256,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			Interface::Log(VerbosityLevel::Debug, "+ Successfully granted SeDebug privilege to self\r\n");
 		}
 		else {
-			Interface::Log("- Failed to grant SeDebug privilege to self. Certain processes will be inaccessible.\r\n");
+			Interface::Log("... Failed to grant SeDebug privilege to self. Certain processes will be inaccessible.\r\n");
 		}
 
 		if ((qwOptFlags & PROCESS_ENUM_FLAG_MEMDUMP)) {
@@ -329,6 +332,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		}
 
 		float fElapsedTime = GetTickCount64() - qwStartTick;
-		Interface::Log("* Scan completed (%f second duration)\r\n", fElapsedTime / 1000.0);
+		Interface::Log("\r\n... scan completed (%f second duration)\r\n", fElapsedTime / 1000.0);
 	}
 }
