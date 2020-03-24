@@ -67,19 +67,9 @@ Process::~Process() {
 #define ThreadQuerySetWin32StartAddress 9
 
 Process::Process(uint32_t dwPid) : Pid(dwPid) {
-	//
-	// Initialize a new entity for each allocation base and add it to this process address space map
-	//
-
 	this->Handle = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
 
 	if (this->Handle != nullptr) {
-		//Interface::Log("* Generating region and subregion blocks.\r\n");
-
-		//
-		//
-		//
-
 		HANDLE hThreadSnap = INVALID_HANDLE_VALUE;
 		THREADENTRY32 ThreadEntry;
 
@@ -91,7 +81,6 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				{
 					if (ThreadEntry.th32OwnerProcessID == this->Pid) {
 						Thread* CurrentThread = new Thread(ThreadEntry.th32ThreadID);
-						//Interface::Log("* TID: 0x%08x\r\n", CurrentThread.GetTid());
 						HANDLE hThread = OpenThread(THREAD_QUERY_INFORMATION, false, CurrentThread->GetTid()); // OpenThreadToken consistently failed even with impersonation (ERROR_NO_TOKEN). The idea was abandoned due to lack of relevance. Get-InjectedThread returns the user as SYSTEM even when it was a regular user which launched the remote thread.
 
 						if (hThread != nullptr) {
@@ -105,7 +94,6 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 
 								if (NT_SUCCESS(NtStatus)) {
 									CurrentThread->SetEntryPoint(pStartAddress);
-									//Interface::Log("* Start address: 0x%p\r\n", CurrentThread.GetEntryPoint());
 								}
 
 								CloseHandle(hDupThread);
@@ -120,7 +108,6 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 
 			CloseHandle(hThreadSnap);
 		}
-		//system("pause");
 
 		wchar_t ImageName[MAX_PATH + 1] = { 0 }, DevFilePath[MAX_PATH + 1] = { 0 };
 
@@ -128,10 +115,9 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 			wchar_t ImageFilePath[MAX_PATH + 1] = { 0 };
 
 			if (FileBase::TranslateDevicePath(DevFilePath, ImageFilePath)) {
-				//printf("Translated %ws to %ws\r\n", DevFilePath, ImageFilePath);
 				this->Name = wstring(ImageName);
 				this->ImageFilePath = wstring(ImageFilePath);
-				Interface::Log(VerbosityLevel::Debug, "* Mapping address space of PID %d [%ws]\r\n", this->Pid, this->Name.c_str());
+				Interface::Log(VerbosityLevel::Debug, "... mapping address space of PID %d [%ws]\r\n", this->Pid, this->Name.c_str());
 				typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
 				static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
 
@@ -141,14 +127,11 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 					if (IsWow64Process(GetCurrentProcess(), (PBOOL)&bSelfWow64)) {
 						if (IsWow64Process(this->Handle, (PBOOL)&this->Wow64)) {
 							if (this->IsWow64()) {
-								//CloseHandle(this->Handle);
-								Interface::Log(VerbosityLevel::Debug, "* PID %d is Wow64\r\n", this->Pid);
-								//system("pause");
-								//throw 2;
+								Interface::Log(VerbosityLevel::Debug, "... PID %d is Wow64\r\n", this->Pid);
 							}
 							else {
 								if (bSelfWow64) {
-									Interface::Log(VerbosityLevel::Debug, "* Cannot scan non-Wow64 process from Wow64 Moneta instance\r\n");
+									Interface::Log(VerbosityLevel::Debug, "... cannot scan non-Wow64 process from Wow64 Moneta instance\r\n");
 									throw 2;
 								}
 							}
@@ -158,16 +141,9 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 			}
 		}
 
-		Interface::Log(VerbosityLevel::Debug, "* Scanning sblocks...\r\n");
-		//system("pause");
 		SIZE_T cbRegionSize = 0;
 		vector<Subregion*> Subregions;
 		vector<Subregion*>::iterator Region;
-		//Entity* CurrentEntity = nullptr;
-
-		//Loop memory, building list of Subregions. Once a block is found which does not match the "current" allocation base, create a new entity containing the corresponding sblock list, and insert it into the address space entities map using the ablock as the key.
-
-		//if (this->Pid == 3272) system("pause");
 
 		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += cbRegionSize) {
 			MEMORY_BASIC_INFORMATION* Mbi = new MEMORY_BASIC_INFORMATION;
@@ -175,46 +151,30 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 			if (VirtualQueryEx(this->Handle, pBaseAddr, (MEMORY_BASIC_INFORMATION*)Mbi, sizeof(MEMORY_BASIC_INFORMATION)) == sizeof(MEMORY_BASIC_INFORMATION)) {
 				cbRegionSize = Mbi->RegionSize;
 
-				if (!Subregions.empty()) { // If the sblock list is empty then there is no ablock for comparison
-					//
-					// In the event that this is a new ablock, create a map pair and insert it into the entities map
-					//
-
-					Interface::Log(VerbosityLevel::Debug, "Sblock list not empty\r\n");
-
+				if (!Subregions.empty()) { // If the subregion list is empty then there is no region base for comparison
 					if (Mbi->AllocationBase != (*Region)->GetBasic()->AllocationBase) {
-						Interface::Log(VerbosityLevel::Debug, "Found a new ablock. Saving sblock list to new entity entry.\r\n");
 						this->Entities.insert(make_pair((uint8_t*)(*Region)->GetBasic()->AllocationBase, Entity::Create(this->Handle, Subregions)));
 						Subregions.clear();
 					}
-					//Interface::Log("done2\r\n");
 				}
 
-				Interface::Log(VerbosityLevel::Debug, "Adding mew sblock to list\r\n");
 				Subregions.push_back(new Subregion(this->Handle, (MEMORY_BASIC_INFORMATION*)Mbi, this->Threads));
 				Region = Subregions.begin(); // This DOES fix a bug.
 			}
 			else {
-				Interface::Log(VerbosityLevel::Debug, "VirtualQuery failed\r\n");
-				//system("pause");
-				delete Mbi;
 				if (!Subregions.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
 					this->Entities.insert(make_pair((uint8_t*)(*Region)->GetBasic()->AllocationBase, Entity::Create(this->Handle, Subregions)));
 				}
-				//Interface::Log("done\r\n");
+
+				delete Mbi;
 				break;
 			}
 		}
-
-		//this->PermissionRecords = new PermissionRecord(this->Blocks); // Initialize 
-		//CloseHandle(hProcess);
 	}
 	else {
-		Interface::Log(VerbosityLevel::Debug, "- Failed to open handle to PID %d\r\n", this->Pid);
-		throw 1; // Not throwing a specific value crashes it
+		Interface::Log(VerbosityLevel::Debug, "... failed to open handle to PID %d\r\n", this->Pid);
+		throw 1;
 	}
-
-	//Interface::Log("* Finished generating region and subregion blocks\r\n");
 }
 
 void AlignName(const wchar_t* pOriginalName, wchar_t* pAlignedName, int32_t nAlignTo) { // Make generic and move to interface?
@@ -236,46 +196,13 @@ void AlignName(const wchar_t* pOriginalName, wchar_t* pAlignedName, int32_t nAli
 	}
 }
 
-/*
-
-ArchWow64PathExpand
-
-The purpose of this function is to receive an unformatted file path (which may
-contain architecture folders or environment variables) and convert the two
-ambiguous architecture directories to Wow64 if applicable.
-
-1. Expand all environment variables.
-2. Check whether the path begins with either of the ambiguous architecture
-folders: C:\Windows\system32, C:\Program Files
-3. If the path does not begin with an ambiguous arch folder return it as is.
-4. If the path does begin with an ambiguous arch folder then convert it to
-the Wow64 equivalent and return it.
-
-Examples:
-
-%programfiles%\example1\example.exe -> C:\Program Files (x86)\example1\example.exe
-C:\Program Files (x86)\example2\example.exe -> C:\Program Files (x86)\example2\example.exe
-C:\Program Files\example3\example.exe -> C:\Program Files (x86)\example3\example.exe
-C:\Windows\system32\notepad.exe -> C:\Windows\syswow64\notepad.exe
-
-*/
-
 void EnumerateThreads(const wstring Indent, vector<Thread*> Threads) {
 	for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
 		Interface::Log("%wsThread 0x%p [TID 0x%08x]\r\n", Indent.c_str(), (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
 	}
 }
 
-/*
-Region map -> Key [Allocation base]
-				-> Suspicions map -> Key [Subregion address]
-									   -> Suspicions list
-*/
-
 int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&SuspicionsMap) {
-	//Interface::Log("* Filtering suspicions...\r\n");
-	//printf("before:\r\n");
-	//Suspicion::EnumerateMap(SuspicionsMap);
 	bool bReWalkMap = false;
 
 	do {
@@ -292,14 +219,16 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 		
 		*/
 		for (map <uint8_t*, map<uint8_t*, list<Suspicion *>>>::const_iterator AbMapItr = SuspicionsMap.begin(); !bReWalkMap && AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
+			/*
+			Region map -> Key [Allocation base]
+							-> Suspicions map -> Key [Subregion address]
+												   -> Suspicions list
+			*/
 			map < uint8_t*, list<Suspicion *>>& RefSbMap = SuspicionsMap.at(AbMapItr->first);
 			int32_t nSbIndex = 0;
 
 			for (map<uint8_t*, list<Suspicion *>>::const_iterator SbMapItr = AbMapItr->second.begin(); !bReWalkMap && SbMapItr != AbMapItr->second.end(); ++SbMapItr, nSbIndex++) {
-				//list<Suspicion *> SuspListCopy = SbMapItr->second;
-				//list<Suspicion *>::const_iterator SuspCopyItr = SuspListCopy.begin();
 				list<Suspicion *>& RefSuspList = RefSbMap.at(SbMapItr->first);
-				//list<Suspicion *>& RefSuspList = reinterpret_cast<list<Suspicion *>>(SbMapItr->second); // Bug: element removed from list which is still being iterated
 				list<Suspicion *>::const_iterator SuspItr = SbMapItr->second.begin();
 
 				for (int32_t nSuspIndex = 0; !bReWalkMap && SuspItr != SbMapItr->second.end(); ++SuspItr, nSuspIndex++) {
@@ -336,12 +265,9 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 
 						if (PeEntity->IsSigned()) {
 							static const wchar_t* pWinmbExt = L".winmd";
-							//if (_wcsnicmp(PeEntity->GetPath().c_str(), Environment::MetadataPath.c_str(), Environment::MetadataPath.length()) == 0 && _wcsicmp(PeEntity->GetPath().c_str() + PeEntity->GetPath().length() - wcslen(pWinmbExt), pWinmbExt) == 0) {
+
 							if (_wcsicmp(PeEntity->GetFileBase()->GetPath().c_str() + PeEntity->GetFileBase()->GetPath().length() - wcslen(pWinmbExt), pWinmbExt) == 0) {
 								if (PeEntity->GetPe() != nullptr && PeEntity->GetPe()->GetEntryPoint() == 0) {
-									//Interface::Log("* %ws is within metadata path\r\n", PeEntity->GetPath().c_str());
-									//system("pause");
-
 									bReWalkMap = true;
 									RefSuspList.erase(SuspItr);
 
@@ -368,9 +294,6 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 		}
 	} while (bReWalkMap);
 
-	//Suspicion::EnumerateMap(SuspicionsMap);
-	//printf("enum done\r\n");
-	//Interface::Log("* Done filtering suspicions.\r\n");
 	return 0;
 }
 
@@ -417,28 +340,27 @@ bool Process::DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION *Mbi, wstring
 		}
 	}
 }
-/*
-1. Loop entities to build suspicions list
-2. Filter suspicions
-3. Loop entities for enumeration if:
-   mselect == process
-   mselect == sblock and this eneity contains the sblock
-   mselect == suspicious and there is 1 or more suspicions
-4. Show the process if it has not been shown before
-5. Display entity info (exe image, private, mapped + total size) ALWAYS (criteria already applied going into loop) along with suspicions (if any)
-5. For PEs, loop sblocks/sections. Enum if:
-	mselect == process
-	mselect == sblock && sblock == current, or the  "from base" option is set
-	or mselect == suspicious and the current sblock has a suspicion or the  "from base" option is set
-6. Dump the current sblock based on the same criteria as above but ONLY if the "from base" option is not set.
-7. Dump the entire PE entity if it met the initial enum criteria and "from base" option is set
-
-8. For private/mapped loop sblocks and enum if:
-	mselect == process
-	mselect == sblock && sblock == current, or the  "from base" option is set
-	or mselect == suspicious and the current sblock has a suspicion or the  "from base" option is set
-9. Dump the current sblock based on the same criteria as above but ONLY if the "from base" option is not set.
-10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
+/* Process memory enumeration
+	1. Loop entities to build suspicions list
+	2. Filter suspicions
+	3. Loop entities for enumeration if:
+	   mselect == process
+	   mselect == sblock and this eneity contains the sblock
+	   mselect == suspicious and there is 1 or more suspicions
+	4. Show the process if it has not been shown before
+	5. Display entity info (exe image, private, mapped + total size) ALWAYS (criteria already applied going into loop) along with suspicions (if any)
+	5. For PEs, loop sblocks/sections. Enum if:
+		mselect == process
+		mselect == sblock && sblock == current, or the  "from base" option is set
+		or mselect == suspicious and the current sblock has a suspicion or the  "from base" option is set
+	6. Dump the current sblock based on the same criteria as above but ONLY if the "from base" option is not set.
+	7. Dump the entire PE entity if it met the initial enum criteria and "from base" option is set
+	8. For private/mapped loop sblocks and enum if:
+		mselect == process
+		mselect == sblock && sblock == current, or the  "from base" option is set
+		or mselect == suspicious and the current sblock has a suspicion or the  "from base" option is set
+	9. Dump the current sblock based on the same criteria as above but ONLY if the "from base" option is not set.
+	10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
 */
 
 vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t MemSelectType, uint8_t *pSelectAddress) {
@@ -452,8 +374,6 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 	// Build suspicions list for following memory selection and apply filters to it.
 	//
 
-	//Interface::Log("* Inspecting/filtering entities...\r\n");
-
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		Suspicion::InspectEntity(*this, *Itr->second, SuspicionsMap);
 	}
@@ -461,8 +381,6 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 	if (SuspicionsMap.size()) {
 		FilterSuspicions(SuspicionsMap);
 	}
-
-	//Interface::Log("* Finished inspecting/filtering entities.\r\n");
 
 	//
 	// Display information on each selected sblock and/or entity within the process address space
@@ -493,7 +411,6 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 				Interface::Log(ConsoleColor::Turquoise, "%ws", this->IsWow64() ? L"Wow64" : L"x64");
 				Interface::Log(" : ");
 				Interface::Log(ConsoleColor::Turquoise, "%ws\r\n", this->ImageFilePath.c_str());
-				//Interface::Log("]\r\n");
 				bShownProc = true;
 			}
 
@@ -506,13 +423,12 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 				Interface::Log("| ");
 
 				if (PeEntity->IsNonExecutableImage()) {
-					Interface::Log(ConsoleColor::Gold, "Unexecutable image  "); //11
-					//Interface::Log("  0x%p:0x%08x   | Unexecutable image  | %ws", PeEntity->GetPeFile(), PeEntity->GetEntitySize(), PeEntity->GetFileBase()->GetPath().c_str());
+					Interface::Log(ConsoleColor::Gold, "Unexecutable image  ");
 				}
 				else {
 					Interface::Log(ConsoleColor::Gold, "Executable image    ");
-					//Interface::Log("  0x%p:0x%08x   | Executable image    | %ws", PeEntity->GetPeFile(), PeEntity->GetEntitySize(), PeEntity->GetFileBase()->GetPath().c_str());
 				}
+
 				Interface::Log("| %ws", PeEntity->GetFileBase()->GetPath().c_str());
 			}
 			else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
@@ -521,9 +437,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 				Interface::Log("   | %ws", dynamic_cast<MappedFile*>(Itr->second)->GetFileBase()->GetPath().c_str());
 			}
 			else {
-				//Interface::Log("  0x%p:0x%08x   | %ws", Itr->second->GetStartVa(), Itr->second->GetEntitySize(), Subregion::AttribDesc(Itr->second->GetSubregions().front()->GetBasic())); // Free memory presents the only exception here, as it has a blank type. While such memory can paint a slightly more detailed picture of a process memory space, it has no allocation base and no type which makes it impossible to parse/enumerate in the style in which this program was written.
 				if (Itr->second->GetSubregions().front()->GetBasic()->Type == MEM_PRIVATE) {
-					//Interface::Log(13, "  0x%p:0x%08x   ");
 					Interface::Log("| ");
 					Interface::Log(ConsoleColor::Gold, "Private");
 				}
@@ -592,12 +506,6 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 																		   pSbMap->count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) &&
 																		   SubEntitySuspCount(pSbMap, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress) > 0))) {
 					wchar_t AlignedAttribDesc[9] = { 0 };
-
-					/*
-					if (!(*SbItr)->GetPrivateSize()) { // Doing this here will not work since private size is needed for suspicion gathering
-						(*SbItr)->SetPrivateSize((*SbItr)->QueryPrivateSize()); //Performance optimization: only query the working set on selected regions/subregions. Doing it on every block of enumerated memory slows scans down substantially.
-					}
-					*/
 
 					AlignName(Subregion::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
 

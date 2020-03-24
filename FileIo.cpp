@@ -63,15 +63,15 @@ bool FileBase::TranslateDevicePath(const wchar_t* DevicePath, wchar_t* Translate
 
 	if (GetLogicalDriveStringsW(MAX_PATH + 1, DriveLetters)) {
 		wchar_t DosPath[MAX_PATH + 1];
-		wchar_t szDrive[3] = L" :";
+		wchar_t DrivePrefix[3] = L" :";
 		wchar_t* p = DriveLetters;
 
 		do {
-			*szDrive = *p;
+			*DrivePrefix = *p;
 
-			if (QueryDosDeviceW(szDrive, DosPath, MAX_PATH + 1)) {
+			if (QueryDosDeviceW(DrivePrefix, DosPath, MAX_PATH + 1)) {
 				if (_wcsnicmp(DevicePath, DosPath, wcslen(DosPath)) == 0) {
-					wcscpy_s(TranslatedPath, MAX_PATH + 1, szDrive);
+					wcscpy_s(TranslatedPath, MAX_PATH + 1, DrivePrefix);
 					//wcscat_s(TranslatedPath, MAX_PATH + 1, L"\\");
 					wcscat_s(TranslatedPath, MAX_PATH + 1, DevicePath + wcslen(DosPath));
 					bTranslated = true;
@@ -84,6 +84,28 @@ bool FileBase::TranslateDevicePath(const wchar_t* DevicePath, wchar_t* Translate
 
 	return bTranslated;
 }
+
+/* ArchWow64PathExpand
+
+The purpose of this function is to receive an unformatted file path (which may
+contain architecture folders or environment variables) and convert the two
+ambiguous architecture directories to Wow64 if applicable.
+
+1. Expand all environment variables.
+2. Check whether the path begins with either of the ambiguous architecture
+folders: C:\Windows\system32, C:\Program Files
+3. If the path does not begin with an ambiguous arch folder return it as is.
+4. If the path does begin with an ambiguous arch folder then convert it to
+the Wow64 equivalent and return it.
+
+Examples:
+
+%programfiles%\example1\example.exe -> C:\Program Files (x86)\example1\example.exe
+C:\Program Files (x86)\example2\example.exe -> C:\Program Files (x86)\example2\example.exe
+C:\Program Files\example3\example.exe -> C:\Program Files (x86)\example3\example.exe
+C:\Windows\system32\notepad.exe -> C:\Windows\syswow64\notepad.exe
+
+*/
 
 #define MAX_ENV_VAR_SIZE 32767
 

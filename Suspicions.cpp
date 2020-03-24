@@ -43,17 +43,6 @@ void EnumerateAll(list<Suspicion *> &SuspicionsList) {
 	for (list<Suspicion *>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
 		Interface::Log("~ ");
 		Interface::Log("%ws", (*SuspItr)->GetDescription().c_str());
-
-		/*
-		switch ((*SuspItr)->GetType()) {
-		case Suspicion::Type::UNSIGNED_MODULE:
-			Interface::Log("%ws", (*SuspItr)->GetDescription().c_str());
-			break;
-		default: 
-			Interface::Log("unknown");
-			break;
-		}*/
-
 		Interface::Log(" within ");
 
 		if ((*SuspItr)->GetBlock() == nullptr) {
@@ -63,7 +52,6 @@ void EnumerateAll(list<Suspicion *> &SuspicionsList) {
 			Interface::Log("block at 0x%p within entity at 0x%p", (*SuspItr)->GetBlock()->GetBasic()->BaseAddress, (*SuspItr)->GetParentObject()->GetStartVa());
 		}
 
-		//Interface::Log(" within %ws:%d [%ws]\r\n", (*SuspItr)->GetProcess()->GetName().c_str(), (*SuspItr)->GetProcess()->GetPid(), (*SuspItr)->GetProcess()->GetImageFilePath().c_str());
 		Interface::Log(" within %ws:%d\r\n", (*SuspItr)->GetProcess()->GetName().c_str(), (*SuspItr)->GetProcess()->GetPid());
 	}
 }
@@ -106,23 +94,19 @@ void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>& S
 	}
 }
 
-/*
+/* Inspect entity: generates a list of suspicions for either a region or subregion
+   + It is important to ensure that all new suspicions are added to the list of the existing map entry even if they share the same base address. This allows the ablock map entry to also hold sblock suspicions such as modified hdr.
+   ~ Create an entry in the primary map with the allocation base as a key and save a reference to the secondary map.
+   ~ Create a suspicion list for the ablock and every sblock, ensuring that sblocks with suspicions which share the ablock address (for example modified headers) are adding their suspicions to the same list so there are not 2 map entries for the ablock address.
+   ~ In the event that no new lists were added to the secondary map, erase the primary map entry. Otherwise, preserve both the primary and secondary map entries.
 
-Generates a list of suspicions for either an ablock or sblock.
-
-Region map -> Key [Allocation base]
-                -> Suspicions map -> Key [Subregion address]
-				                       -> Suspicions list
-
-It is important to ensure that all new suspicions are added to the list of the existing map entry even if they share the same base address. This allows the ablock map entry to also hold sblock suspicions such as modified hdr.
-
-~ Create an entry in the primary map with the allocation base as a key and save a reference to the secondary map.
-~ Create a suspicion list for the ablock and every sblock, ensuring that sblocks with suspicions which share the ablock address (for example modified headers) are adding their suspicions to the same list so there are not 2 map entries for the ablock address.
-~ In the event that no new lists were added to the secondary map, erase the primary map entry. Otherwise, preserve both the primary and secondary map entries.
+	Region map -> Key [Allocation base]
+					-> Suspicions map -> Key [Subregion address]
+										   -> Suspicions list
 
 */
-//MODIFIED_CODE, MODIFIED_HEADER, XMAP, XPRV, UNSIGNED_MODULE, MISSING_PEB_MODULE, MISMATCHING_PEB_MODULE, DISK_PERMISSION_MISMATCH, PHANTOM_IMAGE
-bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, map<uint8_t*, list<Suspicion *>>> &SuspicionsMap) { // Generate suspicions for an entity
+
+bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, map<uint8_t*, list<Suspicion *>>> &SuspicionsMap) {
 	list<Suspicion *> AbSuspList;
 	SuspicionsMap.insert(make_pair(ParentObj.GetStartVa(), map<uint8_t*, list<Suspicion *>>()));
 	map<uint8_t*, list<Suspicion *>>& RefSbMap = SuspicionsMap.at(ParentObj.GetStartVa());
@@ -164,30 +148,14 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 						for (vector<Subregion*>::iterator SbItr = Subregions.begin(); SbItr != Subregions.end(); ++SbItr) {
 							list<Suspicion *> SbSuspList;
 							list<Suspicion *>& TargetSuspList = (*SbItr)->GetBasic()->BaseAddress == ParentObj.GetStartVa() ? AbSuspList : SbSuspList;
-							/*
-							if (!(*SbItr)->GetPrivateSize()) {
-								(*SbItr)->SetPrivateSize((*SbItr)->QueryPrivateSize()); //Performance optimization: only query the working set on selected regions/subregions. Doing it on every block of enumerated memory slows scans down substantially.
-							}
-							*/
-							//
-							// Headers with private pages
-							//
 
 							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && (*SbItr)->GetPrivateSize()) {
 								TargetSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, MODIFIED_HEADER));
 							}
 
-							//
-							// Executable regions within sections that are not marked as executable on disk. For example: data is +rw on disk but has +x sblock
-							//
-
 							if (Subregion::PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
 								TargetSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, DISK_PERMISSION_MISMATCH));
 							}
-
-							//
-							// Executable regions in memory with private pages. Whether their +x is consistent with their section on disk is examined as well.
-							//
 
 							if (Subregion::PageExecutable((*SbItr)->GetBasic()->Protect) && (*SbItr)->GetPrivateSize()) {
 								TargetSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, MODIFIED_CODE));
@@ -247,9 +215,6 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 	if (!RefSbMap.size()) {
 		SuspicionsMap.erase(ParentObj.GetStartVa());
 	}
-
-	//Suspicion::EnumerateMap(SuspicionsMap);
-	//EnumerateAll(SuspicionsList);
 
 	return true;
 }

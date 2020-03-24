@@ -44,7 +44,7 @@ Subregion::Subregion(HANDLE hProcess, MEMORY_BASIC_INFORMATION* Mbi, vector<Thre
 	}
 
 	if (Mbi->State == MEM_COMMIT && Mbi->Type != MEM_PRIVATE) {
-		this->PrivateSize = this->QueryPrivateSize(); // This is the most thorough way to query this data however it is a major performance drain. Working set queries have been moved to only occur on selected subregion blocks.
+		this->PrivateSize = this->QueryPrivateSize(); // Querying the working set is one of the greatest performance drains in the tool and should be done sparingly
 	}
 }
 
@@ -64,73 +64,47 @@ void Subregion::SetPrivateSize(uint32_t dwPrivateSize) {
 
 const wchar_t* Subregion::ProtectSymbol(uint32_t dwProtect) {
 	switch (dwProtect) {
-	case PAGE_READONLY:
-		return L"R";
-	case PAGE_READWRITE:
-		return L"RW";
-	case PAGE_EXECUTE_READ:
-		return L"RX";
-	case PAGE_EXECUTE_READWRITE:
-		return L"RWX";
-	case PAGE_EXECUTE_WRITECOPY:
-		return L"RWXC";
-	case PAGE_EXECUTE:
-		return L"X";
-	case PAGE_WRITECOPY:
-		return L"WC";
-	case PAGE_NOACCESS:
-		return L"NA";
-	case PAGE_WRITECOMBINE:
-		return L"WCB";
-	case PAGE_GUARD:
-		return L"PG";
-	case PAGE_NOCACHE:
-		return L"NC";
-	default: return L"?";
+		case PAGE_READONLY: return L"R";
+		case PAGE_READWRITE: return L"RW";
+		case PAGE_EXECUTE_READ: return L"RX";
+		case PAGE_EXECUTE_READWRITE: return L"RWX";
+		case PAGE_EXECUTE_WRITECOPY: return L"RWXC";
+		case PAGE_EXECUTE: return L"X";
+		case PAGE_WRITECOPY: return L"WC";
+		case PAGE_NOACCESS: return L"NA";
+		case PAGE_WRITECOMBINE: return L"WCB";
+		case (PAGE_GUARD | PAGE_READWRITE): // Typically these flags are never combined: page guard is an exception
+		case PAGE_GUARD: return L"PG";
+		case PAGE_NOCACHE: return L"NC";
+		case 0: return L"-";
+		default:  return L"?";
 	}
 }
 
 const wchar_t* Subregion::StateSymbol(uint32_t dwState) {
-	if (dwState == MEM_COMMIT) {
-		return L"Commit";
-	}
-	else if (dwState == MEM_FREE) {
-		return L"Free";
-	}
-	else if (dwState == MEM_RESERVE) {
-		return L"Reserve";
-	}
-	else {
-		return L"?";
+	switch (dwState) {
+		case MEM_COMMIT: return L"Commit";
+		case MEM_FREE: return L"Free";
+		case MEM_RESERVE: return L"Reserve";
+		default: return L"?";
 	}
 }
 
 const wchar_t* Subregion::AttribDesc(MEMORY_BASIC_INFORMATION* Mbi) {
-	if (Mbi->State == MEM_COMMIT) {
-		return ProtectSymbol(Mbi->Protect);
+	switch (Mbi->State) {
+		case MEM_COMMIT: return ProtectSymbol(Mbi->Protect);
+		case MEM_FREE: return L"Free";
+		case MEM_RESERVE: return L"Reserve";
+		default: return L"?";
 	}
-	else if (Mbi->State == MEM_FREE) {
-		return L"Free";
-	}
-	else if (Mbi->State == MEM_RESERVE) {
-		return L"Reserve";
-	}
-
-	return L"?";
 }
 
 const wchar_t* Subregion::TypeSymbol(uint32_t dwType) {
-	if (dwType == MEM_IMAGE) {
-		return L"IMG";
-	}
-	else if (dwType == MEM_MAPPED) {
-		return L"MAP";
-	}
-	else if (dwType == MEM_PRIVATE) {
-		return L"PRV";
-	}
-	else {
-		return L"?";
+	switch (dwType) {
+		case MEM_IMAGE: return L"IMG";
+		case MEM_MAPPED: return L"MAP";
+		case MEM_PRIVATE: return L"PRV";
+		default: return L"?";
 	}
 }
 
@@ -144,14 +118,12 @@ uint32_t Subregion::QueryPrivateSize() {
 		for (uint32_t dwPageOffset = 0; dwPageOffset < this->Basic->RegionSize; dwPageOffset += 0x1000) {
 			pWorkingSets->VirtualAddress = ((uint8_t*)this->Basic->BaseAddress + dwPageOffset);
 			if (K32QueryWorkingSetEx(this->ProcessHandle, pWorkingSets, dwWorkingSetsSize)) {
-				//Interface::Log("+ Successfully queried working set at 0x%p\r\n", pWorkingSets->VirtualAddress);
 				if (!pWorkingSets->VirtualAttributes.Shared) {
-					//Interface::Log("* Page at 0x%p is shared\r\n", pWorkingSets->VirtualAddress);
 					dwPrivateSize += 0x1000;
 				}
 			}
 			else {
-				Interface::Log("- Failed to query working set at 0x%p\r\n", pWorkingSets->VirtualAddress);
+				Interface::Log("... failed to query working set at 0x%p\r\n", pWorkingSets->VirtualAddress);
 			}
 		}
 	}

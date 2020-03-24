@@ -129,6 +129,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Privilege.cpp" />
     <ClCompile Include="Regions.cpp" />
     <ClCompile Include="FileIo.cpp" />
     <ClCompile Include="Console.cpp" />
@@ -148,6 +149,7 @@
     <ClInclude Include="Interface.hpp" />
     <ClInclude Include="MemDump.hpp" />
     <ClInclude Include="PeFile.hpp" />
+    <ClInclude Include="Privileges.h" />
     <ClInclude Include="Process.hpp" />
     <ClInclude Include="Signing.hpp" />
     <ClInclude Include="StdAfx.h" />

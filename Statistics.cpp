@@ -51,8 +51,7 @@ void PermissionRecord::UpdateMap(vector<Subregion*> SubregionRecords) {
 	}
 }
 
-PermissionRecord::PermissionRecord(vector<Subregion*> SubregionRecords) {
-	PermissionMap = new map<uint32_t, map<uint32_t, uint32_t>>();
+PermissionRecord::PermissionRecord(vector<Subregion*> SubregionRecords) : PermissionMap(new map<uint32_t, map<uint32_t, uint32_t>>()) {
 	UpdateMap(SubregionRecords);
 }
 

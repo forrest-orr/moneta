@@ -89,10 +89,10 @@ PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* 
 		this->Signed = CheckSigning(FilePath);
 
 		if ((this->Pe = PeFile::Load(FilePath)) != nullptr) {
-			//if ((this->Pe = PeFile::Load(this->GetData(), this->GetSize())) != nullptr) {
-				//
-				// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
-				//
+		//if ((this->Pe = PeFile::Load(this->GetData(), this->GetSize())) != nullptr) {
+			//
+			// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
+			//
 
 			for (int32_t nX = -1; nX < this->Pe->GetFileHdr()->NumberOfSections; nX++) {
 				IMAGE_SECTION_HEADER ArtificialPeHdr = { 0 }; // This will initialize other relevant fields such as VirtualAddress to 0 for the PE header edge case.
@@ -120,7 +120,7 @@ PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* 
 					uint8_t* pSubregionEndVa = (uint8_t*)(*SbItr)->GetBasic()->BaseAddress + (*SbItr)->GetBasic()->RegionSize;
 
 					if ((pSubregionStartVa >= pSectStartVa && pSubregionStartVa < pSectEndVa) || (pSubregionEndVa > pSectStartVa&& pSubregionEndVa <= pSectEndVa) || (pSubregionStartVa < pSectStartVa && pSubregionEndVa > pSectEndVa)) {
-						//Interface::Log("* Section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, pSectStartVa, pSectEndVa, pSubregionStartVa, pSubregionEndVa);
+						//Interface::Log("... section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, pSectStartVa, pSectEndVa, pSubregionStartVa, pSubregionEndVa);
 						MEMORY_BASIC_INFORMATION* Mbi = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
 						memcpy(Mbi, (*SbItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
 						OverlapSubregion.push_back(new Subregion(hProcess, Mbi, (*SbItr)->GetThreads()));
@@ -131,7 +131,7 @@ PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* 
 			}
 		}
 		else {
-			Interface::Log("- Failed to load PE file using factory method in PE body constructor\r\n");
+			Interface::Log("... failed to load PE file using factory method in PE body constructor\r\n");
 		}
 	}
 }
@@ -141,7 +141,9 @@ PeVm::Body::~Body() {
 		delete* Itr;
 	}
 
-	delete this->Pe;
+	if (this->Pe != nullptr) {
+		delete this->Pe;
+	}
 }
 
 vector<PeVm::Section*> PeVm::Body::FindOverlapSect(Subregion& Address) {

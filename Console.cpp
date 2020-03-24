@@ -35,6 +35,7 @@ ________________________________________________________________________________
 #include "Memory.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
+#include "Privileges.h"
 
 using namespace std;
 using namespace Memory;
@@ -45,97 +46,6 @@ enum class SelectedProcess_t {
 	AllPids,
 	SelfPid
 };
-
-BOOL SetPrivilege(
-	HANDLE hToken,          // token handle
-	LPCTSTR Privilege,      // Privilege to enable/disable
-	BOOL bEnablePrivilege   // TRUE to enable.  FALSE to disable
-)
-{
-	TOKEN_PRIVILEGES tp;
-	LUID luid;
-	TOKEN_PRIVILEGES tpPrevious;
-	DWORD cbPrevious = sizeof(TOKEN_PRIVILEGES);
-
-	if (!LookupPrivilegeValue(NULL, Privilege, &luid)) return FALSE;
-
-	// 
-	// first pass.  get current privilege setting
-	// 
-	tp.PrivilegeCount = 1;
-	tp.Privileges[0].Luid = luid;
-	tp.Privileges[0].Attributes = 0;
-
-	AdjustTokenPrivileges(
-		hToken,
-		FALSE,
-		&tp,
-		sizeof(TOKEN_PRIVILEGES),
-		&tpPrevious,
-		&cbPrevious
-	);
-
-	if (GetLastError() != ERROR_SUCCESS) return FALSE;
-
-	// 
-	// second pass.  set privilege based on previous setting
-	// 
-	tpPrevious.PrivilegeCount = 1;
-	tpPrevious.Privileges[0].Luid = luid;
-
-	if (bEnablePrivilege) {
-		tpPrevious.Privileges[0].Attributes |= (SE_PRIVILEGE_ENABLED);
-	}
-	else {
-		tpPrevious.Privileges[0].Attributes ^= (SE_PRIVILEGE_ENABLED &
-			tpPrevious.Privileges[0].Attributes);
-	}
-
-	AdjustTokenPrivileges(
-		hToken,
-		FALSE,
-		&tpPrevious,
-		cbPrevious,
-		NULL,
-		NULL
-	);
-
-	if (GetLastError() != ERROR_SUCCESS) return FALSE;
-
-	return TRUE;
-}
-
-bool GrantSelfSeDebug() {
-	HANDLE hToken;
-	if (!OpenThreadToken(GetCurrentThread(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, FALSE, &hToken))
-	{
-		if (GetLastError() == ERROR_NO_TOKEN)
-		{
-			if (!ImpersonateSelf(SecurityImpersonation))
-				return false;
-
-			if (!OpenThreadToken(GetCurrentThread(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, FALSE, &hToken)) {
-				return false;
-			}
-		}
-		else
-			return false;
-	}
-
-	// enable SeDebugPrivilege
-	if (!SetPrivilege(hToken, SE_DEBUG_NAME, TRUE))
-	{
-		CloseHandle(hToken);
-
-		// indicate failure
-		return false;
-	}
-
-	// close handles
-	CloseHandle(hToken);
-
-	return true;
-}
 
 #define DEBUG
 
@@ -239,12 +149,12 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		//
 
 		if (ProcType == SelectedProcess_t::InvalidPid) {
-			Interface::Log("- Invalid target process type selected\r\n");
+			Interface::Log("... invalid target process type selected\r\n");
 			return 0;
 		}
 
 		if (MemSelectType == MemorySelection_t::Invalid) {
-			Interface::Log("- Invalid memory selection type\r\n");
+			Interface::Log("... invalid memory selection type\r\n");
 			return 0;
 		}
 
@@ -253,10 +163,10 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		//
 
 		if (GrantSelfSeDebug()) {
-			Interface::Log(VerbosityLevel::Debug, "+ Successfully granted SeDebug privilege to self\r\n");
+			Interface::Log(VerbosityLevel::Debug, "... successfully granted SeDebug privilege to self\r\n");
 		}
 		else {
-			Interface::Log("... Failed to grant SeDebug privilege to self. Certain processes will be inaccessible.\r\n");
+			Interface::Log("... failed to grant SeDebug privilege to self. Certain processes will be inaccessible.\r\n");
 		}
 
 		if ((qwOptFlags & PROCESS_ENUM_FLAG_MEMDUMP)) {
@@ -279,7 +189,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				}
 			}
 			catch (int32_t nError) {
-				Interface::Log("- Failed to map address space of %d (error %d)\r\n", dwSelectedPid, nError);
+				Interface::Log("... failed to map address space of %d (error %d)\r\n", dwSelectedPid, nError);
 			}
 		}
 		else {
@@ -299,7 +209,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 						}
 #endif
 						try {
-							//TargetProc = new Process(ProcEntry.th32ProcessID);
 							Process TargetProc(ProcEntry.th32ProcessID);
 							vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, pAddress);
 
@@ -313,7 +222,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 							}
 						}
 						catch (int32_t nError) {
-							Interface::Log(VerbosityLevel::Debug, "- Failed to map address space of %d:%ws (error %d)\r\n", ProcEntry.th32ProcessID, ProcEntry.szExeFile, nError);
+							Interface::Log(VerbosityLevel::Debug, "... failed to map address space of %d:%ws (error %d)\r\n", ProcEntry.th32ProcessID, ProcEntry.szExeFile, nError);
 							continue;
 						}
 					} while (Process32NextW(hSnapshot, &ProcEntry));
@@ -323,7 +232,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			}
 			else
 			{
-				Interface::Log("- Failed to create process list snapshot (error %d)\r\n", GetLastError());
+				Interface::Log("... failed to create process list snapshot (error %d)\r\n", GetLastError());
 			}
 
 			if (MemPermRec != nullptr) {

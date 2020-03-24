@@ -5,12 +5,7 @@
 
 using namespace std;
 
-PeFile::PeFile(
-	uint8_t* pPeBuf,
-	uint32_t dwPeFileSize) :
-	Data(new uint8_t[dwPeFileSize]),
-	Size(dwPeFileSize)
-{
+PeFile::PeFile(uint8_t* pPeBuf, uint32_t dwPeFileSize) : Data(new uint8_t[dwPeFileSize]), Size(dwPeFileSize) {
 	memcpy(this->Data, pPeBuf, dwPeFileSize);
 	this->DosHdr = (IMAGE_DOS_HEADER*)this->Data;
 	this->FileHdr = (IMAGE_FILE_HEADER*)((uint8_t*)this->DosHdr + this->DosHdr->e_lfanew + sizeof(LONG));
@@ -20,7 +15,7 @@ PeFile::~PeFile() {
 	delete this->Data;
 }
 
-PeFile* PeFile::Load(uint8_t* pPeBuf, uint32_t dwPeFileSize) { // Factory method for derived 32/64-bit classes
+PeFile* PeFile::Load(uint8_t* pPeBuf, uint32_t dwPeFileSize) {
 	assert(pPeBuf != nullptr);
 	assert(dwPeFileSize);
 
@@ -38,11 +33,7 @@ PeFile* PeFile::Load(uint8_t* pPeBuf, uint32_t dwPeFileSize) { // Factory method
 		}
 
 		if (NewPe != nullptr) {
-			if (NewPe->Validate()) { // Validate method is needed to call template-specific derived methods not present in the base class, such as GetNtHdrs (which in turn also cannot be called from the constructor since it relies on virtual methods which will not exist until the class is initialized post-constructor)
-				//Interface::Log("[+] Successfully initialized/validated %s PE derived class.\r\n", NewPe->GetPeArch() == IMAGE_FILE_MACHINE_I386 ? "32-bit" : "64-bit");
-			}
-			else {
-				//Interface::Log("[-] Failed to initialize/validate %s derived PE class.\r\n", NewPe->GetPeArch() == IMAGE_FILE_MACHINE_I386 ? "32-bit" : "64-bit");
+			if (!NewPe->Validate()) { // Validate method is needed to call template-specific derived methods not present in the base class, such as GetNtHdrs (which in turn also cannot be called from the constructor since it relies on virtual methods which will not exist until the class is initialized post-constructor)
 				delete NewPe;
 				NewPe = nullptr;
 			}
@@ -56,8 +47,6 @@ PeFile* PeFile::Load(const wstring PeFilePath) {
 	HANDLE hFile;
 	PeFile* NewPe = nullptr;
 
-	// Obtain the size of the region from where the DOS header begins and where the optional/section headers end
-
 	if ((hFile = CreateFileW(PeFilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE) {
 		uint32_t dwBytesRead;
 		IMAGE_DOS_HEADER DosHdr = { 0 };
@@ -65,7 +54,7 @@ PeFile* PeFile::Load(const wstring PeFilePath) {
 			SetFilePointer(hFile, DosHdr.e_lfanew + 4, nullptr, FILE_BEGIN);
 			IMAGE_FILE_HEADER FileHdr;
 			if (ReadFile(hFile, &FileHdr, sizeof(FileHdr), (PDWORD)&dwBytesRead, 0)) {
-				uint32_t dwHdrSize = 0;
+				uint32_t dwHdrSize = 0; // Obtain the size of the region from where the DOS header begins and where the optional/section headers end
 				if (FileHdr.Machine == IMAGE_FILE_MACHINE_I386) {
 					IMAGE_OPTIONAL_HEADER32 OptHdr;
 					if (ReadFile(hFile, &OptHdr, sizeof(OptHdr), (PDWORD)&dwBytesRead, 0)) {
@@ -96,10 +85,6 @@ PeFile* PeFile::Load(const wstring PeFilePath) {
 	return NewPe;
 }
 
-//
-// Primary derived architecture class
-//
-
 template<typename NtHdrType> PeArch<NtHdrType>::PeArch(uint8_t* pPeBuf, uint32_t dwPeFileSize) : PeFile(pPeBuf, dwPeFileSize) {}
 
 template<typename NtHdrType> NtHdrType* PeArch<NtHdrType>::GetNtHdrs() {
@@ -124,7 +109,7 @@ template<typename NtHdrType> bool PeArch<NtHdrType>::Validate() {
 	return GetNtHdrs();
 }
 
-template<typename NtHdrType> void* PeArch<NtHdrType>::GetImageBase() {// Had to add the entire Address_T type to the entire class and have it inherotted ny othet set of class methods
+template<typename NtHdrType> void* PeArch<NtHdrType>::GetImageBase() {
 	return (void*)GetNtHdrs()->OptionalHeader.ImageBase;
 }
 
@@ -187,17 +172,5 @@ template<typename NtHdrType> uint8_t* PeArch<NtHdrType>::GetEntryPoint() {
 	return reinterpret_cast<uint8_t *>(GetNtHdrs()->OptionalHeader.AddressOfEntryPoint);
 }
 
-//
-// Derived 32-bit
-//
-
-PeArch32::PeArch32(uint8_t* pPeBuf, uint32_t dwPeFileSize) :
-	PeArch<IMAGE_NT_HEADERS32>(pPeBuf, dwPeFileSize)
-{}
-
-//
-// Derived 64-bit
-//
-
-PeArch64::PeArch64(uint8_t* pPeBuf, uint32_t dwPeFileSize) :
-	PeArch<IMAGE_NT_HEADERS64>(pPeBuf, dwPeFileSize) {}
+PeArch32::PeArch32(uint8_t* pPeBuf, uint32_t dwPeFileSize) : PeArch<IMAGE_NT_HEADERS32>(pPeBuf, dwPeFileSize) {}
+PeArch64::PeArch64(uint8_t* pPeBuf, uint32_t dwPeFileSize) : PeArch<IMAGE_NT_HEADERS64>(pPeBuf, dwPeFileSize) {}
