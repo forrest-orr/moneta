@@ -9,7 +9,7 @@ public:
 	std::wstring GetDescription();
 	static bool InspectEntity(Process& ParentProc, Memory::Entity& ParentObj, std::map <uint8_t*, std::map<uint8_t*, std::list<Suspicion *>>>& SuspicionsMap);
 	static void EnumerateMap(std::map <uint8_t*, std::map<uint8_t*, std::list<Suspicion *>>>& SuspicionsMap);
-	bool IsFullEntitySuspicion();
+	bool IsFullEntitySuspicion() { return (this->Block == nullptr ? true : false); }
 	Suspicion(Process* ParentProc, Memory::Entity* Parent, Memory::Subregion* Block, Suspicion::Type Type);
 	Memory::Entity* GetParentObject() { return this->ParentObject; }
 	Memory::Subregion* GetBlock() { return this->Block; }

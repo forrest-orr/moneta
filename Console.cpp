@@ -47,17 +47,10 @@ enum class SelectedProcess_t {
 	SelfPid
 };
 
-#define DEBUG
-
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	vector<wstring> Args(&pArgv[0], &pArgv[0 + nArgc]);
 	Interface::Initialize(Args);
 
-	for (WORD wX = 0; wX < 200; wX++) {
-		//Interface::Log(wX, "%d ", wX);
-	}
-
-	//Interface::Log("\r\n");
 	Interface::Log(
 		"   _____                        __          \r\n"
 		"  /     \\   ____   ____   _____/  |______   \r\n"
@@ -201,13 +194,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				ProcEntry.dwSize = sizeof(PROCESSENTRY32W);
 
 				if (Process32FirstW(hSnapshot, &ProcEntry)) {
-					do
-					{
-#ifdef DEBUG
-						if (ProcEntry.th32ProcessID == GetCurrentProcessId()) {
-							continue;
-						}
-#endif
+					do {
 						try {
 							Process TargetProc(ProcEntry.th32ProcessID);
 							vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, pAddress);

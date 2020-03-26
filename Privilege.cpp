@@ -1,74 +1,69 @@
 #include <Windows.h>
 
-bool SetPrivilege(HANDLE hToken,  const wchar_t *Privilege, bool bEnablePrivilege) {
-	TOKEN_PRIVILEGES tp;
-	LUID luid;
-	TOKEN_PRIVILEGES tpPrevious;
-	DWORD cbPrevious = sizeof(TOKEN_PRIVILEGES);
+bool SetPrivilege(HANDLE hToken, const wchar_t *Privilege, bool bEnablePrivilege) {
+	TOKEN_PRIVILEGES TokenPrivs = { 0 };
+	LUID Luid;
+	TOKEN_PRIVILEGES TokenPrivPrev = { 0 };
+	DWORD dwPrevSize = sizeof(TOKEN_PRIVILEGES);
 
-	if (LookupPrivilegeValueW(NULL, Privilege, &luid)) {
-		tp.PrivilegeCount = 1;
-		tp.Privileges[0].Luid = luid;
-		tp.Privileges[0].Attributes = 0;
+	if (LookupPrivilegeValueW(nullptr, Privilege, &Luid)) {
+		TokenPrivs.PrivilegeCount = 1;
+		TokenPrivs.Privileges[0].Luid = Luid;
+		TokenPrivs.Privileges[0].Attributes = 0;
 
-		AdjustTokenPrivileges(hToken, false, &tp, sizeof(TOKEN_PRIVILEGES), &tpPrevious, &cbPrevious);
+		AdjustTokenPrivileges(hToken, false, &TokenPrivs, sizeof(TOKEN_PRIVILEGES), &TokenPrivPrev, &dwPrevSize);
 
 		if (GetLastError() == ERROR_SUCCESS) {
-			tpPrevious.PrivilegeCount = 1;
-			tpPrevious.Privileges[0].Luid = luid;
+			TokenPrivPrev.PrivilegeCount = 1;
+			TokenPrivPrev.Privileges[0].Luid = Luid;
 
 			if (bEnablePrivilege) {
-				tpPrevious.Privileges[0].Attributes |= (SE_PRIVILEGE_ENABLED);
+				TokenPrivPrev.Privileges[0].Attributes |= (SE_PRIVILEGE_ENABLED);
 			}
 			else {
-				tpPrevious.Privileges[0].Attributes ^= (SE_PRIVILEGE_ENABLED &
-					tpPrevious.Privileges[0].Attributes);
+				TokenPrivPrev.Privileges[0].Attributes ^= (SE_PRIVILEGE_ENABLED &
+					TokenPrivPrev.Privileges[0].Attributes);
 			}
 
 			AdjustTokenPrivileges(
 				hToken,
-				FALSE,
-				&tpPrevious,
-				cbPrevious,
-				NULL,
-				NULL
+				false,
+				&TokenPrivPrev,
+				dwPrevSize,
+				nullptr,
+				nullptr
 			);
 
-			if (GetLastError() != ERROR_SUCCESS) return FALSE;
+			if (GetLastError() == ERROR_SUCCESS) return true;
 		}
 	}
 
-	return true;
+	return false;
 }
 
 bool GrantSelfSeDebug() {
 	HANDLE hToken;
-	if (!OpenThreadToken(GetCurrentThread(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, FALSE, &hToken))
-	{
-		if (GetLastError() == ERROR_NO_TOKEN)
-		{
-			if (!ImpersonateSelf(SecurityImpersonation))
+
+	if (!OpenThreadToken(GetCurrentThread(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, FALSE, &hToken)) {
+		if (GetLastError() == ERROR_NO_TOKEN) {
+			if (!ImpersonateSelf(SecurityImpersonation)) {
 				return false;
+			}
 
 			if (!OpenThreadToken(GetCurrentThread(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, FALSE, &hToken)) {
 				return false;
 			}
 		}
-		else
+		else {
 			return false;
+		}
 	}
 
-	// enable SeDebugPrivilege
-	if (!SetPrivilege(hToken, L"SeDebugPrivilege", TRUE))
-	{
+	if (!SetPrivilege(hToken, L"SeDebugPrivilege", TRUE)) {
 		CloseHandle(hToken);
-
-		// indicate failure
 		return false;
 	}
 
-	// close handles
 	CloseHandle(hToken);
-
 	return true;
 }

@@ -39,27 +39,6 @@ ________________________________________________________________________________
 using namespace std;
 using namespace Memory;
 
-void EnumerateAll(list<Suspicion *> &SuspicionsList) {
-	for (list<Suspicion *>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
-		Interface::Log("~ ");
-		Interface::Log("%ws", (*SuspItr)->GetDescription().c_str());
-		Interface::Log(" within ");
-
-		if ((*SuspItr)->GetBlock() == nullptr) {
-			Interface::Log("entity at 0x%p", (*SuspItr)->GetParentObject()->GetStartVa());
-		}
-		else {
-			Interface::Log("block at 0x%p within entity at 0x%p", (*SuspItr)->GetBlock()->GetBasic()->BaseAddress, (*SuspItr)->GetParentObject()->GetStartVa());
-		}
-
-		Interface::Log(" within %ws:%d\r\n", (*SuspItr)->GetProcess()->GetName().c_str(), (*SuspItr)->GetProcess()->GetPid());
-	}
-}
-
-bool Suspicion::IsFullEntitySuspicion() {
-	return (this->Block == nullptr ? true : false);
-}
-
 wstring Suspicion::GetDescription() {
 	switch (this->SuspicionType) {
 	case MODIFIED_CODE: return L"Modified code";

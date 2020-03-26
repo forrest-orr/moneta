@@ -53,7 +53,3 @@ bool MemDump::Initialize() {
 
 	return CreateDirectoryW(MemDump::Folder.c_str(), nullptr);
 }
-
-uint32_t MemDump::GetPid() {
-	return this->Pid;
-}

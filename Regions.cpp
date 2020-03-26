@@ -82,14 +82,13 @@ PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* 
 		this->SigningLevel = Mii.ImageSigningLevel;
 	}
 	else {
-		Interface::Log("- NtQueryVirtualMemory failed for image information (0x%08x)\r\n", NtStatus);
+		Interface::Log(VerbosityLevel::Debug, "- NtQueryVirtualMemory failed for image information (0x%08x)\r\n", NtStatus);
 	}
 
 	if (!this->GetFileBase()->IsPhantom()) {
 		this->Signed = CheckSigning(FilePath);
 
 		if ((this->Pe = PeFile::Load(FilePath)) != nullptr) {
-		//if ((this->Pe = PeFile::Load(this->GetData(), this->GetSize())) != nullptr) {
 			//
 			// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
 			//
@@ -131,7 +130,7 @@ PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* 
 			}
 		}
 		else {
-			Interface::Log("... failed to load PE file using factory method in PE body constructor\r\n");
+			Interface::Log(VerbosityLevel::Debug, "... failed to load PE file using factory method in PE body constructor\r\n");
 		}
 	}
 }
@@ -232,7 +231,6 @@ Entity* Entity::Create(HANDLE hProcess, std::vector<Subregion*> Subregions) {
 				wcscpy_s(MaFilePath, MAX_PATH + 1, L"Page File");
 			}
 			else {
-				//Interface::Log("! Phantom image section detected.\r\n");
 				wcscpy_s(MaFilePath, MAX_PATH + 1, L"?");
 			}
 		}

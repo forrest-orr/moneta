@@ -50,19 +50,25 @@ PeFile* PeFile::Load(const wstring PeFilePath) {
 	if ((hFile = CreateFileW(PeFilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE) {
 		uint32_t dwBytesRead;
 		IMAGE_DOS_HEADER DosHdr = { 0 };
+
 		if (ReadFile(hFile, &DosHdr, sizeof(DosHdr), (PDWORD)&dwBytesRead, 0)) {
-			SetFilePointer(hFile, DosHdr.e_lfanew + 4, nullptr, FILE_BEGIN);
 			IMAGE_FILE_HEADER FileHdr;
+
+			SetFilePointer(hFile, DosHdr.e_lfanew + 4, nullptr, FILE_BEGIN);
+
 			if (ReadFile(hFile, &FileHdr, sizeof(FileHdr), (PDWORD)&dwBytesRead, 0)) {
 				uint32_t dwHdrSize = 0; // Obtain the size of the region from where the DOS header begins and where the optional/section headers end
+
 				if (FileHdr.Machine == IMAGE_FILE_MACHINE_I386) {
 					IMAGE_OPTIONAL_HEADER32 OptHdr;
+
 					if (ReadFile(hFile, &OptHdr, sizeof(OptHdr), (PDWORD)&dwBytesRead, 0)) {
 						dwHdrSize = OptHdr.SizeOfHeaders;
 					}
 				}
 				else if (FileHdr.Machine == IMAGE_FILE_MACHINE_AMD64) {
 					IMAGE_OPTIONAL_HEADER64 OptHdr;
+
 					if (ReadFile(hFile, &OptHdr, sizeof(OptHdr), (PDWORD)&dwBytesRead, 0)) {
 						dwHdrSize = OptHdr.SizeOfHeaders;
 					}
@@ -70,6 +76,7 @@ PeFile* PeFile::Load(const wstring PeFilePath) {
 
 				if (dwHdrSize) {
 					uint8_t* HdrData = new uint8_t[dwHdrSize];
+
 					SetFilePointer(hFile, 0, nullptr, FILE_BEGIN);
 
 					if (ReadFile(hFile, HdrData, dwHdrSize, (PDWORD)&dwBytesRead, 0)) {
