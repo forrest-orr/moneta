@@ -22,6 +22,9 @@
     <Filter Include="Source Files\Classes\Memory">
       <UniqueIdentifier>{12f263ff-349e-4eb0-87ba-8e1042e59bd1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Classes\Processes">
+      <UniqueIdentifier>{c61e686a-46b3-45de-b235-3e17d7bd8260}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FileIo.cpp">
@@ -51,17 +54,17 @@
     <ClCompile Include="Suspicions.cpp">
       <Filter>Source Files\Classes</Filter>
     </ClCompile>
-    <ClCompile Include="Process.cpp">
-      <Filter>Source Files\Classes</Filter>
-    </ClCompile>
-    <ClCompile Include="Thread.cpp">
-      <Filter>Source Files\Classes</Filter>
-    </ClCompile>
     <ClCompile Include="PeFile.cpp">
       <Filter>Source Files\Classes</Filter>
     </ClCompile>
     <ClCompile Include="Privilege.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Thread.cpp">
+      <Filter>Source Files\Classes\Processes</Filter>
+    </ClCompile>
+    <ClCompile Include="Process.cpp">
+      <Filter>Source Files\Classes\Processes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -74,9 +77,6 @@
     <ClInclude Include="StdAfx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Process.hpp">
-      <Filter>Header Files\Classes</Filter>
-    </ClInclude>
     <ClInclude Include="Signing.hpp">
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
@@ -84,9 +84,6 @@
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
     <ClInclude Include="Memory.hpp">
-      <Filter>Header Files\Classes</Filter>
-    </ClInclude>
-    <ClInclude Include="Thread.hpp">
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
     <ClInclude Include="PeFile.hpp">
@@ -97,6 +94,9 @@
     </ClInclude>
     <ClInclude Include="Privileges.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Processes.hpp">
+      <Filter>Header Files\Classes</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

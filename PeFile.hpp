@@ -7,7 +7,7 @@ protected:
 	uint32_t Size;
 	uint16_t PeMagic;
 	uint16_t PeArch;
-	PeFile(uint8_t* pPeBuf, uint32_t dwPeFileSize);
+	PeFile(const uint8_t* pPeBuf, uint32_t dwPeFileSize);
 public:
 	virtual bool IsPe32() = 0;
 	virtual bool IsPe64() = 0;
@@ -22,17 +22,17 @@ public:
 	virtual uint8_t* GetEntryPoint() = 0;
 	virtual void SetSubsystem(uint32_t dwSubSystem) = 0;
 	virtual void* GetImageBase() = 0;
-	virtual void SetImageBase(void* pNewImageBase) = 0;
+	virtual void SetImageBase(const void* pNewImageBase) = 0;
 	virtual uint16_t GetDllCharacteristics() = 0;
 	virtual void SetDllCharacteristics(uint16_t wDllCharacteristics) = 0;
 	virtual uint32_t GetImageSize() = 0;
-	uint8_t* GetData() { return this->Data; }
-	uint32_t GetSize() { return this->Size; }
-	PIMAGE_DOS_HEADER GetDosHdr() { return this->DosHdr; }
-	IMAGE_FILE_HEADER* GetFileHdr() { return this->FileHdr; }
-	IMAGE_SECTION_HEADER* GetSectHdrs() { return this->SectHdrs; }
+	uint8_t* GetData() const { return this->Data; }
+	uint32_t GetSize() const { return this->Size; }
+	PIMAGE_DOS_HEADER GetDosHdr() const { return this->DosHdr; }
+	IMAGE_FILE_HEADER* GetFileHdr() const { return this->FileHdr; }
+	IMAGE_SECTION_HEADER* GetSectHdrs() const { return this->SectHdrs; }
 	~PeFile();
-	static PeFile* Load(uint8_t* pPeBuf, uint32_t dwPeFileSize); // Factory
+	static PeFile* Load(const uint8_t* pPeBuf, uint32_t dwPeFileSize); // Factory
 	static PeFile* Load(const std::wstring PeFilePath); // Factory
 };
 
@@ -43,7 +43,7 @@ public:
 template<typename NtHdrType> class PeArch : public PeFile { // Every method within this class must have the same template prototype as the class itself. Types used to initialize the template are inheritted by all methods as well. Note that a template function CANNOT be declared within a class unless its template matches that of its containing class.
 protected:
 	NtHdrType* NtHdr;
-	PeArch(uint8_t* pPeBuf, uint32_t dwPeFileSize);
+	PeArch(const uint8_t* pPeBuf, uint32_t dwPeFileSize);
 public:
 	bool Validate();
 	NtHdrType* GetNtHdrs();
@@ -54,7 +54,7 @@ public:
 	uint32_t GetSubsystem();
 	void SetSubsystem(uint32_t dwSubSystem);
 	void* GetImageBase();
-	void SetImageBase(void* pNewImageBase);
+	void SetImageBase(const void* pNewImageBase);
 	uint8_t* GetEntryPoint();
 	uint16_t GetDllCharacteristics();
 	void SetDllCharacteristics(uint16_t wDllCharacteristics);
@@ -67,7 +67,7 @@ public:
 	bool IsPe64() { return false; }
 	uint16_t GetPeMagic() { return IMAGE_NT_OPTIONAL_HDR32_MAGIC; }
 	uint16_t GetPeArch() { return IMAGE_FILE_MACHINE_I386; }
-	PeArch32(uint8_t* pPeBuf, uint32_t dwPeFileSize);
+	PeArch32(const uint8_t* pPeBuf, uint32_t dwPeFileSize);
 };
 
 class PeArch64 : public PeArch<IMAGE_NT_HEADERS64> {
@@ -76,5 +76,5 @@ public:
 	bool IsPe64() { return true; }
 	uint16_t GetPeMagic() { return IMAGE_NT_OPTIONAL_HDR64_MAGIC; }
 	uint16_t GetPeArch() { return IMAGE_FILE_MACHINE_AMD64; }
-	PeArch64(uint8_t* pPeBuf, uint32_t dwPeFileSize);
+	PeArch64(const uint8_t* pPeBuf, uint32_t dwPeFileSize);
 };

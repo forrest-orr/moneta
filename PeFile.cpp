@@ -5,7 +5,7 @@
 
 using namespace std;
 
-PeFile::PeFile(uint8_t* pPeBuf, uint32_t dwPeFileSize) : Data(new uint8_t[dwPeFileSize]), Size(dwPeFileSize) {
+PeFile::PeFile(const uint8_t* pPeBuf, uint32_t dwPeFileSize) : Data(new uint8_t[dwPeFileSize]), Size(dwPeFileSize) {
 	memcpy(this->Data, pPeBuf, dwPeFileSize);
 	this->DosHdr = (IMAGE_DOS_HEADER*)this->Data;
 	this->FileHdr = (IMAGE_FILE_HEADER*)((uint8_t*)this->DosHdr + this->DosHdr->e_lfanew + sizeof(LONG));
@@ -15,7 +15,7 @@ PeFile::~PeFile() {
 	delete this->Data;
 }
 
-PeFile* PeFile::Load(uint8_t* pPeBuf, uint32_t dwPeFileSize) {
+PeFile* PeFile::Load(const uint8_t* pPeBuf, uint32_t dwPeFileSize) {
 	assert(pPeBuf != nullptr);
 	assert(dwPeFileSize);
 
@@ -92,7 +92,7 @@ PeFile* PeFile::Load(const wstring PeFilePath) {
 	return NewPe;
 }
 
-template<typename NtHdrType> PeArch<NtHdrType>::PeArch(uint8_t* pPeBuf, uint32_t dwPeFileSize) : PeFile(pPeBuf, dwPeFileSize) {}
+template<typename NtHdrType> PeArch<NtHdrType>::PeArch(const uint8_t* pPeBuf, uint32_t dwPeFileSize) : PeFile(pPeBuf, dwPeFileSize) {}
 
 template<typename NtHdrType> NtHdrType* PeArch<NtHdrType>::GetNtHdrs() {
 	assert(this->DosHdr != nullptr);
@@ -120,7 +120,7 @@ template<typename NtHdrType> void* PeArch<NtHdrType>::GetImageBase() {
 	return (void*)GetNtHdrs()->OptionalHeader.ImageBase;
 }
 
-template<typename NtHdrType> void PeArch<NtHdrType>::SetImageBase(void* pNewImageBase) {
+template<typename NtHdrType> void PeArch<NtHdrType>::SetImageBase(const void* pNewImageBase) {
 	GetNtHdrs()->OptionalHeader.ImageBase = (decltype(GetNtHdrs()->OptionalHeader.ImageBase))pNewImageBase;
 }
 
@@ -179,5 +179,5 @@ template<typename NtHdrType> uint8_t* PeArch<NtHdrType>::GetEntryPoint() {
 	return reinterpret_cast<uint8_t *>(GetNtHdrs()->OptionalHeader.AddressOfEntryPoint);
 }
 
-PeArch32::PeArch32(uint8_t* pPeBuf, uint32_t dwPeFileSize) : PeArch<IMAGE_NT_HEADERS32>(pPeBuf, dwPeFileSize) {}
-PeArch64::PeArch64(uint8_t* pPeBuf, uint32_t dwPeFileSize) : PeArch<IMAGE_NT_HEADERS64>(pPeBuf, dwPeFileSize) {}
+PeArch32::PeArch32(const uint8_t* pPeBuf, uint32_t dwPeFileSize) : PeArch<IMAGE_NT_HEADERS32>(pPeBuf, dwPeFileSize) {}
+PeArch64::PeArch64(const uint8_t* pPeBuf, uint32_t dwPeFileSize) : PeArch<IMAGE_NT_HEADERS64>(pPeBuf, dwPeFileSize) {}

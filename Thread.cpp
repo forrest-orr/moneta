@@ -29,13 +29,14 @@ ________________________________________________________________________________
 */
 
 #include "StdAfx.h"
-#include "Thread.hpp"
+#include "Processes.hpp"
 
 using namespace std;
+using namespace Processes;
 
-void Thread::SetEntryPoint(void* pStartAddress) {
+void Thread::SetEntryPoint(const void* pStartAddress) {
 	this->StartAddress = pStartAddress;
 }
 
 Thread::Thread(uint32_t dwTid) : Id(dwTid) {}
-Thread::Thread(uint32_t dwTid, void* pStartAddress) : Id(dwTid), StartAddress(pStartAddress) {}
+Thread::Thread(uint32_t dwTid, const void* pStartAddress) : Id(dwTid), StartAddress(pStartAddress) {}

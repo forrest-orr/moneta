@@ -2,7 +2,7 @@
 #include "MemDump.hpp"
 #include "FileIo.hpp"
 #include "PeFile.hpp"
-#include "Process.hpp"
+#include "Processes.hpp"
 #include "Memory.hpp"
 
 using namespace std;
@@ -12,7 +12,7 @@ wstring MemDump::Folder;
 
 MemDump::MemDump(HANDLE hProcess, uint32_t dwPid) : Handle(hProcess), Pid(dwPid) {}
 
-bool MemDump::Create(wstring Folder, MEMORY_BASIC_INFORMATION *Mbi, wchar_t* DumFilePath, size_t ccDumFilePathLen) {
+bool MemDump::Create(wstring Folder, const MEMORY_BASIC_INFORMATION *Mbi,  wchar_t* DumFilePath, size_t ccDumFilePathLen) const {
 	SIZE_T cbBytesRead = 0;
 	uint8_t* pBuf = new uint8_t[Mbi->RegionSize];
 	wstring TargetDmpFolder;
@@ -39,7 +39,7 @@ bool MemDump::Create(wstring Folder, MEMORY_BASIC_INFORMATION *Mbi, wchar_t* Dum
 	}
 }
 
-bool MemDump::Create(MEMORY_BASIC_INFORMATION* Mbi, wchar_t* DumFilePath, size_t ccDumFilePathLen) {
+bool MemDump::Create(const MEMORY_BASIC_INFORMATION* Mbi, wchar_t* DumFilePath, size_t ccDumFilePathLen) const {
 	return Create(L"", Mbi, DumFilePath, ccDumFilePathLen);
 }
 

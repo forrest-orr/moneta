@@ -31,7 +31,7 @@ ________________________________________________________________________________
 #include "StdAfx.h"
 #include "FileIo.hpp"
 #include "PeFile.hpp"
-#include "Process.hpp"
+#include "Processes.hpp"
 #include "Memory.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
@@ -160,7 +160,7 @@ vector<PeVm::Section*> PeVm::Body::FindOverlapSect(Subregion& Address) {
 	return OverlappingSections;
 }
 
-PeVm::Body::PebModule::PebModule(HANDLE hProcess, uint8_t* pModBase) {
+PeVm::Body::PebModule::PebModule(HANDLE hProcess, const uint8_t* pModBase) {
 	if (hProcess != nullptr) {
 		if (GetModuleInformation(hProcess, (HMODULE)pModBase, &this->Info, sizeof(this->Info))) {
 			wchar_t ModuleName[MAX_PATH + 1] = { 0 }, ModulePath[MAX_PATH + 1] = { 0 };

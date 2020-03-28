@@ -31,7 +31,7 @@ ________________________________________________________________________________
 #include "StdAfx.h"
 #include "FileIo.hpp"
 #include "PeFile.hpp"
-#include "Process.hpp"
+#include "Processes.hpp"
 #include "Memory.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
@@ -39,6 +39,7 @@ ________________________________________________________________________________
 
 using namespace std;
 using namespace Memory;
+using namespace Processes;
 
 enum class SelectedProcess_t {
 	InvalidPid = 0,

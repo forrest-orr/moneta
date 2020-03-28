@@ -31,16 +31,16 @@ ________________________________________________________________________________
 #include "StdAfx.h"
 #include "FileIo.hpp"
 #include "PeFile.hpp"
-#include "Process.hpp"
+#include "Processes.hpp"
 #include "Memory.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
 #include "Suspicions.hpp"
 #include "Signing.hpp"
-#include "Thread.hpp"
 
 using namespace std;
 using namespace Memory;
+using namespace Processes;
 
 Process::~Process() {
 	if (this->Handle != nullptr) {
@@ -158,7 +158,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 					}
 				}
 
-				Subregions.push_back(new Subregion(this->Handle, (MEMORY_BASIC_INFORMATION*)Mbi, this->Threads));
+				Subregions.push_back(new Subregion(this->Handle, Mbi, this->Threads));
 				Region = Subregions.begin(); // This DOES fix a bug.
 			}
 			else {
@@ -196,8 +196,8 @@ void AlignName(const wchar_t* pOriginalName, wchar_t* pAlignedName, int32_t nAli
 	}
 }
 
-void EnumerateThreads(const wstring Indent, vector<Thread*> Threads) {
-	for (vector<Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
+void EnumerateThreads(const wstring Indent, vector<Processes::Thread*> Threads) {
+	for (vector<Processes::Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
 		Interface::Log("%wsThread 0x%p [TID 0x%08x]\r\n", Indent.c_str(), (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
 	}
 }
@@ -261,7 +261,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 							   0x000000000F3E0000:0x0009e000 | R        | .rsrc    | 0x00000000
 						*/
 
-						PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>((*SuspItr)->GetParentObject());
+						const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*SuspItr)->GetParentObject());
 
 						if (PeEntity->IsSigned()) {
 							static const wchar_t* pWinmbExt = L".winmd";
@@ -326,7 +326,7 @@ int32_t SubEntitySuspCount(map<uint8_t*, list<Suspicion*>>* pSbMap, uint8_t* pSb
 	return nCount;
 }
 
-bool Process::DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION *Mbi, wstring Indent) {
+bool Process::DumpBlock(MemDump &ProcDmp, const MEMORY_BASIC_INFORMATION *Mbi, wstring Indent) {
 	wchar_t DumFilePath[MAX_PATH + 1] = { 0 };
 
 	if (Mbi->State == MEM_COMMIT) {
@@ -363,7 +363,7 @@ bool Process::DumpBlock(MemDump &ProcDmp, MEMORY_BASIC_INFORMATION *Mbi, wstring
 	10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
 */
 
-vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t MemSelectType, uint8_t *pSelectAddress) {
+vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t MemSelectType, const uint8_t *pSelectAddress) {
 	bool bShownProc = false;
 	MemDump ProcDmp(this->Handle, this->Pid);
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
@@ -387,11 +387,11 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 	//
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-		auto AbMapItr = SuspicionsMap.find(Itr->second->GetStartVa()); // An iterator into the main ablock map which points to the entry for the sb map.
+		auto AbMapItr = SuspicionsMap.find(static_cast<unsigned char *>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
 		map<uint8_t*, list<Suspicion *>>* pSbMap = nullptr;
 
 		if (AbMapItr != SuspicionsMap.end()) {
-			pSbMap = &SuspicionsMap.at(Itr->second->GetStartVa());
+			pSbMap = &SuspicionsMap.at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
 		}
 
 		if (MemSelectType == MemorySelection_t::All ||

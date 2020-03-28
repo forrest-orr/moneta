@@ -150,11 +150,10 @@
     <ClInclude Include="MemDump.hpp" />
     <ClInclude Include="PeFile.hpp" />
     <ClInclude Include="Privileges.h" />
-    <ClInclude Include="Process.hpp" />
+    <ClInclude Include="Processes.hpp" />
     <ClInclude Include="Signing.hpp" />
     <ClInclude Include="StdAfx.h" />
     <ClInclude Include="Suspicions.hpp" />
-    <ClInclude Include="Thread.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Moneta.rc" />

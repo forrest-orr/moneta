@@ -55,7 +55,7 @@ PermissionRecord::PermissionRecord(vector<Subregion*> SubregionRecords) : Permis
 	UpdateMap(SubregionRecords);
 }
 
-void PermissionRecord::ShowRecords() {
+void PermissionRecord::ShowRecords() const {
 	Interface::Log("\r\nMemory statistics\r\n");
 	for (map<uint32_t, map<uint32_t, uint32_t>>::const_iterator Itr = PermissionMap->begin(); Itr != PermissionMap->end(); ++Itr) {
 		int32_t nTotalRegions = 0, nX = 0;

@@ -30,7 +30,7 @@ ________________________________________________________________________________
 
 #include "StdAfx.h"
 #include "FileIo.hpp"
-#include "Process.hpp"
+#include "Processes.hpp"
 #include "Memory.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
@@ -38,8 +38,9 @@ ________________________________________________________________________________
 
 using namespace std;
 using namespace Memory;
+using namespace Processes;
 
-wstring Suspicion::GetDescription() {
+wstring Suspicion::GetDescription() const {
 	switch (this->SuspicionType) {
 	case MODIFIED_CODE: return L"Modified code";
 	case UNSIGNED_MODULE: return L"Unsigned module";
@@ -87,8 +88,8 @@ void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>& S
 
 bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, map<uint8_t*, list<Suspicion *>>> &SuspicionsMap) {
 	list<Suspicion *> AbSuspList;
-	SuspicionsMap.insert(make_pair(ParentObj.GetStartVa(), map<uint8_t*, list<Suspicion *>>()));
-	map<uint8_t*, list<Suspicion *>>& RefSbMap = SuspicionsMap.at(ParentObj.GetStartVa());
+	SuspicionsMap.insert(make_pair(static_cast<unsigned char*>(const_cast<void*>(ParentObj.GetStartVa())), map<uint8_t*, list<Suspicion *>>()));
+	map<uint8_t*, list<Suspicion *>>& RefSbMap = SuspicionsMap.at(static_cast<unsigned char *>(const_cast<void*>(ParentObj.GetStartVa())));
 
 	switch (ParentObj.GetType()) {
 		case Entity::Type::PE_FILE: {
@@ -188,11 +189,11 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 	}
 
 	if (AbSuspList.size()) {
-		RefSbMap.insert(make_pair(ParentObj.GetStartVa(), AbSuspList));
+		RefSbMap.insert(make_pair(static_cast<unsigned char*>(const_cast<void*>(ParentObj.GetStartVa())), AbSuspList));
 	}
 
 	if (!RefSbMap.size()) {
-		SuspicionsMap.erase(ParentObj.GetStartVa());
+		SuspicionsMap.erase(static_cast<unsigned char*>(const_cast<void*>(ParentObj.GetStartVa())));
 	}
 
 	return true;

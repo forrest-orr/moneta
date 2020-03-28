@@ -3,11 +3,11 @@
 
 using namespace std;
 
-FileBase::FileBase(wstring DesiredPath, uint8_t* DataBuf, uint32_t dwSize) : Path(DesiredPath), FileData(new uint8_t[dwSize]), FileSize(dwSize) {
+FileBase::FileBase(wstring DesiredPath, const uint8_t* DataBuf, uint32_t dwSize) : Path(DesiredPath), FileData(new uint8_t[dwSize]), FileSize(dwSize) {
 	memcpy(this->FileData, DataBuf, dwSize);
 }
 
-bool FileBase::ToDisk(bool bAppend) {
+bool FileBase::ToDisk (bool bAppend) const {
 	assert(this->FileData != nullptr);
 
 	HANDLE hFile;

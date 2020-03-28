@@ -31,15 +31,16 @@ ________________________________________________________________________________
 #include "StdAfx.h"
 #include "Memory.hpp"
 #include "Interface.hpp"
-#include "Thread.hpp"
+#include "Processes.hpp"
 
 using namespace std;
 using namespace Memory;
+using namespace Processes;
 
-Subregion::Subregion(HANDLE hProcess, MEMORY_BASIC_INFORMATION* Mbi, vector<Thread*> Threads1) : ProcessHandle(hProcess), Basic(Mbi) {
-	for (vector<Thread*>::const_iterator ThItr = Threads1.begin(); ThItr != Threads1.end(); ++ThItr) {
+Subregion::Subregion(HANDLE hProcess, const MEMORY_BASIC_INFORMATION* Mbi, vector<Processes::Thread*> Threads) : ProcessHandle(hProcess), Basic(Mbi) {
+	for (vector<Processes::Thread*>::const_iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
 		if ((*ThItr)->GetEntryPoint() >= this->Basic->BaseAddress && (*ThItr)->GetEntryPoint() < ((uint8_t*)this->Basic->BaseAddress + this->Basic->RegionSize)) {
-			this->Threads.push_back(new Thread((*ThItr)->GetTid(), (*ThItr)->GetEntryPoint()));
+			this->Threads.push_back(new Processes::Thread((*ThItr)->GetTid(), (*ThItr)->GetEntryPoint()));
 		}
 	}
 
@@ -53,13 +54,9 @@ Subregion::~Subregion() {
 		delete Basic;
 	}
 
-	for (vector<Thread*>::const_iterator Itr = this->Threads.begin(); Itr != this->Threads.end(); ++Itr) {
+	for (vector<Processes::Thread*>::const_iterator Itr = this->Threads.begin(); Itr != this->Threads.end(); ++Itr) {
 		delete* Itr;
 	}
-}
-
-void Subregion::SetPrivateSize(uint32_t dwPrivateSize) {
-	this->PrivateSize = dwPrivateSize;
 }
 
 const wchar_t* Subregion::ProtectSymbol(uint32_t dwProtect) {
@@ -90,7 +87,7 @@ const wchar_t* Subregion::StateSymbol(uint32_t dwState) {
 	}
 }
 
-const wchar_t* Subregion::AttribDesc(MEMORY_BASIC_INFORMATION* Mbi) {
+const wchar_t* Subregion::AttribDesc(const MEMORY_BASIC_INFORMATION* Mbi) {
 	switch (Mbi->State) {
 		case MEM_COMMIT: return ProtectSymbol(Mbi->Protect);
 		case MEM_FREE: return L"Free";
@@ -108,7 +105,7 @@ const wchar_t* Subregion::TypeSymbol(uint32_t dwType) {
 	}
 }
 
-uint32_t Subregion::QueryPrivateSize() {
+uint32_t Subregion::QueryPrivateSize() const {
 	uint32_t dwPrivateSize = 0;
 
 	if (this->Basic->State == MEM_COMMIT && this->Basic->Protect != PAGE_NOACCESS) {
