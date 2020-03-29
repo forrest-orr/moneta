@@ -7,8 +7,8 @@ using namespace std;
 
 PeFile::PeFile(const uint8_t* pPeBuf, uint32_t dwPeFileSize) : Data(new uint8_t[dwPeFileSize]), Size(dwPeFileSize) {
 	memcpy(this->Data, pPeBuf, dwPeFileSize);
-	this->DosHdr = (IMAGE_DOS_HEADER*)this->Data;
-	this->FileHdr = (IMAGE_FILE_HEADER*)(reinterpret_cast<uint8_t *>(this->DosHdr) + this->DosHdr->e_lfanew + sizeof(LONG));
+	this->DosHdr = reinterpret_cast<IMAGE_DOS_HEADER*>(this->Data);
+	this->FileHdr = reinterpret_cast<IMAGE_FILE_HEADER*>((reinterpret_cast<uint8_t *>(this->DosHdr) + this->DosHdr->e_lfanew + sizeof(LONG)));
 }
 
 PeFile::~PeFile() {
@@ -22,8 +22,8 @@ PeFile* PeFile::Load(const uint8_t* pPeBuf, uint32_t dwPeFileSize) {
 	PeFile* NewPe = nullptr;
 
 	if (*(uint16_t*)&pPeBuf[0] == 'ZM') {
-		PIMAGE_DOS_HEADER pDosHdr = (PIMAGE_DOS_HEADER)pPeBuf;
-		IMAGE_FILE_HEADER* pFileHdr = (IMAGE_FILE_HEADER*)(pPeBuf + pDosHdr->e_lfanew + sizeof(LONG));
+		PIMAGE_DOS_HEADER pDosHdr = reinterpret_cast<IMAGE_DOS_HEADER*>(const_cast<uint8_t *>(pPeBuf));
+		IMAGE_FILE_HEADER* pFileHdr = reinterpret_cast<IMAGE_FILE_HEADER*>((const_cast<uint8_t *>(pPeBuf) + pDosHdr->e_lfanew + sizeof(LONG)));
 
 		if (pFileHdr->Machine == IMAGE_FILE_MACHINE_I386) {
 			NewPe = new PeArch32(pPeBuf, dwPeFileSize);

@@ -64,13 +64,13 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	);
 	SYSTEM_INFO SystemInfo = { 0 };
 	typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
-	static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
+	static ISWOW64PROCESS IsWow64Process = reinterpret_cast<ISWOW64PROCESS>(GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process"));
 	uint64_t qwOptFlags = 0;
 	
 	if (IsWow64Process != nullptr) {
 		BOOL bSelfWow64 = FALSE;
 
-		if (IsWow64Process(GetCurrentProcess(), (PBOOL)&bSelfWow64)) {
+		if (IsWow64Process(GetCurrentProcess(), static_cast<PBOOL>(&bSelfWow64))) {
 			GetNativeSystemInfo(&SystemInfo); // Native version of this call works on both Wow64 and x64 as opposed to just x64 for GetSystemInfo. Works on XP+
 
 			if (SystemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 && bSelfWow64) {

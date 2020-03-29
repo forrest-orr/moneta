@@ -159,18 +159,18 @@ wchar_t* GetWindowsPECatalogIssuer(const wchar_t* TargetFilePath)
                             {
                                 if (CryptMsgGetParam(hMsg, CMSG_SIGNER_INFO_PARAM, 0, nullptr, reinterpret_cast<PDWORD>(&dwSignerInfoSize)) && dwSignerInfoSize)
                                 {
-                                    pSignerInfo = (PCMSG_SIGNER_INFO)new uint8_t[dwSignerInfoSize];
+                                    pSignerInfo = reinterpret_cast<PCMSG_SIGNER_INFO>(new uint8_t[dwSignerInfoSize]);
 
-                                    if (CryptMsgGetParam(hMsg, CMSG_SIGNER_INFO_PARAM, 0, (void*)pSignerInfo, reinterpret_cast<PDWORD>(&dwSignerInfoSize)))
+                                    if (CryptMsgGetParam(hMsg, CMSG_SIGNER_INFO_PARAM, 0, static_cast<void*>(pSignerInfo), reinterpret_cast<PDWORD>(&dwSignerInfoSize)))
                                     {
                                         CertInfo.Issuer = pSignerInfo->Issuer;
                                         CertInfo.SerialNumber = pSignerInfo->SerialNumber;
 
-                                        if ((pCertContext = CertFindCertificateInStore(hCertStore, (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING), 0, CERT_FIND_SUBJECT_CERT, (void*)&CertInfo, nullptr)) != nullptr)
+                                        if ((pCertContext = CertFindCertificateInStore(hCertStore, (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING), 0, CERT_FIND_SUBJECT_CERT, static_cast<void*>(&CertInfo), nullptr)) != nullptr)
                                         {
                                             if ((dwCertNameLength = CertGetNameStringW(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, CERT_NAME_ISSUER_FLAG, nullptr, nullptr, 0)))
                                             {
-                                                pCerificateIssuer = (wchar_t*)new uint8_t[((dwCertNameLength + 1) * sizeof(wchar_t))]; // Documentation says the length returned is in characters not bytes.
+                                                pCerificateIssuer = reinterpret_cast<wchar_t *>(new uint8_t[((dwCertNameLength + 1) * sizeof(wchar_t))]); // Documentation says the length returned is in characters not bytes.
 
                                                 if (!CertGetNameStringW(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, CERT_NAME_ISSUER_FLAG, nullptr, pCerificateIssuer, dwCertNameLength))
                                                 {

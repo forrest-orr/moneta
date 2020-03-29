@@ -129,10 +129,10 @@ bool FileBase::ArchWow64PathExpand(const wchar_t* TargetFilePath, wchar_t* Outpu
 
 			if ((qwPathLength = GetSystemWow64DirectoryW(SysWow64Directory, MAX_PATH + 1))) {
 				if ((qwPathLength = GetSystemDirectoryW(SystemDirectory, MAX_PATH + 1))) {
-					ProgFilePath64 = (wchar_t*)new uint8_t[MAX_ENV_VAR_SIZE]; // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
+					ProgFilePath64 = reinterpret_cast<wchar_t *>(new uint8_t[MAX_ENV_VAR_SIZE]); // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
 
 					if ((qwPathLength = GetEnvironmentVariableW(L"ProgramW6432", ProgFilePath64, MAX_ENV_VAR_SIZE))) {
-						ProgFilePathWow64 = (wchar_t*)new uint8_t[MAX_ENV_VAR_SIZE]; // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
+						ProgFilePathWow64 = reinterpret_cast<wchar_t *>(new uint8_t[MAX_ENV_VAR_SIZE]); // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
 
 						if ((qwPathLength = GetEnvironmentVariableW(L"ProgramFiles(x86)", ProgFilePathWow64, MAX_ENV_VAR_SIZE))) {
 							//
