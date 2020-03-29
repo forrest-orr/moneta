@@ -62,6 +62,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		"\r\n"
 		"Moneta v1.0 | Forrest Orr | 2020\r\n\r\n"
 	);
+
 	SYSTEM_INFO SystemInfo = { 0 };
 	typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
 	static ISWOW64PROCESS IsWow64Process = reinterpret_cast<ISWOW64PROCESS>(GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process"));
@@ -177,6 +178,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			try {
 				Process TargetProc(dwSelectedPid);
 				vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, pAddress);
+
 				if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
 					PermissionRecord* MemPermRec = new PermissionRecord(SelectedSbrs);
 					MemPermRec->ShowRecords();

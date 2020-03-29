@@ -77,9 +77,6 @@
     <ClInclude Include="StdAfx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Signing.hpp">
-      <Filter>Header Files\Classes</Filter>
-    </ClInclude>
     <ClInclude Include="Suspicions.hpp">
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
@@ -97,6 +94,9 @@
     </ClInclude>
     <ClInclude Include="Processes.hpp">
       <Filter>Header Files\Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="Signing.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

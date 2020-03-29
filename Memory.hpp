@@ -2,6 +2,7 @@ typedef class Thread;
 typedef class MemDump;
 typedef class FileBase;
 typedef class PeFile;
+typedef enum class Signing_t;
 
 namespace Processes {
 	typedef class Thread;
@@ -88,7 +89,7 @@ namespace Memory {
 		protected:
 			std::vector<Section*> Sections;
 			::PeFile* Pe;
-			bool Signed;
+			Signing_t Signed;
 			bool NonExecutableImage;
 			bool PartiallyMapped;
 			uint32_t ImageSize;
@@ -111,7 +112,8 @@ namespace Memory {
 		public:
 			Entity::Type GetType() { return Entity::Type::PE_FILE; }
 			::PeFile* GetPe() const { return this->Pe; }
-			bool IsSigned() const { return this->Signed; }
+			bool IsSigned() const;
+			Signing_t GetSisningType() const;
 			bool IsNonExecutableImage() const { return this->NonExecutableImage; }
 			bool IsPartiallyMapped() const { return this->PartiallyMapped; }
 			std::vector<Section*> GetSections() const { return Sections; }

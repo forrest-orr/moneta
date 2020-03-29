@@ -36,7 +36,7 @@ ________________________________________________________________________________
 #include "Interface.hpp"
 #include "MemDump.hpp"
 #include "Suspicions.hpp"
-#include "Signing.hpp"
+#include "Signing.h"
 
 using namespace std;
 using namespace Memory;
@@ -462,7 +462,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 					Interface::Log("    | Size of image: %d\r\n", PeEntity->GetImageSize());
 					Interface::Log("    | Non-executable: %ws\r\n", PeEntity->IsNonExecutableImage() ? L"yes" : L"no");
 					Interface::Log("    | Partially mapped: %ws\r\n", PeEntity->IsPartiallyMapped() ? L"yes" : L"no");
-					Interface::Log("    | Signed: %ws\r\n", PeEntity->IsSigned() ? L"yes" : L"no");
+					Interface::Log("    | Signed: %ws [%ws]\r\n", PeEntity->IsSigned() ? L"yes" : L"no", TranslateSigningType(PeEntity->GetSisningType()));
 					Interface::Log("    | Signing level: %ws\r\n", TranslateSigningLevel(PeEntity->GetSigningLevel()));
 					Interface::Log("    |__ PEB module");
 
@@ -483,7 +483,6 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 					Interface::Log("    | Mapped file size: %d\r\n", Itr->second->GetEntitySize());
 					Interface::Log("    | Mapped file path: %ws\r\n", dynamic_cast<MappedFile*>(Itr->second)->GetFileBase()->GetPath().c_str());
 				}
-
 				/*
 				if (Itr->second->GetRegionInfo() != nullptr) {
 					// Due to flag inconsistency between architectures and different Windows version MEMORY_REGION_INFORMATION has been excluded

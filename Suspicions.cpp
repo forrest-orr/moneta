@@ -83,7 +83,6 @@ void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>& S
 	Region map -> Key [Allocation base]
 					-> Suspicions map -> Key [Subregion address]
 										   -> Suspicions list
-
 */
 
 bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, map<uint8_t*, list<Suspicion *>>> &SuspicionsMap) {

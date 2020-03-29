@@ -35,7 +35,7 @@ ________________________________________________________________________________
 #include "Memory.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
-#include "Signing.hpp"
+#include "Signing.h"
 
 using namespace std;
 using namespace Memory;
@@ -158,6 +158,14 @@ vector<PeVm::Section*> PeVm::Body::FindOverlapSect(Subregion& Address) {
 	}
 
 	return OverlappingSections;
+}
+
+bool PeVm::Body::IsSigned() const {
+	return (this->Signed == Signing_t::Unsigned ? false : true);
+}
+
+Signing_t PeVm::Body::GetSisningType() const {
+	return this->Signed;
 }
 
 PeVm::Body::PebModule::PebModule(HANDLE hProcess, const uint8_t* pModBase) {
