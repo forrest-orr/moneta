@@ -8,7 +8,7 @@ using namespace std;
 PeFile::PeFile(const uint8_t* pPeBuf, uint32_t dwPeFileSize) : Data(new uint8_t[dwPeFileSize]), Size(dwPeFileSize) {
 	memcpy(this->Data, pPeBuf, dwPeFileSize);
 	this->DosHdr = (IMAGE_DOS_HEADER*)this->Data;
-	this->FileHdr = (IMAGE_FILE_HEADER*)((uint8_t*)this->DosHdr + this->DosHdr->e_lfanew + sizeof(LONG));
+	this->FileHdr = (IMAGE_FILE_HEADER*)(reinterpret_cast<uint8_t *>(this->DosHdr) + this->DosHdr->e_lfanew + sizeof(LONG));
 }
 
 PeFile::~PeFile() {
@@ -51,25 +51,25 @@ PeFile* PeFile::Load(const wstring PeFilePath) {
 		uint32_t dwBytesRead;
 		IMAGE_DOS_HEADER DosHdr = { 0 };
 
-		if (ReadFile(hFile, &DosHdr, sizeof(DosHdr), (PDWORD)&dwBytesRead, 0)) {
+		if (ReadFile(hFile, &DosHdr, sizeof(DosHdr), reinterpret_cast<PDWORD>(&dwBytesRead), 0)) {
 			IMAGE_FILE_HEADER FileHdr;
 
 			SetFilePointer(hFile, DosHdr.e_lfanew + 4, nullptr, FILE_BEGIN);
 
-			if (ReadFile(hFile, &FileHdr, sizeof(FileHdr), (PDWORD)&dwBytesRead, 0)) {
+			if (ReadFile(hFile, &FileHdr, sizeof(FileHdr), reinterpret_cast<PDWORD>(&dwBytesRead), 0)) {
 				uint32_t dwHdrSize = 0; // Obtain the size of the region from where the DOS header begins and where the optional/section headers end
 
 				if (FileHdr.Machine == IMAGE_FILE_MACHINE_I386) {
 					IMAGE_OPTIONAL_HEADER32 OptHdr;
 
-					if (ReadFile(hFile, &OptHdr, sizeof(OptHdr), (PDWORD)&dwBytesRead, 0)) {
+					if (ReadFile(hFile, &OptHdr, sizeof(OptHdr), reinterpret_cast<PDWORD>(&dwBytesRead), 0)) {
 						dwHdrSize = OptHdr.SizeOfHeaders;
 					}
 				}
 				else if (FileHdr.Machine == IMAGE_FILE_MACHINE_AMD64) {
 					IMAGE_OPTIONAL_HEADER64 OptHdr;
 
-					if (ReadFile(hFile, &OptHdr, sizeof(OptHdr), (PDWORD)&dwBytesRead, 0)) {
+					if (ReadFile(hFile, &OptHdr, sizeof(OptHdr), reinterpret_cast<PDWORD>(&dwBytesRead), 0)) {
 						dwHdrSize = OptHdr.SizeOfHeaders;
 					}
 				}
@@ -79,7 +79,7 @@ PeFile* PeFile::Load(const wstring PeFilePath) {
 
 					SetFilePointer(hFile, 0, nullptr, FILE_BEGIN);
 
-					if (ReadFile(hFile, HdrData, dwHdrSize, (PDWORD)&dwBytesRead, 0)) {
+					if (ReadFile(hFile, HdrData, dwHdrSize, reinterpret_cast<PDWORD>(&dwBytesRead), 0)) {
 						NewPe = PeFile::Load(HdrData, dwHdrSize);
 					}
 				}
@@ -96,7 +96,7 @@ template<typename NtHdrType> PeArch<NtHdrType>::PeArch(const uint8_t* pPeBuf, ui
 
 template<typename NtHdrType> NtHdrType* PeArch<NtHdrType>::GetNtHdrs() {
 	assert(this->DosHdr != nullptr);
-	NtHdrType* pNtHdr = (NtHdrType*)((uint8_t*)this->DosHdr + this->DosHdr->e_lfanew);
+	NtHdrType* pNtHdr = (NtHdrType*)(reinterpret_cast<uint8_t *>(this->DosHdr) + this->DosHdr->e_lfanew);
 
 	if (pNtHdr->Signature == 'EP') {
 		if (pNtHdr->FileHeader.Machine == GetPeArch()) {
@@ -145,7 +145,7 @@ template<typename NtHdrType> void  PeArch<NtHdrType>::SetCrc32(uint32_t dwCrc32)
 template<typename NtHdrType> uint32_t PeArch<NtHdrType>::RefreshCrc32() {
 	uint32_t dwOriginalCRC32 = 0, dwNewCRC32 = 0;
 
-	if (CheckSumMappedFile(this->Data, this->Size, (PDWORD)&dwOriginalCRC32, (PDWORD)&dwNewCRC32)) {
+	if (CheckSumMappedFile(this->Data, this->Size, reinterpret_cast<PDWORD>(&dwOriginalCRC32), reinterpret_cast<PDWORD>(&dwNewCRC32))) {
 		GetNtHdrs()->OptionalHeader.CheckSum = dwNewCRC32;
 	}
 	else {

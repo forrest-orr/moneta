@@ -70,7 +70,7 @@ bool Interface::Log(VerbosityLevel MsgVlvl, const char *LogFormat, ...) {
 
 		va_end(pVarList);
 
-		return WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), (PDWORD)&dwBytesWritten, NULL);
+		return WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), reinterpret_cast<PDWORD>(&dwBytesWritten), NULL);
 	}
 
 	return FALSE;
@@ -89,20 +89,20 @@ bool Interface::Log(const char *LogFormat, ...) {
 
 	va_end(pVarList);
 
-	return WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), (PDWORD)&dwBytesWritten, NULL);
+	return WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), reinterpret_cast<PDWORD>(&dwBytesWritten), NULL);
 }
 
 bool Interface::Log(ConsoleColor Color, const char* LogFormat, ...) {
 	char LogBuffer[4000] = { 0 };
 	char* pVarList;
 	uint32_t dwBytesWritten = 0;
-	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+	CONSOLE_SCREEN_BUFFER_INFO ConsoleInfo;
 	WORD wOldAttrib;
 	bool bWriteSuccess;
 	
 	if (Interface::IsStdout) {
-		GetConsoleScreenBufferInfo(Interface::Handle, &consoleInfo);
-		wOldAttrib = consoleInfo.wAttributes;
+		GetConsoleScreenBufferInfo(Interface::Handle, &ConsoleInfo);
+		wOldAttrib = ConsoleInfo.wAttributes;
 		SetConsoleTextAttribute(Interface::Handle, (WORD)Color);
 	}
 
@@ -114,7 +114,7 @@ bool Interface::Log(ConsoleColor Color, const char* LogFormat, ...) {
 
 	va_end(pVarList);
 
-	bWriteSuccess = WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), (PDWORD)&dwBytesWritten, NULL);
+	bWriteSuccess = WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), reinterpret_cast<PDWORD>(&dwBytesWritten), NULL);
 
 	if (Interface::IsStdout) {
 		SetConsoleTextAttribute(Interface::Handle, wOldAttrib);

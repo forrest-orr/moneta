@@ -118,7 +118,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				}
 			}
 			else if (Arg == L"--address") {
-				pAddress = (uint8_t*)wcstoull((*(i + 1)).c_str(), NULL, 0);
+				pAddress = reinterpret_cast<uint8_t *>(wcstoull((*(i + 1)).c_str(), NULL, 0));
 			}
 			else if (Arg == L"-d") {
 				qwOptFlags |= PROCESS_ENUM_FLAG_MEMDUMP;

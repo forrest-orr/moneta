@@ -77,20 +77,19 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 			ThreadEntry.dwSize = sizeof(THREADENTRY32);
 
 			if (Thread32First(hThreadSnap, &ThreadEntry)) {
-				do
-				{
+				do {
 					if (ThreadEntry.th32OwnerProcessID == this->Pid) {
 						Thread* CurrentThread = new Thread(ThreadEntry.th32ThreadID);
 						HANDLE hThread = OpenThread(THREAD_QUERY_INFORMATION, false, CurrentThread->GetTid()); // OpenThreadToken consistently failed even with impersonation (ERROR_NO_TOKEN). The idea was abandoned due to lack of relevance. Get-InjectedThread returns the user as SYSTEM even when it was a regular user which launched the remote thread.
 
 						if (hThread != nullptr) {
 							typedef NTSTATUS(NTAPI* NtQueryInformationThread_t) (HANDLE, THREADINFOCLASS, void*, uint32_t, uint32_t*);
-							static NtQueryInformationThread_t NtQueryInformationThread = (NtQueryInformationThread_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationThread");
+							static NtQueryInformationThread_t NtQueryInformationThread = reinterpret_cast<NtQueryInformationThread_t>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationThread"));
 							void* pStartAddress = nullptr;
 							HANDLE hDupThread = nullptr;
 
 							if (DuplicateHandle(GetCurrentProcess(), hThread, GetCurrentProcess(), &hDupThread, THREAD_QUERY_INFORMATION, FALSE, 0)) { // Without duplicating this handle NtQueryInformationThread will consistently fail to query the start address.
-								NTSTATUS NtStatus = NtQueryInformationThread(hDupThread, (THREADINFOCLASS)ThreadQuerySetWin32StartAddress, &pStartAddress, sizeof(pStartAddress), nullptr);
+								NTSTATUS NtStatus = NtQueryInformationThread(hDupThread, static_cast<THREADINFOCLASS>(ThreadQuerySetWin32StartAddress), &pStartAddress, sizeof(pStartAddress), nullptr);
 
 								if (NT_SUCCESS(NtStatus)) {
 									CurrentThread->SetEntryPoint(pStartAddress);
@@ -119,13 +118,13 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				this->ImageFilePath = wstring(ImageFilePath);
 				Interface::Log(VerbosityLevel::Debug, "... mapping address space of PID %d [%ws]\r\n", this->Pid, this->Name.c_str());
 				typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
-				static ISWOW64PROCESS IsWow64Process = (ISWOW64PROCESS)GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process");
+				static ISWOW64PROCESS IsWow64Process = reinterpret_cast<ISWOW64PROCESS>(GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process"));
 
 				if (IsWow64Process != nullptr) {
 					BOOL bSelfWow64 = FALSE;
 
-					if (IsWow64Process(GetCurrentProcess(), (PBOOL)&bSelfWow64)) {
-						if (IsWow64Process(this->Handle, (PBOOL)&this->Wow64)) {
+					if (IsWow64Process(GetCurrentProcess(), static_cast<PBOOL>(&bSelfWow64))) {
+						if (IsWow64Process(this->Handle, static_cast<PBOOL>(&this->Wow64))) {
 							if (this->IsWow64()) {
 								Interface::Log(VerbosityLevel::Debug, "... PID %d is Wow64\r\n", this->Pid);
 							}
@@ -148,12 +147,12 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += cbRegionSize) {
 			MEMORY_BASIC_INFORMATION* Mbi = new MEMORY_BASIC_INFORMATION;
 
-			if (VirtualQueryEx(this->Handle, pBaseAddr, (MEMORY_BASIC_INFORMATION*)Mbi, sizeof(MEMORY_BASIC_INFORMATION)) == sizeof(MEMORY_BASIC_INFORMATION)) {
+			if (VirtualQueryEx(this->Handle, pBaseAddr, Mbi, sizeof(MEMORY_BASIC_INFORMATION)) == sizeof(MEMORY_BASIC_INFORMATION)) {
 				cbRegionSize = Mbi->RegionSize;
 
 				if (!Subregions.empty()) { // If the subregion list is empty then there is no region base for comparison
 					if (Mbi->AllocationBase != (*Region)->GetBasic()->AllocationBase) {
-						this->Entities.insert(make_pair((uint8_t*)(*Region)->GetBasic()->AllocationBase, Entity::Create(this->Handle, Subregions)));
+						this->Entities.insert(make_pair(static_cast<uint8_t *>((*Region)->GetBasic()->AllocationBase), Entity::Create(this->Handle, Subregions)));
 						Subregions.clear();
 					}
 				}
@@ -163,7 +162,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 			}
 			else {
 				if (!Subregions.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
-					this->Entities.insert(make_pair((uint8_t*)(*Region)->GetBasic()->AllocationBase, Entity::Create(this->Handle, Subregions)));
+					this->Entities.insert(make_pair(static_cast<uint8_t *>((*Region)->GetBasic()->AllocationBase), Entity::Create(this->Handle, Subregions)));
 				}
 
 				delete Mbi;
@@ -450,7 +449,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 			// Display suspicions associated with the entity, if the current entity has any suspicions associated with it
 			//
 
-			AppendOverlapSuspicion(pSbMap, (uint8_t*)Itr->second->GetStartVa(), true);
+			AppendOverlapSuspicion(pSbMap, static_cast<uint8_t*>(const_cast<void *>(Itr->second->GetStartVa())), true);
 			Interface::Log("\r\n");
 
 			if (Interface::GetVerbosity() == VerbosityLevel::Detail) {
@@ -503,8 +502,8 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 					(MemSelectType == MemorySelection_t::Block && (pSelectAddress == (*SbItr)->GetBasic()->BaseAddress || (qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE))) ||
 					(MemSelectType == MemorySelection_t::Suspicious && ((qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE) || 
 																		  (pSbMap != nullptr &&
-																		   pSbMap->count((uint8_t*)(*SbItr)->GetBasic()->BaseAddress)) &&
-																		   SubEntitySuspCount(pSbMap, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress) > 0))) {
+																		   pSbMap->count(static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress))) &&
+																		   SubEntitySuspCount(pSbMap, static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress)) > 0))) {
 					wchar_t AlignedAttribDesc[9] = { 0 };
 
 					AlignName(Subregion::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
@@ -518,7 +517,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 
 						if (OverlapSections.empty()) {
 							Interface::Log("    0x%p:0x%08x | %ws | ?        | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbItr)->GetPrivateSize());
-							AppendOverlapSuspicion(pSbMap, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, false);
+							AppendOverlapSuspicion(pSbMap, static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress), false);
 							Interface::Log("\r\n");
 						}
 						else{
@@ -528,10 +527,10 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 
 								strncpy_s(AnsiSectName, 9, (char*)(*SectItr)->GetHeader()->Name, 8);
 								wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
-								AlignName((const wchar_t*)UnicodeSectName.c_str(), AlignedSectName, 8);
+								AlignName(static_cast<const wchar_t*>(UnicodeSectName.c_str()), AlignedSectName, 8);
 
 								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName, (*SbItr)->GetPrivateSize());
-								AppendOverlapSuspicion(pSbMap, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, false);
+								AppendOverlapSuspicion(pSbMap, static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress), false);
 								Interface::Log("\r\n");
 
 							}
@@ -539,7 +538,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 					}
 					else {
 						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbItr)->GetPrivateSize());
-						AppendOverlapSuspicion(pSbMap, (uint8_t*)(*SbItr)->GetBasic()->BaseAddress, false);
+						AppendOverlapSuspicion(pSbMap, static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress), false);
 						Interface::Log("\r\n");
 					}
 

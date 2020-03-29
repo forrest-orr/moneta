@@ -39,7 +39,7 @@ using namespace Processes;
 
 Subregion::Subregion(HANDLE hProcess, const MEMORY_BASIC_INFORMATION* Mbi, vector<Processes::Thread*> Threads) : ProcessHandle(hProcess), Basic(Mbi) {
 	for (vector<Processes::Thread*>::const_iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
-		if ((*ThItr)->GetEntryPoint() >= this->Basic->BaseAddress && (*ThItr)->GetEntryPoint() < ((uint8_t*)this->Basic->BaseAddress + this->Basic->RegionSize)) {
+		if ((*ThItr)->GetEntryPoint() >= this->Basic->BaseAddress && (*ThItr)->GetEntryPoint() < (static_cast<uint8_t *>(this->Basic->BaseAddress) + this->Basic->RegionSize)) {
 			this->Threads.push_back(new Processes::Thread((*ThItr)->GetTid(), (*ThItr)->GetEntryPoint()));
 		}
 	}
@@ -113,7 +113,7 @@ uint32_t Subregion::QueryPrivateSize() const {
 		uint32_t dwWorkingSetsSize = sizeof(PSAPI_WORKING_SET_EX_INFORMATION);
 
 		for (uint32_t dwPageOffset = 0; dwPageOffset < this->Basic->RegionSize; dwPageOffset += 0x1000) {
-			pWorkingSets->VirtualAddress = ((uint8_t*)this->Basic->BaseAddress + dwPageOffset);
+			pWorkingSets->VirtualAddress = (static_cast<uint8_t *>(this->Basic->BaseAddress) + dwPageOffset);
 			if (K32QueryWorkingSetEx(this->ProcessHandle, pWorkingSets, dwWorkingSetsSize)) {
 				if (!pWorkingSets->VirtualAttributes.Shared) {
 					dwPrivateSize += 0x1000;

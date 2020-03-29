@@ -70,8 +70,8 @@ typedef struct _MEMORY_IMAGE_INFORMATION {
 
 typedef NTSTATUS(__stdcall* NtQueryVirtualMemory_t)(HANDLE, void*, MEMORY_INFORMATION_CLASS, void*, SIZE_T, SIZE_T*);
 
-PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* FilePath) : Region(hProcess, Subregions), PeVm::Component(hProcess, Subregions, (uint8_t*)(Subregions.front())->GetBasic()->BaseAddress), MappedFile(hProcess, Subregions, FilePath, false), PebMod(hProcess, this->PeFile) {
-	static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory");
+PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* FilePath) : Region(hProcess, Subregions), PeVm::Component(hProcess, Subregions, static_cast<uint8_t *>((Subregions.front())->GetBasic()->BaseAddress)), MappedFile(hProcess, Subregions, FilePath, false), PebMod(hProcess, this->PeFile) {
+	static NtQueryVirtualMemory_t NtQueryVirtualMemory = reinterpret_cast<NtQueryVirtualMemory_t>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory"));
 	MEMORY_IMAGE_INFORMATION Mii = { 0 };
 	NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, this->PeFile, MemoryImageInformation, &Mii, sizeof(MEMORY_IMAGE_INFORMATION), nullptr);
 
@@ -97,7 +97,7 @@ PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* 
 				IMAGE_SECTION_HEADER ArtificialPeHdr = { 0 }; // This will initialize other relevant fields such as VirtualAddress to 0 for the PE header edge case.
 
 				if (nX == -1) {
-					strcpy_s((char*)ArtificialPeHdr.Name, sizeof(ArtificialPeHdr.Name), "Header");
+					strcpy_s(reinterpret_cast<char*>(ArtificialPeHdr.Name), sizeof(ArtificialPeHdr.Name), "Header");
 					ArtificialPeHdr.SizeOfRawData = this->Pe->GetSectHdrs()->VirtualAddress; // Consider the size of the PE headers to be all data leading up to the start of the first real section.
 				}
 				else {
@@ -115,8 +115,8 @@ PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* 
 				vector<Subregion*> OverlapSubregion;
 
 				for (vector<Subregion*>::const_iterator SbItr = Subregions.begin(); SbItr != Subregions.end(); ++SbItr) {
-					uint8_t* pSubregionStartVa = (uint8_t*)(*SbItr)->GetBasic()->BaseAddress;
-					uint8_t* pSubregionEndVa = (uint8_t*)(*SbItr)->GetBasic()->BaseAddress + (*SbItr)->GetBasic()->RegionSize;
+					uint8_t* pSubregionStartVa = static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress);
+					uint8_t* pSubregionEndVa = static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress) + (*SbItr)->GetBasic()->RegionSize;
 
 					if ((pSubregionStartVa >= pSectStartVa && pSubregionStartVa < pSectEndVa) || (pSubregionEndVa > pSectStartVa&& pSubregionEndVa <= pSectEndVa) || (pSubregionStartVa < pSectStartVa && pSubregionEndVa > pSectEndVa)) {
 						//Interface::Log("... section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, pSectStartVa, pSectEndVa, pSubregionStartVa, pSubregionEndVa);
@@ -220,7 +220,7 @@ Entity* Entity::Create(HANDLE hProcess, std::vector<Subregion*> Subregions) {
 		wchar_t DevFilePath[MAX_PATH + 1] = { 0 };
 		wchar_t MaFilePath[MAX_PATH + 1] = { 0 };
 
-		if (GetMappedFileNameW(hProcess, (HMODULE)Subregions.front()->GetBasic()->BaseAddress, DevFilePath, MAX_PATH)) {
+		if (GetMappedFileNameW(hProcess, static_cast<HMODULE>(Subregions.front()->GetBasic()->BaseAddress), DevFilePath, MAX_PATH)) {
 			if (!FileBase::TranslateDevicePath(DevFilePath, MaFilePath)) {
 				Interface::Log(VerbosityLevel::Debug, "! Failed to translate device path: %ws\r\n", DevFilePath);
 				wcscpy_s(MaFilePath, MAX_PATH + 1, L"?");
@@ -281,7 +281,7 @@ Entity::~Entity() {
 
 void Entity::SetSubregions(vector<Subregion*> Subregions) {
 	this->Subregions = Subregions;
-	this->StartVa = (uint8_t*)(Subregions.front())->GetBasic()->BaseAddress;
-	this->EndVa = ((uint8_t*)(Subregions.back())->GetBasic()->BaseAddress + (Subregions.back())->GetBasic()->RegionSize);
-	this->EntitySize = ((uint8_t*)(Subregions.back())->GetBasic()->BaseAddress + (Subregions.back())->GetBasic()->RegionSize) - (Subregions.front())->GetBasic()->BaseAddress;
+	this->StartVa = static_cast<uint8_t *>((Subregions.front())->GetBasic()->BaseAddress);
+	this->EndVa = (static_cast<uint8_t *>((Subregions.back())->GetBasic()->BaseAddress) + (Subregions.back())->GetBasic()->RegionSize);
+	this->EntitySize = (static_cast<uint8_t *>((Subregions.back())->GetBasic()->BaseAddress) + (Subregions.back())->GetBasic()->RegionSize) - (Subregions.front())->GetBasic()->BaseAddress;
 }

@@ -143,11 +143,11 @@ wchar_t* GetWindowsPECatalogIssuer(const wchar_t* TargetFilePath)
     {
         if ((hFile = CreateFileW(TargetFilePath, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr)) != INVALID_HANDLE_VALUE)
         {
-            if (CryptCATAdminCalcHashFromFileHandle(hFile, (PDWORD)&dwHashSize, nullptr, 0) && dwHashSize != 0)
+            if (CryptCATAdminCalcHashFromFileHandle(hFile, reinterpret_cast<PDWORD>(&dwHashSize), nullptr, 0) && dwHashSize != 0)
             {
                 uint8_t* pHashBuffer = new uint8_t[dwHashSize];
 
-                if (CryptCATAdminCalcHashFromFileHandle(hFile, (PDWORD)&dwHashSize, pHashBuffer, 0))
+                if (CryptCATAdminCalcHashFromFileHandle(hFile, reinterpret_cast<PDWORD>(&dwHashSize), pHashBuffer, 0))
                 {
                     if ((hTargetCatalog = CryptCATAdminEnumCatalogFromHash(hCatalogContext, pHashBuffer, dwHashSize, 0, nullptr)) != nullptr)
                     {
@@ -155,13 +155,13 @@ wchar_t* GetWindowsPECatalogIssuer(const wchar_t* TargetFilePath)
                         {
                            // printf("[*] Path from catalog info is %ws\r\n", CatalogInfo.wszCatalogFile);
 
-                            if (CryptQueryObject(CERT_QUERY_OBJECT_FILE, CatalogInfo.wszCatalogFile, CERT_QUERY_CONTENT_FLAG_PKCS7_SIGNED_EMBED, CERT_QUERY_FORMAT_FLAG_BINARY, 0, (PDWORD)&dwEncoding, (PDWORD)&dwContentType, (PDWORD)&dwFormatType, &hCertStore, &hMsg, nullptr))
+                            if (CryptQueryObject(CERT_QUERY_OBJECT_FILE, CatalogInfo.wszCatalogFile, CERT_QUERY_CONTENT_FLAG_PKCS7_SIGNED_EMBED, CERT_QUERY_FORMAT_FLAG_BINARY, 0, reinterpret_cast<PDWORD>(&dwEncoding), reinterpret_cast<PDWORD>(&dwContentType), reinterpret_cast<PDWORD>(&dwFormatType), &hCertStore, &hMsg, nullptr))
                             {
-                                if (CryptMsgGetParam(hMsg, CMSG_SIGNER_INFO_PARAM, 0, nullptr, (PDWORD)&dwSignerInfoSize) && dwSignerInfoSize)
+                                if (CryptMsgGetParam(hMsg, CMSG_SIGNER_INFO_PARAM, 0, nullptr, reinterpret_cast<PDWORD>(&dwSignerInfoSize)) && dwSignerInfoSize)
                                 {
                                     pSignerInfo = (PCMSG_SIGNER_INFO)new uint8_t[dwSignerInfoSize];
 
-                                    if (CryptMsgGetParam(hMsg, CMSG_SIGNER_INFO_PARAM, 0, (void*)pSignerInfo, (PDWORD)&dwSignerInfoSize))
+                                    if (CryptMsgGetParam(hMsg, CMSG_SIGNER_INFO_PARAM, 0, (void*)pSignerInfo, reinterpret_cast<PDWORD>(&dwSignerInfoSize)))
                                     {
                                         CertInfo.Issuer = pSignerInfo->Issuer;
                                         CertInfo.SerialNumber = pSignerInfo->SerialNumber;

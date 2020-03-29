@@ -142,7 +142,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 							}
 
 							if (SbSuspList.size()) { // Do not insert the list to the map if it overlaps with the ablock.
-								RefSbMap.insert(make_pair((uint8_t *)(*SbItr)->GetBasic()->BaseAddress, SbSuspList));
+								RefSbMap.insert(make_pair(static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress), SbSuspList));
 							}
 						}
 					}
@@ -162,7 +162,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 					SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, XMAP));
 				}
 				if (SbSuspList.size()) {
-					RefSbMap.insert(make_pair((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, SbSuspList));
+					RefSbMap.insert(make_pair(static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress), SbSuspList));
 				}
 			}
 
@@ -179,7 +179,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 					}
 
 					if (SbSuspList.size()) {
-						RefSbMap.insert(make_pair((uint8_t*)(*SbItr)->GetBasic()->BaseAddress, SbSuspList));
+						RefSbMap.insert(make_pair(static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress), SbSuspList));
 					}
 				}
 			}

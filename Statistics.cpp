@@ -75,31 +75,31 @@ void PermissionRecord::ShowRecords() const {
 			}
 			switch (Itr2->first) {
 			case PAGE_READONLY:
-				Interface::Log("PAGE_READONLY: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("PAGE_READONLY: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			case PAGE_READWRITE:
-				Interface::Log("PAGE_READWRITE: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("PAGE_READWRITE: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			case PAGE_EXECUTE_READ:
-				Interface::Log("PAGE_EXECUTE_READ: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("PAGE_EXECUTE_READ: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			case PAGE_EXECUTE_READWRITE:
-				Interface::Log("PAGE_EXECUTE_READWRITE: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("PAGE_EXECUTE_READWRITE: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			case PAGE_EXECUTE_WRITECOPY:
-				Interface::Log("PAGE_EXECUTE_WRITECOPY: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("PAGE_EXECUTE_WRITECOPY: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			case PAGE_WRITECOPY:
-				Interface::Log("PAGE_WRITECOPY: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("PAGE_WRITECOPY: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			case PAGE_EXECUTE:
-				Interface::Log("PAGE_EXECUTE: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("PAGE_EXECUTE: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			case PAGE_NOACCESS:
-				Interface::Log("PAGE_NOACCESS: %d (%f%%)", Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("PAGE_NOACCESS: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			default:
-				Interface::Log("0x%08x: %d (%f%%)", Itr2->first, Itr2->second, (float)Itr2->second / nTotalRegions * 100.0);
+				Interface::Log("0x%08x: %d (%f%%)", Itr2->first, Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			}
 

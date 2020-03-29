@@ -17,7 +17,7 @@ bool MemDump::Create(wstring Folder, const MEMORY_BASIC_INFORMATION *Mbi,  wchar
 	uint8_t* pBuf = new uint8_t[Mbi->RegionSize];
 	wstring TargetDmpFolder;
 
-	if (ReadProcessMemory(this->Handle, Mbi->BaseAddress, pBuf, Mbi->RegionSize, (SIZE_T*)&cbBytesRead)) {
+	if (ReadProcessMemory(this->Handle, Mbi->BaseAddress, pBuf, Mbi->RegionSize, static_cast<SIZE_T*>(&cbBytesRead))) {
 		if (!Folder.empty()) {
 			TargetDmpFolder = MemDump::Folder + L"\\" + Folder;
 

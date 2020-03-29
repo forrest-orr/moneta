@@ -15,7 +15,7 @@ bool FileBase::ToDisk (bool bAppend) const {
 
 	if ((hFile = CreateFileW(this->Path.c_str(), bAppend ? FILE_APPEND_DATA : GENERIC_WRITE, bAppend ? FILE_SHARE_READ : 0, NULL, bAppend ? OPEN_ALWAYS : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)) != INVALID_HANDLE_VALUE) {
 		uint32_t dwBytesWritten;
-		if (WriteFile(hFile, this->GetData(), this->GetSize(), (PDWORD)&dwBytesWritten, 0)) {
+		if (WriteFile(hFile, this->GetData(), this->GetSize(), reinterpret_cast<PDWORD>(&dwBytesWritten), 0)) {
 			bWritten = true;
 		}
 
@@ -33,7 +33,7 @@ FileBase::FileBase(wstring TargetPath, bool bMemStore, bool bForceOpen) : Path(T
 			uint32_t dwBytesRead;
 			this->FileSize = GetFileSize(hFile, NULL);
 			this->FileData = new uint8_t[this->FileSize];
-			if (!ReadFile(hFile, this->FileData, this->FileSize, (PDWORD)&dwBytesRead, 0)) throw 2;
+			if (!ReadFile(hFile, this->FileData, this->FileSize, reinterpret_cast<PDWORD>(&dwBytesRead), 0)) throw 2;
 		}
 
 		CloseHandle(hFile);
