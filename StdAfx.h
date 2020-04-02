@@ -15,6 +15,10 @@
 #include <assert.h>
 #include <ImageHlp.h>
 #include <strsafe.h>
+#include <Softpub.h>
+#include <mscat.h>
+#include <wincrypt.h>
+#include <wintrust.h>
 #include <list>
 #include <map>
 #include <string>

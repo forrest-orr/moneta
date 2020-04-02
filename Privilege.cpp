@@ -1,5 +1,4 @@
-#include <Windows.h>
-#include <stdint.h>
+#include "StdAfx.h"
 
 bool SetPrivilege(HANDLE hToken, const wchar_t *Privilege, bool bEnablePrivilege) {
 	TOKEN_PRIVILEGES TokenPrivs = { 0 };

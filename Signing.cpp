@@ -1,11 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <windows.h>
-#include <Softpub.h>
-#include <stdint.h>
-#include <mscat.h>
-#include <wincrypt.h>
-#include <wintrust.h>
+#include "StdAfx.h"
 #include "Signing.h"
 
 #pragma comment (lib, "Wintrust.lib")
