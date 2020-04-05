@@ -34,6 +34,7 @@ namespace Processes {
 		std::wstring ImageFilePath;
 		BOOL Wow64; // bool and BOOL translate to different sizes, IsWow64Process pointed at a bool will corrupt memory.
 		std::vector<Thread*> Threads;
+		std::vector<void*> Heaps;
 		std::map<uint8_t*, Memory::Entity*> Entities; // A region can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
 	public:
 		HANDLE GetHandle() const { return this->Handle; }

@@ -106,6 +106,22 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 			}
 
 			CloseHandle(hThreadSnap);
+
+			HEAPLIST32 HlEntry;
+			HANDLE hHeapSnap = CreateToolhelp32Snapshot(TH32CS_SNAPHEAPLIST, dwPid); // PID will be ignored for a heap listing (it will include all heaps of all processes)
+
+			HlEntry.dwSize = sizeof(HEAPLIST32);
+
+			if (hHeapSnap != INVALID_HANDLE_VALUE) {
+				if (Heap32ListFirst(hHeapSnap, &HlEntry)) {
+					do {
+						this->Heaps.push_back(reinterpret_cast<void *>(HlEntry.th32HeapID));
+						HlEntry.dwSize = sizeof(HEAPLIST32);
+					} while (Heap32ListNext(hHeapSnap, &HlEntry));
+				}
+			}
+
+			CloseHandle(hHeapSnap);
 		}
 
 		wchar_t ImageName[MAX_PATH + 1] = { 0 }, DevFilePath[MAX_PATH + 1] = { 0 };
@@ -232,8 +248,8 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 
 				for (int32_t nSuspIndex = 0; !bReWalkMap && SuspItr != SbMapItr->second.end(); ++SuspItr, nSuspIndex++) {
 					switch ((*SuspItr)->GetType()) {
-					/*case Suspicion::Type::XPRV: {
-						//Interface::Log("* Filtered executable private memory at 0x%p\r\n", (*SuspItr)->GetBlock()->GetBasic()->BaseAddress);
+					case Suspicion::Type::XPRV: {
+						/*
 						bReWalkMap = true;
 						RefSuspList.erase(SuspItr);
 
@@ -247,9 +263,30 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 							if (!RefSbMap.size()) {
 								SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
 							}
+						}*/
+						
+						/*
+						//(*SuspItr)->GetParentObject()->GetEntitySize
+						uint32_t dwBlockSize = (*SuspItr)->GetBlock()->GetBasic()->RegionSize;
+						uint8_t* pZeroMem = static_cast<uint8_t *>(HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwBlockSize));
+						uint8_t* pBlockBuf = static_cast<uint8_t*>(HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwBlockSize));
+						SIZE_T cbBytesRead;
+
+						if (ReadProcessMemory((*SuspItr)->GetProcess()->GetHandle(), (*SuspItr)->GetBlock()->GetBasic()->BaseAddress, pBlockBuf, dwBlockSize, &cbBytesRead)) {
+							if (memcmp(pBlockBuf, pZeroMem, dwBlockSize) == 0) {
+								printf("0x%p is an empry +x private block\r\n", (*SuspItr)->GetBlock()->GetBasic()->BaseAddress);
+								system("pause");
+							}
 						}
+						else {
+							printf("Failed to ReadProcessMemory\r\n");
+							system("pause");
+						}
+
+						HeapFree(GetProcessHeap(), 0, pZeroMem);
+						HeapFree(GetProcessHeap(), 0, pBlockBuf);*/
 						break;
-					}*/
+					}
 					case Suspicion::Type::MISSING_PEB_MODULE: {
 						/* Filter cases for missing PEB modules:
 							 ~ Signed metadata PEs. These appear in the C:\Windows\System32\WinMetadata folder with the .winmd extension. They've also been noted to appear in WindpwsApps, SystemApps and others.
