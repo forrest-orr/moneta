@@ -39,6 +39,7 @@ namespace Processes {
 	public:
 		HANDLE GetHandle() const { return this->Handle; }
 		uint32_t GetPid() const { return this->Pid; }
+		std::vector<void*> GetHeaps() const { return this->Heaps; }
 		std::wstring GetName() const { return this->Name; }
 		std::wstring GetImageFilePath() const { return this->ImageFilePath; }
 		bool DumpBlock(MemDump& ProcDmp, const MEMORY_BASIC_INFORMATION* Mbi, std::wstring Indent);

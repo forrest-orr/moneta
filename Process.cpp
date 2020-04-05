@@ -249,21 +249,24 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 				for (int32_t nSuspIndex = 0; !bReWalkMap && SuspItr != SbMapItr->second.end(); ++SuspItr, nSuspIndex++) {
 					switch ((*SuspItr)->GetType()) {
 					case Suspicion::Type::XPRV: {
-						/*
-						bReWalkMap = true;
-						RefSuspList.erase(SuspItr);
+						vector<void*> Heaps = (*SuspItr)->GetProcess()->GetHeaps();
+						if (find(Heaps.begin(), Heaps.end(), (*SuspItr)->GetBlock()->GetBasic()->BaseAddress) != Heaps.end()) {
+							printf("Filtered: 0x%p\r\n", (*SuspItr)->GetBlock()->GetBasic()->BaseAddress);
+							bReWalkMap = true;
+							RefSuspList.erase(SuspItr);
 
-						if (!RefSuspList.size()) {
-							//
-							// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
-							//
+							if (!RefSuspList.size()) {
+								//
+								// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
+								//
 
-							RefSbMap.erase(SbMapItr);
+								RefSbMap.erase(SbMapItr);
 
-							if (!RefSbMap.size()) {
-								SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
+								if (!RefSbMap.size()) {
+									SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
+								}
 							}
-						}*/
+						}
 						
 						/*
 						//(*SuspItr)->GetParentObject()->GetEntitySize
