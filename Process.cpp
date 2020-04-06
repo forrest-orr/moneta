@@ -70,6 +70,38 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	this->Handle = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
 
 	if (this->Handle != nullptr) {
+		wchar_t ImageName[MAX_PATH + 1] = { 0 }, DevFilePath[MAX_PATH + 1] = { 0 };
+
+		if (GetModuleBaseNameW(this->Handle, nullptr, ImageName, MAX_PATH + 1) && GetProcessImageFileNameW(this->Handle, DevFilePath, sizeof(DevFilePath))) {
+			wchar_t ImageFilePath[MAX_PATH + 1] = { 0 };
+
+			if (FileBase::TranslateDevicePath(DevFilePath, ImageFilePath)) {
+				this->Name = wstring(ImageName);
+				this->ImageFilePath = wstring(ImageFilePath);
+				Interface::Log(VerbosityLevel::Debug, "... mapping address space of PID %d [%ws]\r\n", this->Pid, this->Name.c_str());
+				typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
+				static ISWOW64PROCESS IsWow64Process = reinterpret_cast<ISWOW64PROCESS>(GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process"));
+
+				if (IsWow64Process != nullptr) {
+					BOOL bSelfWow64 = FALSE;
+
+					if (IsWow64Process(GetCurrentProcess(), static_cast<PBOOL>(&bSelfWow64))) {
+						if (IsWow64Process(this->Handle, static_cast<PBOOL>(&this->Wow64))) {
+							if (this->IsWow64()) {
+								Interface::Log(VerbosityLevel::Debug, "... PID %d is Wow64\r\n", this->Pid);
+							}
+							else {
+								if (bSelfWow64) {
+									Interface::Log(VerbosityLevel::Debug, "... cannot scan non-Wow64 process from Wow64 Moneta instance\r\n");
+									throw 2;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
 		HANDLE hThreadSnap = INVALID_HANDLE_VALUE;
 		THREADENTRY32 ThreadEntry;
 
@@ -115,6 +147,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 			if (hHeapSnap != INVALID_HANDLE_VALUE) {
 				if (Heap32ListFirst(hHeapSnap, &HlEntry)) {
 					do {
+						printf("Heap at 0x%p\r\n", HlEntry.th32HeapID);
 						this->Heaps.push_back(reinterpret_cast<void *>(HlEntry.th32HeapID));
 						HlEntry.dwSize = sizeof(HEAPLIST32);
 					} while (Heap32ListNext(hHeapSnap, &HlEntry));
@@ -122,38 +155,6 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 			}
 
 			CloseHandle(hHeapSnap);
-		}
-
-		wchar_t ImageName[MAX_PATH + 1] = { 0 }, DevFilePath[MAX_PATH + 1] = { 0 };
-
-		if (GetModuleBaseNameW(this->Handle, nullptr, ImageName, MAX_PATH + 1) && GetProcessImageFileNameW(this->Handle, DevFilePath, sizeof(DevFilePath))) {
-			wchar_t ImageFilePath[MAX_PATH + 1] = { 0 };
-
-			if (FileBase::TranslateDevicePath(DevFilePath, ImageFilePath)) {
-				this->Name = wstring(ImageName);
-				this->ImageFilePath = wstring(ImageFilePath);
-				Interface::Log(VerbosityLevel::Debug, "... mapping address space of PID %d [%ws]\r\n", this->Pid, this->Name.c_str());
-				typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
-				static ISWOW64PROCESS IsWow64Process = reinterpret_cast<ISWOW64PROCESS>(GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process"));
-
-				if (IsWow64Process != nullptr) {
-					BOOL bSelfWow64 = FALSE;
-
-					if (IsWow64Process(GetCurrentProcess(), static_cast<PBOOL>(&bSelfWow64))) {
-						if (IsWow64Process(this->Handle, static_cast<PBOOL>(&this->Wow64))) {
-							if (this->IsWow64()) {
-								Interface::Log(VerbosityLevel::Debug, "... PID %d is Wow64\r\n", this->Pid);
-							}
-							else {
-								if (bSelfWow64) {
-									Interface::Log(VerbosityLevel::Debug, "... cannot scan non-Wow64 process from Wow64 Moneta instance\r\n");
-									throw 2;
-								}
-							}
-						}
-					}
-				}
-			}
 		}
 
 		SIZE_T cbRegionSize = 0;
@@ -249,7 +250,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 				for (int32_t nSuspIndex = 0; !bReWalkMap && SuspItr != SbMapItr->second.end(); ++SuspItr, nSuspIndex++) {
 					switch ((*SuspItr)->GetType()) {
 					case Suspicion::Type::XPRV: {
-						if (((*SuspItr)->GetBlock()->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP)) {
+						if (((*SuspItr)->GetBlock()->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP)&&false) {
 							bReWalkMap = true;
 							RefSuspList.erase(SuspItr);
 
@@ -441,10 +442,10 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		auto AbMapItr = SuspicionsMap.find(static_cast<unsigned char *>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
-		map<uint8_t*, list<Suspicion *>>* pSbMap = nullptr;
+		map<uint8_t*, list<Suspicion *>>* SbrMap = nullptr;
 
 		if (AbMapItr != SuspicionsMap.end()) {
-			pSbMap = &SuspicionsMap.at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
+			SbrMap = &SuspicionsMap.at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
 		}
 
 		if (MemSelectType == MemorySelection_t::All ||
@@ -503,7 +504,8 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 			// Display suspicions associated with the entity, if the current entity has any suspicions associated with it
 			//
 
-			AppendOverlapSuspicion(pSbMap, static_cast<uint8_t*>(const_cast<void *>(Itr->second->GetStartVa())), true);
+			AppendSubregionAttributes(Itr->second->GetSubregions().front());
+			AppendOverlapSuspicion(SbrMap, static_cast<uint8_t*>(const_cast<void *>(Itr->second->GetStartVa())), true);
 			Interface::Log("\r\n");
 
 			if (Interface::GetVerbosity() == VerbosityLevel::Detail) {
@@ -554,9 +556,9 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 				if (MemSelectType == MemorySelection_t::All ||
 					(MemSelectType == MemorySelection_t::Block && (pSelectAddress == (*SbrItr)->GetBasic()->BaseAddress || (qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE))) ||
 					(MemSelectType == MemorySelection_t::Suspicious && ((qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE) || 
-																		  (pSbMap != nullptr &&
-																		   pSbMap->count(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress))) &&
-																		   SubEntitySuspCount(pSbMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress)) > 0))) {
+																		  (SbrMap != nullptr &&
+																		   SbrMap->count(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress))) &&
+																		   SubEntitySuspCount(SbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress)) > 0))) {
 					wchar_t AlignedAttribDesc[9] = { 0 };
 
 					AlignName(Subregion::AttribDesc((*SbrItr)->GetBasic()), AlignedAttribDesc, 8);
@@ -571,7 +573,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 						if (OverlapSections.empty()) {
 							Interface::Log("    0x%p:0x%08x | %ws | ?        | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
 							AppendSubregionAttributes(*SbrItr);
-							AppendOverlapSuspicion(pSbMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
+							AppendOverlapSuspicion(SbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
 							Interface::Log("\r\n");
 						}
 						else{
@@ -585,7 +587,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 
 								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName, (*SbrItr)->GetPrivateSize());
 								AppendSubregionAttributes(*SbrItr);
-								AppendOverlapSuspicion(pSbMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
+								AppendOverlapSuspicion(SbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
 								Interface::Log("\r\n");
 
 							}
@@ -594,7 +596,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 					else {
 						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
 						AppendSubregionAttributes(*SbrItr);
-						AppendOverlapSuspicion(pSbMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
+						AppendOverlapSuspicion(SbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
 						Interface::Log("\r\n");
 					}
 
