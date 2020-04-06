@@ -1,3 +1,7 @@
+#define PROCESS_ENUM_FLAG_MEMDUMP 0x1
+#define PROCESS_ENUM_FLAG_FROM_BASE 0x2
+#define PROCESS_ENUM_FLAG_STATISTICS 0x4
+
 typedef enum class VerbosityLevel;
 typedef class Suspicion;
 namespace Memory {
@@ -40,6 +44,7 @@ namespace Processes {
 		HANDLE GetHandle() const { return this->Handle; }
 		uint32_t GetPid() const { return this->Pid; }
 		std::vector<void*> GetHeaps() const { return this->Heaps; }
+		std::vector<Thread*> GetThreads() const { return this->Threads; }
 		std::wstring GetName() const { return this->Name; }
 		std::wstring GetImageFilePath() const { return this->ImageFilePath; }
 		bool DumpBlock(MemDump& ProcDmp, const MEMORY_BASIC_INFORMATION* Mbi, std::wstring Indent);
@@ -49,7 +54,3 @@ namespace Processes {
 		~Process();
 	};
 }
-
-#define PROCESS_ENUM_FLAG_MEMDUMP 0x1
-#define PROCESS_ENUM_FLAG_FROM_BASE 0x2
-#define PROCESS_ENUM_FLAG_STATISTICS 0x4

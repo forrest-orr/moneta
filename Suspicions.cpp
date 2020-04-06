@@ -124,24 +124,24 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
 						vector<Subregion*> Subregions = (*SectItr)->GetSubregions();
 
-						for (vector<Subregion*>::iterator SbItr = Subregions.begin(); SbItr != Subregions.end(); ++SbItr) {
+						for (vector<Subregion*>::iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
 							list<Suspicion *> SbSuspList;
-							list<Suspicion *>& TargetSuspList = (*SbItr)->GetBasic()->BaseAddress == ParentObj.GetStartVa() ? AbSuspList : SbSuspList;
+							list<Suspicion *>& TargetSuspList = (*SbrItr)->GetBasic()->BaseAddress == ParentObj.GetStartVa() ? AbSuspList : SbSuspList;
 
-							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && (*SbItr)->GetPrivateSize()) {
-								TargetSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, MODIFIED_HEADER));
+							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && (*SbrItr)->GetPrivateSize()) {
+								TargetSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbrItr, MODIFIED_HEADER));
 							}
 
-							if (Subregion::PageExecutable((*SbItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
-								TargetSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, DISK_PERMISSION_MISMATCH));
+							if (Subregion::PageExecutable((*SbrItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
+								TargetSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbrItr, DISK_PERMISSION_MISMATCH));
 							}
 
-							if (Subregion::PageExecutable((*SbItr)->GetBasic()->Protect) && (*SbItr)->GetPrivateSize()) {
-								TargetSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, MODIFIED_CODE));
+							if (Subregion::PageExecutable((*SbrItr)->GetBasic()->Protect) && (*SbrItr)->GetPrivateSize()) {
+								TargetSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbrItr, MODIFIED_CODE));
 							}
 
 							if (SbSuspList.size()) { // Do not insert the list to the map if it overlaps with the ablock.
-								RefSbMap.insert(make_pair(static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress), SbSuspList));
+								RefSbMap.insert(make_pair(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), SbSuspList));
 							}
 						}
 					}
@@ -155,13 +155,13 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 		}
 		case Entity::Type::MAPPED_FILE: {
 			vector<Subregion*> Subregions = ParentObj.GetSubregions(); // This must be done explicitly, otherwise each time GetSubregions is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
-			for (vector<Subregion*>::iterator SbItr = Subregions.begin(); SbItr != Subregions.end(); ++SbItr) {
+			for (vector<Subregion*>::iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
 				list<Suspicion *> SbSuspList;
-				if (Subregion::PageExecutable((*SbItr)->GetBasic()->Protect)) {
-					SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, XMAP));
+				if (Subregion::PageExecutable((*SbrItr)->GetBasic()->Protect)) {
+					SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbrItr, XMAP));
 				}
 				if (SbSuspList.size()) {
-					RefSbMap.insert(make_pair(static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress), SbSuspList));
+					RefSbMap.insert(make_pair(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), SbSuspList));
 				}
 			}
 
@@ -171,14 +171,14 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 			vector<Subregion*> Subregions = ParentObj.GetSubregions(); // This must be done explicitly, otherwise each time GetSubregions is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 
 			if (Subregions.front()->GetBasic()->Type == MEM_PRIVATE) {
-				for (vector<Subregion*>::iterator SbItr = Subregions.begin(); SbItr != Subregions.end(); ++SbItr) {
+				for (vector<Subregion*>::iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
 					list<Suspicion *> SbSuspList;
-					if (Subregion::PageExecutable((*SbItr)->GetBasic()->Protect)) {
-						SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbItr, XPRV));
+					if (Subregion::PageExecutable((*SbrItr)->GetBasic()->Protect)) {
+						SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbrItr, XPRV));
 					}
 
 					if (SbSuspList.size()) {
-						RefSbMap.insert(make_pair(static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress), SbSuspList));
+						RefSbMap.insert(make_pair(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), SbSuspList));
 					}
 				}
 			}

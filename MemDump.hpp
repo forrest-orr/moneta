@@ -1,3 +1,6 @@
+#define MEMDMP_OPT_FLAG_FROM_BASE 0x1
+#define MEMDMP_OPT_FLAG_SUSPICIOUS 0x2
+
 class MemDump {
 public:
 	MemDump(HANDLE hProcess, uint32_t dwPid);
@@ -11,5 +14,3 @@ protected:
 	uint32_t Pid;
 };
 
-#define MEMDMP_OPT_FLAG_FROM_BASE 0x1
-#define MEMDMP_OPT_FLAG_SUSPICIOUS 0x2

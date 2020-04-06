@@ -70,10 +70,10 @@ typedef struct _MEMORY_IMAGE_INFORMATION {
 
 typedef NTSTATUS(__stdcall* NtQueryVirtualMemory_t)(HANDLE, void*, MEMORY_INFORMATION_CLASS, void*, SIZE_T, SIZE_T*);
 
-PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* FilePath) : Region(hProcess, Subregions), PeVm::Component(hProcess, Subregions, static_cast<uint8_t *>((Subregions.front())->GetBasic()->BaseAddress)), MappedFile(hProcess, Subregions, FilePath, false), PebMod(hProcess, this->PeFile) {
+PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, const wchar_t* FilePath) : Region(OwnerProc.GetHandle(), Subregions), PeVm::Component(OwnerProc.GetHandle(), Subregions, static_cast<uint8_t *>((Subregions.front())->GetBasic()->BaseAddress)), MappedFile(OwnerProc.GetHandle(), Subregions, FilePath, false), PebMod(OwnerProc.GetHandle(), this->PeFile) {
 	static NtQueryVirtualMemory_t NtQueryVirtualMemory = reinterpret_cast<NtQueryVirtualMemory_t>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory"));
 	MEMORY_IMAGE_INFORMATION Mii = { 0 };
-	NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, this->PeFile, MemoryImageInformation, &Mii, sizeof(MEMORY_IMAGE_INFORMATION), nullptr);
+	NTSTATUS NtStatus = NtQueryVirtualMemory(OwnerProc.GetHandle(), this->PeFile, MemoryImageInformation, &Mii, sizeof(MEMORY_IMAGE_INFORMATION), nullptr);
 
 	if (NT_SUCCESS(NtStatus)) {
 		this->NonExecutableImage = Mii.ImageNotExecutable;
@@ -114,19 +114,19 @@ PeVm::Body::Body(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* 
 
 				vector<Subregion*> OverlapSubregion;
 
-				for (vector<Subregion*>::const_iterator SbItr = Subregions.begin(); SbItr != Subregions.end(); ++SbItr) {
-					uint8_t* pSubregionStartVa = static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress);
-					uint8_t* pSubregionEndVa = static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress) + (*SbItr)->GetBasic()->RegionSize;
+				for (vector<Subregion*>::const_iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
+					uint8_t* pSubregionStartVa = static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress);
+					uint8_t* pSubregionEndVa = static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress) + (*SbrItr)->GetBasic()->RegionSize;
 
 					if ((pSubregionStartVa >= pSectStartVa && pSubregionStartVa < pSectEndVa) || (pSubregionEndVa > pSectStartVa&& pSubregionEndVa <= pSectEndVa) || (pSubregionStartVa < pSectStartVa && pSubregionEndVa > pSectEndVa)) {
 						//Interface::Log("... section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, pSectStartVa, pSectEndVa, pSubregionStartVa, pSubregionEndVa);
 						MEMORY_BASIC_INFORMATION* Mbi = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
-						memcpy(Mbi, (*SbItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
-						OverlapSubregion.push_back(new Subregion(hProcess, Mbi, (*SbItr)->GetThreads()));
+						memcpy(Mbi, (*SbrItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
+						OverlapSubregion.push_back(new Subregion(OwnerProc, Mbi));
 					}
 				}
 
-				this->Sections.push_back(new Section(hProcess, OverlapSubregion, &ArtificialPeHdr, this->PeFile));
+				this->Sections.push_back(new Section(OwnerProc.GetHandle(), OverlapSubregion, &ArtificialPeHdr, this->PeFile));
 			}
 		}
 		else {
@@ -150,8 +150,8 @@ vector<PeVm::Section*> PeVm::Body::FindOverlapSect(Subregion& Address) {
 
 	for (vector<Section*>::const_iterator SectItr = this->Sections.begin(); SectItr != this->Sections.end(); ++SectItr) {
 		vector<Subregion*> SbList = (*SectItr)->GetSubregions();
-		for (vector<Subregion*>::const_iterator SbItr = SbList.begin(); SbItr != SbList.end(); ++SbItr) {
-			if (Address.GetBasic()->BaseAddress == (*SbItr)->GetBasic()->BaseAddress) {
+		for (vector<Subregion*>::const_iterator SbrItr = SbList.begin(); SbrItr != SbList.end(); ++SbrItr) {
+			if (Address.GetBasic()->BaseAddress == (*SbrItr)->GetBasic()->BaseAddress) {
 				OverlappingSections.push_back(*SectItr);
 			}
 		}
@@ -221,14 +221,14 @@ Region::Region(HANDLE hProcess, vector<Subregion*> Subregions) { // Removed as a
 	SetSubregions(Subregions);
 }
 
-Entity* Entity::Create(HANDLE hProcess, std::vector<Subregion*> Subregions) {
+Entity* Entity::Create(Processes::Process& OwnerProc, std::vector<Subregion*> Subregions) {
 	Entity* pNewEntity = nullptr;
 
 	if (Subregions.front()->GetBasic()->Type == MEM_MAPPED || Subregions.front()->GetBasic()->Type == MEM_IMAGE) {
 		wchar_t DevFilePath[MAX_PATH + 1] = { 0 };
 		wchar_t MaFilePath[MAX_PATH + 1] = { 0 };
 
-		if (GetMappedFileNameW(hProcess, static_cast<HMODULE>(Subregions.front()->GetBasic()->BaseAddress), DevFilePath, MAX_PATH)) {
+		if (GetMappedFileNameW(OwnerProc.GetHandle(), static_cast<HMODULE>(Subregions.front()->GetBasic()->BaseAddress), DevFilePath, MAX_PATH)) {
 			if (!FileBase::TranslateDevicePath(DevFilePath, MaFilePath)) {
 				Interface::Log(VerbosityLevel::Debug, "! Failed to translate device path: %ws\r\n", DevFilePath);
 				wcscpy_s(MaFilePath, MAX_PATH + 1, L"?");
@@ -244,14 +244,14 @@ Entity* Entity::Create(HANDLE hProcess, std::vector<Subregion*> Subregions) {
 		}
 
 		if (Subregions.front()->GetBasic()->Type == MEM_MAPPED) {
-			pNewEntity = new MappedFile(hProcess, Subregions, MaFilePath);
+			pNewEntity = new MappedFile(OwnerProc.GetHandle(), Subregions, MaFilePath);
 		}
 		else if (Subregions.front()->GetBasic()->Type == MEM_IMAGE) {
-			pNewEntity = new PeVm::Body(hProcess, Subregions, MaFilePath);
+			pNewEntity = new PeVm::Body(OwnerProc, Subregions, MaFilePath);
 		}
 	}
 	else {
-		pNewEntity = new Region(hProcess, Subregions);
+		pNewEntity = new Region(OwnerProc.GetHandle(), Subregions);
 	}
 
 	return pNewEntity;
@@ -264,10 +264,10 @@ bool Entity::Dump(MemDump& ProcDmp, Entity& Target) {
 
 	swprintf_s(DumpFolder, MAX_PATH + 1, L"%d_%p_%ws", ProcDmp.GetPid(), Target.GetStartVa(), Subregion::TypeSymbol(Subregions.front()->GetBasic()->Type));
 
-	for (vector<Subregion*>::iterator SbItr = Subregions.begin(); SbItr != Subregions.end(); ++SbItr) {
-		if ((*SbItr)->GetBasic()->State == MEM_COMMIT) {
+	for (vector<Subregion*>::iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
+		if ((*SbrItr)->GetBasic()->State == MEM_COMMIT) {
 			wchar_t DumFilePath[MAX_PATH + 1] = { 0 };
-			if (ProcDmp.Create(DumpFolder, (*SbItr)->GetBasic(), DumFilePath, MAX_PATH + 1)) {
+			if (ProcDmp.Create(DumpFolder, (*SbrItr)->GetBasic(), DumFilePath, MAX_PATH + 1)) {
 				nDumpCount++;
 			}
 		}

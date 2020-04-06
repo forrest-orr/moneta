@@ -7,7 +7,8 @@ enum class VerbosityLevel {
 enum class ConsoleColor {
 	Turquoise = 11,
 	Red = 12,
-	Gold = 6
+	Gold = 6,
+	Yellow = 14
 };
 
 class Interface

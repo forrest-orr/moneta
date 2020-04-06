@@ -168,17 +168,17 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 
 				if (!Subregions.empty()) { // If the subregion list is empty then there is no region base for comparison
 					if (Mbi->AllocationBase != (*Region)->GetBasic()->AllocationBase) {
-						this->Entities.insert(make_pair(static_cast<uint8_t *>((*Region)->GetBasic()->AllocationBase), Entity::Create(this->Handle, Subregions)));
+						this->Entities.insert(make_pair(static_cast<uint8_t *>((*Region)->GetBasic()->AllocationBase), Entity::Create(*this, Subregions)));
 						Subregions.clear();
 					}
 				}
 
-				Subregions.push_back(new Subregion(this->Handle, Mbi, this->Threads));
+				Subregions.push_back(new Subregion(*this, Mbi));
 				Region = Subregions.begin(); // This DOES fix a bug.
 			}
 			else {
 				if (!Subregions.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
-					this->Entities.insert(make_pair(static_cast<uint8_t *>((*Region)->GetBasic()->AllocationBase), Entity::Create(this->Handle, Subregions)));
+					this->Entities.insert(make_pair(static_cast<uint8_t *>((*Region)->GetBasic()->AllocationBase), Entity::Create(*this, Subregions)));
 				}
 
 				delete Mbi;
@@ -249,9 +249,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 				for (int32_t nSuspIndex = 0; !bReWalkMap && SuspItr != SbMapItr->second.end(); ++SuspItr, nSuspIndex++) {
 					switch ((*SuspItr)->GetType()) {
 					case Suspicion::Type::XPRV: {
-						vector<void*> Heaps = (*SuspItr)->GetProcess()->GetHeaps();
-						if (find(Heaps.begin(), Heaps.end(), (*SuspItr)->GetBlock()->GetBasic()->BaseAddress) != Heaps.end()) {
-							printf("Filtered: 0x%p\r\n", (*SuspItr)->GetBlock()->GetBasic()->BaseAddress);
+						if (((*SuspItr)->GetBlock()->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP)) {
 							bReWalkMap = true;
 							RefSuspList.erase(SuspItr);
 
@@ -336,24 +334,40 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 	return 0;
 }
 
-int32_t AppendOverlapSuspicion(map<uint8_t*, list<Suspicion *>>* pSbMap, uint8_t *pSbAddress, bool bEntityTop) {
-	if (pSbMap != nullptr && pSbMap->count(pSbAddress)) {
-		list<Suspicion *>& SuspicionsList = pSbMap->at(pSbAddress);
+int32_t AppendOverlapSuspicion(map<uint8_t*, list<Suspicion *>>* Suspicions, uint8_t *pSbAddress, bool bEntityTop) {
+	int32_t nCount = 0;
+
+	if (Suspicions != nullptr && Suspicions->count(pSbAddress)) {
+		list<Suspicion *>& SuspicionsList = Suspicions->at(pSbAddress);
 
 		for (list<Suspicion *>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
 			if (bEntityTop == (*SuspItr)->IsFullEntitySuspicion()) {
 				Interface::Log(" | ");
 				Interface::Log(ConsoleColor::Red, "%ws", (*SuspItr)->GetDescription().c_str());
+				nCount++;
 			}
 		}
 	}
+
+	return nCount;
 }
 
-int32_t SubEntitySuspCount(map<uint8_t*, list<Suspicion*>>* pSbMap, uint8_t* pSbAddress) {
+int32_t AppendSubregionAttributes(Subregion *Sbr) {
 	int32_t nCount = 0;
 
-	if (pSbMap != nullptr && pSbMap->count(pSbAddress)) {
-		list<Suspicion*>& SuspicionsList = pSbMap->at(pSbAddress);
+	if ((Sbr->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP)) {
+		Interface::Log(" | ");
+		Interface::Log(ConsoleColor::Yellow, "Heap");
+		nCount++;
+	}
+
+	return nCount;
+}
+int32_t SubEntitySuspCount(map<uint8_t*, list<Suspicion*>>* Suspicions, uint8_t* pSbAddress) {
+	int32_t nCount = 0;
+
+	if (Suspicions != nullptr && Suspicions->count(pSbAddress)) {
+		list<Suspicion*>& SuspicionsList = Suspicions->at(pSbAddress);
 
 		for (list<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
 			if (!(*SuspItr)->IsFullEntitySuspicion()) {
@@ -536,27 +550,28 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 
 			vector<Subregion*> Subregions = Itr->second->GetSubregions();
 
-			for (vector<Subregion*>::iterator SbItr = Subregions.begin(); SbItr != Subregions.end(); ++SbItr) {
+			for (vector<Subregion*>::iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
 				if (MemSelectType == MemorySelection_t::All ||
-					(MemSelectType == MemorySelection_t::Block && (pSelectAddress == (*SbItr)->GetBasic()->BaseAddress || (qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE))) ||
+					(MemSelectType == MemorySelection_t::Block && (pSelectAddress == (*SbrItr)->GetBasic()->BaseAddress || (qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE))) ||
 					(MemSelectType == MemorySelection_t::Suspicious && ((qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE) || 
 																		  (pSbMap != nullptr &&
-																		   pSbMap->count(static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress))) &&
-																		   SubEntitySuspCount(pSbMap, static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress)) > 0))) {
+																		   pSbMap->count(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress))) &&
+																		   SubEntitySuspCount(pSbMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress)) > 0))) {
 					wchar_t AlignedAttribDesc[9] = { 0 };
 
-					AlignName(Subregion::AttribDesc((*SbItr)->GetBasic()), AlignedAttribDesc, 8);
+					AlignName(Subregion::AttribDesc((*SbrItr)->GetBasic()), AlignedAttribDesc, 8);
 
 					if (Itr->second->GetType() == Entity::Type::PE_FILE && !dynamic_cast<PeVm::Body*>(Itr->second)->GetFileBase()->IsPhantom()) {
 						//
 						// Generate a list of all sections overlapping with this sblock and display them all. A typical example is a +r sblock at the end of the PE which encompasses all consecutive readonly sections ie. .rdata, .rsrc, .reloc
 						//
 
-						vector<PeVm::Section*> OverlapSections = dynamic_cast<PeVm::Body*>(Itr->second)->FindOverlapSect(*(*SbItr));
+						vector<PeVm::Section*> OverlapSections = dynamic_cast<PeVm::Body*>(Itr->second)->FindOverlapSect(*(*SbrItr));
 
 						if (OverlapSections.empty()) {
-							Interface::Log("    0x%p:0x%08x | %ws | ?        | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbItr)->GetPrivateSize());
-							AppendOverlapSuspicion(pSbMap, static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress), false);
+							Interface::Log("    0x%p:0x%08x | %ws | ?        | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
+							AppendSubregionAttributes(*SbrItr);
+							AppendOverlapSuspicion(pSbMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
 							Interface::Log("\r\n");
 						}
 						else{
@@ -568,39 +583,41 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 								wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
 								AlignName(static_cast<const wchar_t*>(UnicodeSectName.c_str()), AlignedSectName, 8);
 
-								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName, (*SbItr)->GetPrivateSize());
-								AppendOverlapSuspicion(pSbMap, static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress), false);
+								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName, (*SbrItr)->GetPrivateSize());
+								AppendSubregionAttributes(*SbrItr);
+								AppendOverlapSuspicion(pSbMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
 								Interface::Log("\r\n");
 
 							}
 						}
 					}
 					else {
-						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbItr)->GetBasic()->BaseAddress, (*SbItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbItr)->GetPrivateSize());
-						AppendOverlapSuspicion(pSbMap, static_cast<uint8_t *>((*SbItr)->GetBasic()->BaseAddress), false);
+						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
+						AppendSubregionAttributes(*SbrItr);
+						AppendOverlapSuspicion(pSbMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
 						Interface::Log("\r\n");
 					}
 
 					if (Interface::GetVerbosity() == VerbosityLevel::Detail) {
-						Interface::Log("    |__ Base address: 0x%p\r\n", (*SbItr)->GetBasic()->BaseAddress);
-						Interface::Log("      | Size: 0x%d\r\n", (*SbItr)->GetBasic()->RegionSize);
-						Interface::Log("      | Permissions: %ws\r\n", Subregion::ProtectSymbol((*SbItr)->GetBasic()->Protect));
-						Interface::Log("      | Type: %ws\r\n", Subregion::TypeSymbol((*SbItr)->GetBasic()->Type));
-						Interface::Log("      | State: %ws\r\n", Subregion::StateSymbol((*SbItr)->GetBasic()->State));
-						Interface::Log("      | Allocation base: 0x%p\r\n", (*SbItr)->GetBasic()->AllocationBase);
-						Interface::Log("      | Allocation permissions: %ws\r\n", Subregion::ProtectSymbol((*SbItr)->GetBasic()->AllocationProtect));
-						Interface::Log("      | Private size: %d [%d pages]\r\n", (*SbItr)->GetPrivateSize(), (*SbItr)->GetPrivateSize() / 0x1000);
+						Interface::Log("    |__ Base address: 0x%p\r\n", (*SbrItr)->GetBasic()->BaseAddress);
+						Interface::Log("      | Size: 0x%d\r\n", (*SbrItr)->GetBasic()->RegionSize);
+						Interface::Log("      | Permissions: %ws\r\n", Subregion::ProtectSymbol((*SbrItr)->GetBasic()->Protect));
+						Interface::Log("      | Type: %ws\r\n", Subregion::TypeSymbol((*SbrItr)->GetBasic()->Type));
+						Interface::Log("      | State: %ws\r\n", Subregion::StateSymbol((*SbrItr)->GetBasic()->State));
+						Interface::Log("      | Allocation base: 0x%p\r\n", (*SbrItr)->GetBasic()->AllocationBase);
+						Interface::Log("      | Allocation permissions: %ws\r\n", Subregion::ProtectSymbol((*SbrItr)->GetBasic()->AllocationProtect));
+						Interface::Log("      | Private size: %d [%d pages]\r\n", (*SbrItr)->GetPrivateSize(), (*SbrItr)->GetPrivateSize() / 0x1000);
 					}
 
-					EnumerateThreads(L"      ", (*SbItr)->GetThreads());
+					EnumerateThreads(L"      ", (*SbrItr)->GetThreads());
 
 					if ((qwOptFlags & PROCESS_ENUM_FLAG_MEMDUMP)) {
 						if (!(qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE)) {
-							this->DumpBlock(ProcDmp, (*SbItr)->GetBasic(), L"      ");
+							this->DumpBlock(ProcDmp, (*SbrItr)->GetBasic(), L"      ");
 						}
 					}
 
-					SelectedSbrs.push_back(*SbItr);
+					SelectedSbrs.push_back(*SbrItr);
 				}
 			}
 

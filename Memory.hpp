@@ -1,3 +1,5 @@
+#define MEMORY_SUBREGION_FLAG_HEAP 0x1
+
 typedef class Thread;
 typedef class MemDump;
 typedef class FileBase;
@@ -6,6 +8,7 @@ typedef enum class Signing_t;
 
 namespace Processes {
 	typedef class Thread;
+	typedef class Process;
 }
 
 namespace Memory {
@@ -15,14 +18,16 @@ namespace Memory {
 		std::vector<Processes::Thread*> Threads;
 		uint32_t PrivateSize;
 		HANDLE ProcessHandle;
+		uint64_t Flags;
 	public:
-		Subregion(HANDLE hProcess, const MEMORY_BASIC_INFORMATION* Mbi, std::vector<Processes::Thread*> Threads);
+		Subregion(Processes::Process& OwnerProc, const MEMORY_BASIC_INFORMATION* Mbi);
 		~Subregion();
 		const MEMORY_BASIC_INFORMATION* GetBasic() const { return this->Basic; }
 		std::vector<Processes::Thread*> GetThreads() const { return this->Threads; }
 		void SetPrivateSize(uint32_t dwPrivateSize) { this->PrivateSize = dwPrivateSize; }
 		uint32_t GetPrivateSize() const { return this->PrivateSize; }
 		uint32_t QueryPrivateSize() const;
+		uint64_t GetFlags() const { return this->Flags; }
 		static const wchar_t* ProtectSymbol(uint32_t dwProtect);
 		static const wchar_t* AttribDesc(const MEMORY_BASIC_INFORMATION* Mbi);
 		static const wchar_t* TypeSymbol(uint32_t dwType);
@@ -52,7 +57,7 @@ namespace Memory {
 		const void* GetStartVa() const { return this->StartVa; }
 		const void* GetEndVa() const { return this->EndVa; }
 		uint32_t GetEntitySize() const { return this->EntitySize; }
-		static Entity* Create(HANDLE hProcess, std::vector<Subregion*> Subregions); // Factory method for derived PE images, mapped files, unknown memory ranges.
+		static Entity* Create(Processes::Process& OwnerProc, std::vector<Subregion*> Subregions); // Factory method for derived PE images, mapped files, unknown memory ranges.
 		static bool Dump(MemDump& ProcDmp, Entity& Target);
 		void SetSubregions(std::vector<Subregion*>);
 		~Entity();
@@ -121,7 +126,7 @@ namespace Memory {
 			std::vector<Section*> FindOverlapSect(Subregion& Address);
 			uint32_t GetImageSize() const { return this->ImageSize; }
 			uint32_t GetSigningLevel() const { return this->SigningLevel; }
-			Body(HANDLE hProcess, std::vector<Subregion*> Subregions, const wchar_t* FilePath);
+			Body(Processes::Process& OwnerProc, std::vector<Subregion*> Subregions, const wchar_t* FilePath);
 			~Body();
 		};
 

@@ -37,11 +37,18 @@ using namespace std;
 using namespace Memory;
 using namespace Processes;
 
-Subregion::Subregion(HANDLE hProcess, const MEMORY_BASIC_INFORMATION* Mbi, vector<Processes::Thread*> Threads) : ProcessHandle(hProcess), Basic(Mbi) {
+Subregion::Subregion(Processes::Process &OwnerProc, const MEMORY_BASIC_INFORMATION* Mbi) : ProcessHandle(OwnerProc.GetHandle()), Basic(Mbi) {
+	vector<Processes::Thread*> Threads = OwnerProc.GetThreads();
+	vector<void*> Heaps = OwnerProc.GetHeaps();
+
 	for (vector<Processes::Thread*>::const_iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
 		if ((*ThItr)->GetEntryPoint() >= this->Basic->BaseAddress && (*ThItr)->GetEntryPoint() < (static_cast<uint8_t *>(this->Basic->BaseAddress) + this->Basic->RegionSize)) {
 			this->Threads.push_back(new Processes::Thread((*ThItr)->GetTid(), (*ThItr)->GetEntryPoint()));
 		}
+	}
+
+	if (find(Heaps.begin(), Heaps.end(), Mbi->BaseAddress) != Heaps.end()) {
+		this->Flags |= MEMORY_SUBREGION_FLAG_HEAP;
 	}
 
 	if (Mbi->State == MEM_COMMIT && Mbi->Type != MEM_PRIVATE) {

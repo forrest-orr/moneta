@@ -51,7 +51,9 @@ enum class SelectedProcess_t {
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	vector<wstring> Args(&pArgv[0], &pArgv[0 + nArgc]);
 	Interface::Initialize(Args);
-
+	//for (uint32_t dwX = 0; dwX < 100; dwX++)Interface::Log((ConsoleColor)dwX, "%d ", dwX);
+	//Interface::Log("\r\n");
+	//system("pause");
 	Interface::Log(
 		"   _____                        __          \r\n"
 		"  /     \\   ____   ____   _____/  |______   \r\n"
