@@ -37,6 +37,7 @@ ________________________________________________________________________________
 #include "MemDump.hpp"
 #include "Suspicions.hpp"
 #include "Signing.h"
+#include "PEB.h"
 
 using namespace std;
 using namespace Memory;
@@ -103,22 +104,28 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 
 		static NtQueryInformationProcess_t NtQueryInformationProcess = reinterpret_cast<NtQueryInformationProcess_t>(GetProcAddress(GetModuleHandleW(L"Ntdll.dll"), "NtQueryInformationProcess"));
 		NTSTATUS NtStatus;
+		//PPROCESS_ENV_BLOCK Peb = nullptr;
+		void* Peb = nullptr;
 
-		
 		if (this->IsWow64()) {
-			//
+			NtStatus = NtQueryInformationProcess(this->Handle, ProcessWow64Information, &Peb, sizeof(Peb), nullptr);
 		}
 		else {
 			PROCESS_BASIC_INFORMATION Pbi = { 0 };
-			uint32_t dwBytesReturned = 0;
 
-			NtStatus = NtQueryInformationProcess(this->Handle, ProcessBasicInformation, &Pbi, sizeof(Pbi), reinterpret_cast<PULONG>(&dwBytesReturned));
+			NtStatus = NtQueryInformationProcess(this->Handle, ProcessBasicInformation, &Pbi, sizeof(Pbi), nullptr);
 
 			if (NT_SUCCESS(NtStatus)) {
-				//
+				//Peb = reinterpret_cast<PPROCESS_ENV_BLOCK>(Pbi.PebBaseAddress);
+				Peb = Pbi.PebBaseAddress;
 			}
 		}
 
+		if (Peb != nullptr) {
+			Interface::Log(VerbosityLevel::Debug, "... PEB of 0x%p\r\n", Peb);
+		}
+		system("pause");
+		// NtWow64ReadVirtualMemory64 or ReadProcessMemory to dump PEB and read heaps (compare count to validate) https://github.com/sashasochka/ProcessMonitor/blob/master/ProcessMonitor.cpp
 		HANDLE hThreadSnap = INVALID_HANDLE_VALUE;
 		THREADENTRY32 ThreadEntry;
 

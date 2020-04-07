@@ -148,6 +148,7 @@
     <ClInclude Include="FileIo.hpp" />
     <ClInclude Include="Interface.hpp" />
     <ClInclude Include="MemDump.hpp" />
+    <ClInclude Include="PEB.h" />
     <ClInclude Include="PeFile.hpp" />
     <ClInclude Include="Privileges.h" />
     <ClInclude Include="Processes.hpp" />
