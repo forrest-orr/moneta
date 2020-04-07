@@ -79,7 +79,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				this->Name = wstring(ImageName);
 				this->ImageFilePath = wstring(ImageFilePath);
 				Interface::Log(VerbosityLevel::Debug, "... mapping address space of PID %d [%ws]\r\n", this->Pid, this->Name.c_str());
-				static ISWOW64PROCESS IsWow64Process = reinterpret_cast<ISWOW64PROCESS>(GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process"));
+				static IsWow64Process_t IsWow64Process = reinterpret_cast<IsWow64Process_t>(GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process"));
 
 				if (IsWow64Process != nullptr) {
 					BOOL bSelfWow64 = FALSE;
@@ -98,6 +98,24 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 						}
 					}
 				}
+			}
+		}
+
+		static NtQueryInformationProcess_t NtQueryInformationProcess = reinterpret_cast<NtQueryInformationProcess_t>(GetProcAddress(GetModuleHandleW(L"Ntdll.dll"), "NtQueryInformationProcess"));
+		NTSTATUS NtStatus;
+
+		
+		if (this->IsWow64()) {
+			//
+		}
+		else {
+			PROCESS_BASIC_INFORMATION Pbi = { 0 };
+			uint32_t dwBytesReturned = 0;
+
+			NtStatus = NtQueryInformationProcess(this->Handle, ProcessBasicInformation, &Pbi, sizeof(Pbi), reinterpret_cast<PULONG>(&dwBytesReturned));
+
+			if (NT_SUCCESS(NtStatus)) {
+				//
 			}
 		}
 

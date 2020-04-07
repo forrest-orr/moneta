@@ -66,7 +66,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	);
 
 	SYSTEM_INFO SystemInfo = { 0 };
-	static ISWOW64PROCESS IsWow64Process = reinterpret_cast<ISWOW64PROCESS>(GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process"));
+	static IsWow64Process_t IsWow64Process = reinterpret_cast<IsWow64Process_t>(GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process"));
 	uint64_t qwOptFlags = 0;
 	
 	if (IsWow64Process != nullptr) {

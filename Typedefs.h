@@ -28,4 +28,5 @@ typedef struct _MEMORY_IMAGE_INFORMATION {
 
 typedef NTSTATUS(__stdcall* NtQueryVirtualMemory_t)(HANDLE, void*, MEMORY_INFORMATION_CLASS, void*, SIZE_T, SIZE_T*);
 typedef NTSTATUS(NTAPI* NtQueryInformationThread_t) (HANDLE, THREADINFOCLASS, void*, uint32_t, uint32_t*);
-typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
+typedef BOOL(WINAPI* IsWow64Process_t) (HANDLE, PBOOL);
+typedef NTSTATUS(NTAPI *NtQueryInformationProcess_t)(HANDLE ProcessHandle, PROCESSINFOCLASS ProcessInformationClass, PVOID ProcessInformation, ULONG ProcessInformationLength, PULONG ReturnLength);
