@@ -40,40 +40,12 @@ ________________________________________________________________________________
 using namespace std;
 using namespace Memory;
 
-typedef enum _MEMORY_INFORMATION_CLASS {
-	MemoryBasicInformation, // MEMORY_BASIC_INFORMATION
-	MemoryWorkingSetInformation, // MEMORY_WORKING_SET_INFORMATION
-	MemoryMappedFilenameInformation, // UNICODE_STRING
-	MemoryRegionInformation, // MEMORY_REGION_INFORMATION
-	MemoryWorkingSetExInformation, // MEMORY_WORKING_SET_EX_INFORMATION
-	MemorySharedCommitInformation, // MEMORY_SHARED_COMMIT_INFORMATION
-	MemoryImageInformation, // MEMORY_IMAGE_INFORMATION
-	MemoryRegionInformationEx,
-	MemoryPrivilegedBasicInformation,
-	MemoryEnclaveImageInformation, // MEMORY_ENCLAVE_IMAGE_INFORMATION // since REDSTONE3
-	MemoryBasicInformationCapped
-} MEMORY_INFORMATION_CLASS;
-
-typedef struct _MEMORY_IMAGE_INFORMATION {
-	PVOID ImageBase;
-	SIZE_T SizeOfImage;
-	union {
-		ULONG ImageFlags;
-		struct {
-			ULONG ImagePartialMap : 1;
-			ULONG ImageNotExecutable : 1;
-			ULONG ImageSigningLevel : 4; // REDSTONE3
-			ULONG Reserved : 26;
-		};
-	};
-} MEMORY_IMAGE_INFORMATION, * PMEMORY_IMAGE_INFORMATION;
-
-typedef NTSTATUS(__stdcall* NtQueryVirtualMemory_t)(HANDLE, void*, MEMORY_INFORMATION_CLASS, void*, SIZE_T, SIZE_T*);
-
 PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, const wchar_t* FilePath) : Region(OwnerProc.GetHandle(), Subregions), PeVm::Component(OwnerProc.GetHandle(), Subregions, static_cast<uint8_t *>((Subregions.front())->GetBasic()->BaseAddress)), MappedFile(OwnerProc.GetHandle(), Subregions, FilePath, false), PebMod(OwnerProc.GetHandle(), this->PeFile) {
 	static NtQueryVirtualMemory_t NtQueryVirtualMemory = reinterpret_cast<NtQueryVirtualMemory_t>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory"));
 	MEMORY_IMAGE_INFORMATION Mii = { 0 };
 	NTSTATUS NtStatus = NtQueryVirtualMemory(OwnerProc.GetHandle(), this->PeFile, MemoryImageInformation, &Mii, sizeof(MEMORY_IMAGE_INFORMATION), nullptr);
+
+	Interface::Log(VerbosityLevel::Debug, "... creating PE entity for %ws within %ws (PID %d)\r\n", FilePath, OwnerProc.GetName().c_str(), OwnerProc.GetPid());
 
 	if (NT_SUCCESS(NtStatus)) {
 		this->NonExecutableImage = Mii.ImageNotExecutable;
@@ -104,7 +76,8 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 					memcpy(&ArtificialPeHdr, (this->Pe->GetSectHdrs() + nX), sizeof(IMAGE_SECTION_HEADER));
 				}
 
-				uint32_t dwSectionSize = (ArtificialPeHdr.SizeOfRawData == 0 ? ArtificialPeHdr.Misc.VirtualSize : ArtificialPeHdr.SizeOfRawData);
+				//uint32_t dwSectionSize = (ArtificialPeHdr.SizeOfRawData == 0 ? ArtificialPeHdr.Misc.VirtualSize : ArtificialPeHdr.SizeOfRawData);
+				uint32_t dwSectionSize = (ArtificialPeHdr.SizeOfRawData < ArtificialPeHdr.Misc.VirtualSize ? ArtificialPeHdr.Misc.VirtualSize : ArtificialPeHdr.SizeOfRawData); // .data sections will sometimes have a non-zero raw data where the virtual size is still larger than the raw size (copy-on-write)
 				uint8_t* pSectStartVa = this->PeFile + ArtificialPeHdr.VirtualAddress;
 				uint8_t* pSectEndVa = this->PeFile + ArtificialPeHdr.VirtualAddress + dwSectionSize;
 
@@ -119,7 +92,7 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 					uint8_t* pSubregionEndVa = static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress) + (*SbrItr)->GetBasic()->RegionSize;
 
 					if ((pSubregionStartVa >= pSectStartVa && pSubregionStartVa < pSectEndVa) || (pSubregionEndVa > pSectStartVa&& pSubregionEndVa <= pSectEndVa) || (pSubregionStartVa < pSectStartVa && pSubregionEndVa > pSectEndVa)) {
-						//Interface::Log("... section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", Sect->GetHeader()->Name, pSectStartVa, pSectEndVa, pSubregionStartVa, pSubregionEndVa);
+						Interface::Log(VerbosityLevel::Debug, "... section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa, pSectEndVa, pSubregionStartVa, pSubregionEndVa);
 						MEMORY_BASIC_INFORMATION* Mbi = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
 						memcpy(Mbi, (*SbrItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
 						OverlapSubregion.push_back(new Subregion(OwnerProc, Mbi));

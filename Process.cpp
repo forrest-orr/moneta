@@ -79,7 +79,6 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				this->Name = wstring(ImageName);
 				this->ImageFilePath = wstring(ImageFilePath);
 				Interface::Log(VerbosityLevel::Debug, "... mapping address space of PID %d [%ws]\r\n", this->Pid, this->Name.c_str());
-				typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
 				static ISWOW64PROCESS IsWow64Process = reinterpret_cast<ISWOW64PROCESS>(GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process"));
 
 				if (IsWow64Process != nullptr) {
@@ -115,7 +114,6 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 						HANDLE hThread = OpenThread(THREAD_QUERY_INFORMATION, false, CurrentThread->GetTid()); // OpenThreadToken consistently failed even with impersonation (ERROR_NO_TOKEN). The idea was abandoned due to lack of relevance. Get-InjectedThread returns the user as SYSTEM even when it was a regular user which launched the remote thread.
 
 						if (hThread != nullptr) {
-							typedef NTSTATUS(NTAPI* NtQueryInformationThread_t) (HANDLE, THREADINFOCLASS, void*, uint32_t, uint32_t*);
 							static NtQueryInformationThread_t NtQueryInformationThread = reinterpret_cast<NtQueryInformationThread_t>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationThread"));
 							void* pStartAddress = nullptr;
 							HANDLE hDupThread = nullptr;

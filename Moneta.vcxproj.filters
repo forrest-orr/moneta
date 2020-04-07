@@ -98,6 +98,9 @@
     <ClInclude Include="Signing.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Typedefs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Moneta.rc">

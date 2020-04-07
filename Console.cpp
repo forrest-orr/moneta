@@ -66,7 +66,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	);
 
 	SYSTEM_INFO SystemInfo = { 0 };
-	typedef BOOL(WINAPI* ISWOW64PROCESS) (HANDLE, PBOOL);
 	static ISWOW64PROCESS IsWow64Process = reinterpret_cast<ISWOW64PROCESS>(GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process"));
 	uint64_t qwOptFlags = 0;
 	
