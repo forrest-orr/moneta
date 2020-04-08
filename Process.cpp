@@ -105,10 +105,11 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		static NtQueryInformationProcess_t NtQueryInformationProcess = reinterpret_cast<NtQueryInformationProcess_t>(GetProcAddress(GetModuleHandleW(L"Ntdll.dll"), "NtQueryInformationProcess"));
 		NTSTATUS NtStatus;
 		//PPROCESS_ENV_BLOCK Peb = nullptr;
-		void* Peb = nullptr;
+		void* RemotePeb = nullptr;
+		uint32_t dwPebSize = 0;
 
 		if (this->IsWow64()) {
-			NtStatus = NtQueryInformationProcess(this->Handle, ProcessWow64Information, &Peb, sizeof(Peb), nullptr);
+			NtStatus = NtQueryInformationProcess(this->Handle, ProcessWow64Information, &RemotePeb, sizeof(RemotePeb), nullptr);
 		}
 		else {
 			PROCESS_BASIC_INFORMATION Pbi = { 0 };
@@ -117,14 +118,31 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 
 			if (NT_SUCCESS(NtStatus)) {
 				//Peb = reinterpret_cast<PPROCESS_ENV_BLOCK>(Pbi.PebBaseAddress);
-				Peb = Pbi.PebBaseAddress;
+				RemotePeb = Pbi.PebBaseAddress;
 			}
 		}
 
-		if (Peb != nullptr) {
-			Interface::Log(VerbosityLevel::Debug, "... PEB of 0x%p\r\n", Peb);
+		if (RemotePeb != nullptr) {
+			Interface::Log(VerbosityLevel::Debug, "... PEB of 0x%p\r\n", RemotePeb);
+			PEB64 *LocalPeb = new PEB64;
+			dwPebSize = sizeof(PEB64);
+			
+			if (ReadProcessMemory(this->Handle, RemotePeb, LocalPeb, dwPebSize, nullptr)) {
+				Interface::Log(VerbosityLevel::Debug, "... successfully read remote PEB to local memory.\r\n");
+				uint32_t dwNumberOfHeaps = LocalPeb->NumberOfHeaps;
+				uint32_t dwHeapsSize = dwNumberOfHeaps * sizeof(void*);
+				void** Heaps = new void* [dwNumberOfHeaps];
+				if (ReadProcessMemory(this->Handle, reinterpret_cast<void*>(LocalPeb->ProcessHeaps), Heaps, dwHeapsSize, nullptr)) {
+					Interface::Log(VerbosityLevel::Debug, "... successfully read remote heaps to local memory.\r\n");
+					for (uint32_t dwX = 0; dwX < dwNumberOfHeaps; dwX++) {
+						Interface::Log(VerbosityLevel::Debug, "... 0x%p\r\n", Heaps[dwX]);
+						this->Heaps.push_back(Heaps[dwX]);
+					}
+				}
+			}
 		}
-		system("pause");
+		//system("pause");
+		// Stack can be queried from TEB: https://stackoverflow.com/questions/3171475/stack-and-stack-base-address
 		// NtWow64ReadVirtualMemory64 or ReadProcessMemory to dump PEB and read heaps (compare count to validate) https://github.com/sashasochka/ProcessMonitor/blob/master/ProcessMonitor.cpp
 		HANDLE hThreadSnap = INVALID_HANDLE_VALUE;
 		THREADENTRY32 ThreadEntry;
@@ -161,7 +179,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 			}
 
 			CloseHandle(hThreadSnap);
-
+			/*
 			HEAPLIST32 HlEntry;
 			HANDLE hHeapSnap = CreateToolhelp32Snapshot(TH32CS_SNAPHEAPLIST, dwPid); // PID will be ignored for a heap listing (it will include all heaps of all processes)
 
@@ -177,7 +195,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				}
 			}
 
-			CloseHandle(hHeapSnap);
+			CloseHandle(hHeapSnap);*/
 		}
 
 		SIZE_T cbRegionSize = 0;
@@ -527,7 +545,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 			// Display suspicions associated with the entity, if the current entity has any suspicions associated with it
 			//
 
-			AppendSubregionAttributes(Itr->second->GetSubregions().front());
+			//AppendSubregionAttributes(Itr->second->GetSubregions().front());
 			AppendOverlapSuspicion(SbrMap, static_cast<uint8_t*>(const_cast<void *>(Itr->second->GetStartVa())), true);
 			Interface::Log("\r\n");
 
