@@ -614,24 +614,24 @@ typedef struct _PEB32
             BYTE                    SpareBit : 1;   //0x0003:7
         } bits;
     } byte3;
-    uint32_t                          Mutant;                             //0x0004
-    uint32_t ImageBaseAddress;                   //0x0008
-    uint32_t Ldr;                                //0x000C  (all loaded modules in process)
-    uint32_t ProcessParameters;                  //0x0010
-    uint32_t SubSystemData;                      //0x0014
-    uint32_t ProcessHeap;                        //0x0018
-    uint32_t FastPebLock;                        //0x001C
+    HANDLE                          Mutant;                             //0x0004
+    void* ImageBaseAddress;                   //0x0008
+    PEB_LDR_DATA32* Ldr;                                //0x000C  (all loaded modules in process)
+    RTL_USER_PROCESS_PARAMETERS32* ProcessParameters;                  //0x0010
+    void* SubSystemData;                      //0x0014
+    void* ProcessHeap;                        //0x0018
+    RTL_CRITICAL_SECTION* FastPebLock;                        //0x001C
     union
     {
-        uint32_t FastPebLockRoutine;                 //0x0020 (NT3.51-Win2k)
-        uint32_t SparePtr1;                          //0x0020 (early WS03)
-        uint32_t AtlThunkSListPtr;                   //0x0020 (late WS03+)
+        void* FastPebLockRoutine;                 //0x0020 (NT3.51-Win2k)
+        void* SparePtr1;                          //0x0020 (early WS03)
+        void* AtlThunkSListPtr;                   //0x0020 (late WS03+)
     } dword20;
     union
     {
-        uint32_t FastPebUnlockRoutine;               //0x0024 (NT3.51-XP)
-        uint32_t SparePtr2;                          //0x0024 (WS03)
-        uint32_t IFEOKey;                            //0x0024 (Vista+)
+        void* FastPebUnlockRoutine;               //0x0024 (NT3.51-XP)
+        void* SparePtr2;                          //0x0024 (WS03)
+        void* IFEOKey;                            //0x0024 (Vista+)
     } dword24;
     union
     {
@@ -648,8 +648,8 @@ typedef struct _PEB32
     } struct28;
     union
     {
-        uint32_t KernelCallbackTable;                //0x002C (Vista+)
-        uint32_t UserSharedInfoPtr;                  //0x002C (Vista+)
+        void* KernelCallbackTable;                //0x002C (Vista+)
+        void* UserSharedInfoPtr;                  //0x002C (Vista+)
     } dword2C;
     DWORD                           SystemReserved;                     //0x0030 (NT3.51-XP)
     //Microsoft seems to keep changing their mind with DWORD 0x34
@@ -672,23 +672,23 @@ typedef struct _PEB32
     } dword34;
     union
     {
-        uint32_t FreeList;                           //0x0038 (NT3.51-early Vista)
+        PEB_FREE_BLOCK* FreeList;                           //0x0038 (NT3.51-early Vista)
         DWORD                       SparePebPtr0;                       //0x0038 (last Vista)
-        uint32_t ApiSetMap;                          //0x0038 (Win7+)
+        void* ApiSetMap;                          //0x0038 (Win7+)
     } dword38;
     DWORD                           TlsExpansionCounter;                //0x003C
-    uint32_t TlsBitmap;                          //0x0040
+    void* TlsBitmap;                          //0x0040
     DWORD                           TlsBitmapBits[2];                   //0x0044
-    uint32_t ReadOnlySharedMemoryBase;           //0x004C
+    void* ReadOnlySharedMemoryBase;           //0x004C
     union
     {
-        uint32_t ReadOnlyShareMemoryHeap;            //0x0050 (NT3.51-WS03)
-        uint32_t HotpatchInformation;                //0x0050 (Vista+)
+        void* ReadOnlyShareMemoryHeap;            //0x0050 (NT3.51-WS03)
+        void* HotpatchInformation;                //0x0050 (Vista+)
     } dword50;
-    uint32_t ReadOnlyStaticServerData;           //0x0054
-    uint32_t AnsiCodePageData;                   //0x0058
-    uint32_t OemCodePageData;                    //0x005C
-    uint32_t UnicodeCaseTableData;               //0x0060
+    void** ReadOnlyStaticServerData;           //0x0054
+    void* AnsiCodePageData;                   //0x0058
+    void* OemCodePageData;                    //0x005C
+    void* UnicodeCaseTableData;               //0x0060
     DWORD                           NumberOfProcessors;                 //0x0064
     DWORD                           NtGlobalFlag;                       //0x0068
     LARGE_INTEGER                   CriticalSectionTimeout;             //0x0070
@@ -698,22 +698,22 @@ typedef struct _PEB32
     DWORD                           HeapDeCommitFreeBlockThreshold;     //0x0084
     DWORD                           NumberOfHeaps;                      //0x0088
     DWORD                           MaximumNumberOfHeaps;               //0x008C
-    uint32_t ProcessHeaps;                       //0x0090
-    uint32_t GdiSharedHandleTable;               //0x0094
+    void** ProcessHeaps;                       //0x0090
+    void* GdiSharedHandleTable;               //0x0094
 
     //end of NT 3.51 members / members that follow available on NT 4.0 and up
 
-    uint32_t ProcessStarterHelper;               //0x0098
+    void* ProcessStarterHelper;               //0x0098
     DWORD                           GdiDCAttributeList;                 //0x009C
     union
     {
         struct
         {
-            uint32_t LoaderLock;                         //0x00A0 (NT4)
+            void* LoaderLock;                         //0x00A0 (NT4)
         } nt4;
         struct
         {
-            uint32_t LoaderLock;                         //0x00A0 (Win2k+)
+            RTL_CRITICAL_SECTION* LoaderLock;                         //0x00A0 (Win2k+)
         } win2k;
     } dwordA0;
     DWORD                           OSMajorVersion;                     //0x00A4
@@ -730,17 +730,17 @@ typedef struct _PEB32
         KAFFINITY                   ActiveProcessAffinityMask;          //0x00C0 (late Vista+)
     } dwordC0;
     DWORD                           GdiHandleBuffer[0x22];              //0x00C4
-    uint32_t PostProcessInitRoutine;             //0x014C / void (*PostProcessInitRoutine) (void);
+    void* PostProcessInitRoutine;             //0x014C / void (*PostProcessInitRoutine) (void);
 
     //members that follow available on Windows 2000 and up
 
-    uint32_t TlsExpansionBitmap;                 //0x0150
+    void* TlsExpansionBitmap;                 //0x0150
     DWORD                           TlsExpansionBitmapBits[0x20];       //0x0154
     DWORD                           SessionId;                          //0x01D4
     ULARGE_INTEGER                  AppCompatFlags;                     //0x01D8
     ULARGE_INTEGER                  AppCompatFlagsUser;                 //0x01E0
-    uint32_t pShimData;                          //0x01E8
-    uint32_t AppCompatInfo;                      //0x01EC
+    void* pShimData;                          //0x01E8
+    void* AppCompatInfo;                      //0x01EC
     UNICODE_STRING                  CSDVersion;                         //0x01F0
 
     //members that follow available on Windows XP and up
@@ -755,23 +755,23 @@ typedef struct _PEB32
 
     FLS_CALLBACK_INFO* FlsCallback;                        //0x020C
     LIST_ENTRY                      FlsListHead;                        //0x0210
-    uint32_t FlsBitmap;                          //0x0218
+    void* FlsBitmap;                          //0x0218
     DWORD                           FlsBitmapBits[4];                   //0x021C
     DWORD                           FlsHighIndex;                       //0x022C
 
     //members that follow available on Windows Vista and up
 
-    uint32_t WerRegistrationData;                //0x0230
-    uint32_t WerShipAssertPtr;                   //0x0234
+    void* WerRegistrationData;                //0x0230
+    void* WerShipAssertPtr;                   //0x0234
 
     //members that follow available on Windows 7 BETA and up
 
     union
     {
-        uint32_t pContextData;                       //0x0238 (prior to Windows 8)
-        uint32_t pUnused;                            //0x0238 (Windows 8)
+        void* pContextData;                       //0x0238 (prior to Windows 8)
+        void* pUnused;                            //0x0238 (Windows 8)
     } dword238;
-    uint32_t pImageHeaderHash;                   //0x023C
+    void* pImageHeaderHash;                   //0x023C
 
     //members that follow available on Windows 7 RTM and up
 
@@ -794,7 +794,7 @@ typedef struct _PEB32
         LIST_ENTRY                  TppWorkerpList;                     //0x0254
         DWORD                       dwSystemCallMode;                   //0x0254 / set to 2 under 64-bit Windows in a 32-bit process (WOW64)
     } dword254;
-    uint32_t WaitOnAddressHashTable[128];        //0x025C
+    void* WaitOnAddressHashTable[128];        //0x025C
 
 } PEB32;
 
@@ -853,9 +853,9 @@ struct TEB32
 {
     //NT_TIB structure portion
     EXCEPTION_REGISTRATION* ExceptionList;                              //0x0000 / Current Structured Exception Handling (SEH) frame
-    uint32_t StackBase;                                  //0x0004 / Bottom of stack (high address)
-    uint32_t StackLimit;                                 //0x0008 / Ceiling of stack (low address)
-    uint32_t SubSystemTib;                               //0x000C
+    void* StackBase;                                  //0x0004 / Bottom of stack (high address)
+    void* StackLimit;                                 //0x0008 / Ceiling of stack (low address)
+    void* SubSystemTib;                               //0x000C
     union
     {
         void* FiberData;                                  //0x0010

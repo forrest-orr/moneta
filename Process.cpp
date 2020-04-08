@@ -124,19 +124,40 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 
 		if (RemotePeb != nullptr) {
 			Interface::Log(VerbosityLevel::Debug, "... PEB of 0x%p\r\n", RemotePeb);
-			PEB64 *LocalPeb = new PEB64;
-			dwPebSize = sizeof(PEB64);
-			
-			if (ReadProcessMemory(this->Handle, RemotePeb, LocalPeb, dwPebSize, nullptr)) {
-				Interface::Log(VerbosityLevel::Debug, "... successfully read remote PEB to local memory.\r\n");
-				uint32_t dwNumberOfHeaps = LocalPeb->NumberOfHeaps;
-				uint32_t dwHeapsSize = dwNumberOfHeaps * sizeof(void*);
-				void** Heaps = new void* [dwNumberOfHeaps];
-				if (ReadProcessMemory(this->Handle, reinterpret_cast<void*>(LocalPeb->ProcessHeaps), Heaps, dwHeapsSize, nullptr)) {
-					Interface::Log(VerbosityLevel::Debug, "... successfully read remote heaps to local memory.\r\n");
-					for (uint32_t dwX = 0; dwX < dwNumberOfHeaps; dwX++) {
-						Interface::Log(VerbosityLevel::Debug, "... 0x%p\r\n", Heaps[dwX]);
-						this->Heaps.push_back(Heaps[dwX]);
+
+			if (this->IsWow64()) {
+				PEB32* LocalPeb = new PEB32;
+				dwPebSize = sizeof(PEB32);
+
+				if (ReadProcessMemory(this->Handle, RemotePeb, LocalPeb, dwPebSize, nullptr)) {
+					uint32_t dwNumberOfHeaps = LocalPeb->NumberOfHeaps;
+					Interface::Log(VerbosityLevel::Debug, "... successfully read remote PEB to local memory (%d heaps)\r\n", dwNumberOfHeaps);
+					uint32_t dwHeapsSize = dwNumberOfHeaps * sizeof(uint32_t);
+					uint32_t* Heaps = new uint32_t [dwNumberOfHeaps];
+					if (ReadProcessMemory(this->Handle, reinterpret_cast<void*>(LocalPeb->ProcessHeaps), Heaps, dwHeapsSize, nullptr)) {
+						Interface::Log(VerbosityLevel::Debug, "... successfully read remote heaps to local memory.\r\n");
+						for (uint32_t dwX = 0; dwX < dwNumberOfHeaps; dwX++) {
+							Interface::Log(VerbosityLevel::Debug, "... 0x%08x\r\n", Heaps[dwX]);
+							this->Heaps.push_back(reinterpret_cast<void *>(Heaps[dwX]));
+						}
+					}
+				}
+			}
+			else {
+				PEB64* LocalPeb = new PEB64;
+				dwPebSize = sizeof(PEB64);
+
+				if (ReadProcessMemory(this->Handle, RemotePeb, LocalPeb, dwPebSize, nullptr)) {
+					Interface::Log(VerbosityLevel::Debug, "... successfully read remote PEB to local memory.\r\n");
+					uint32_t dwNumberOfHeaps = LocalPeb->NumberOfHeaps;
+					uint32_t dwHeapsSize = dwNumberOfHeaps * sizeof(void*);
+					void** Heaps = new void* [dwNumberOfHeaps];
+					if (ReadProcessMemory(this->Handle, reinterpret_cast<void*>(LocalPeb->ProcessHeaps), Heaps, dwHeapsSize, nullptr)) {
+						Interface::Log(VerbosityLevel::Debug, "... successfully read remote heaps to local memory.\r\n");
+						for (uint32_t dwX = 0; dwX < dwNumberOfHeaps; dwX++) {
+							Interface::Log(VerbosityLevel::Debug, "... 0x%p\r\n", Heaps[dwX]);
+							this->Heaps.push_back(Heaps[dwX]);
+						}
 					}
 				}
 			}
