@@ -65,8 +65,6 @@ Process::~Process() {
 	}
 }
 
-#define ThreadQuerySetWin32StartAddress 9
-
 Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	this->Handle = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
 
@@ -174,27 +172,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 			if (Thread32First(hThreadSnap, &ThreadEntry)) {
 				do {
 					if (ThreadEntry.th32OwnerProcessID == this->Pid) {
-						Thread* CurrentThread = new Thread(ThreadEntry.th32ThreadID);
-						HANDLE hThread = OpenThread(THREAD_QUERY_INFORMATION, false, CurrentThread->GetTid()); // OpenThreadToken consistently failed even with impersonation (ERROR_NO_TOKEN). The idea was abandoned due to lack of relevance. Get-InjectedThread returns the user as SYSTEM even when it was a regular user which launched the remote thread.
-
-						if (hThread != nullptr) {
-							static NtQueryInformationThread_t NtQueryInformationThread = reinterpret_cast<NtQueryInformationThread_t>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationThread"));
-							void* pStartAddress = nullptr;
-							HANDLE hDupThread = nullptr;
-
-							if (DuplicateHandle(GetCurrentProcess(), hThread, GetCurrentProcess(), &hDupThread, THREAD_QUERY_INFORMATION, FALSE, 0)) { // Without duplicating this handle NtQueryInformationThread will consistently fail to query the start address.
-								NTSTATUS NtStatus = NtQueryInformationThread(hDupThread, static_cast<THREADINFOCLASS>(ThreadQuerySetWin32StartAddress), &pStartAddress, sizeof(pStartAddress), nullptr);
-
-								if (NT_SUCCESS(NtStatus)) {
-									CurrentThread->SetEntryPoint(pStartAddress);
-								}
-
-								CloseHandle(hDupThread);
-							}
-
-							this->Threads.push_back(CurrentThread);
-							CloseHandle(hThread);
-						}
+						this->Threads.push_back(new Thread(ThreadEntry.th32ThreadID));
 					}
 				} while (Thread32Next(hThreadSnap, &ThreadEntry));
 			}

@@ -1,3 +1,6 @@
+#define ThreadQuerySetWin32StartAddress 9
+#define ThreadBasicInformation 0
+
 typedef enum _MEMORY_INFORMATION_CLASS {
 	MemoryBasicInformation, // MEMORY_BASIC_INFORMATION
 	MemoryWorkingSetInformation, // MEMORY_WORKING_SET_INFORMATION
@@ -25,6 +28,15 @@ typedef struct _MEMORY_IMAGE_INFORMATION {
 		};
 	};
 } MEMORY_IMAGE_INFORMATION, * PMEMORY_IMAGE_INFORMATION;
+
+typedef struct _THREAD_BASIC_INFORMATION {
+	NTSTATUS                ExitStatus;
+	PVOID                   TebBaseAddress;
+	CLIENT_ID               ClientId;
+	KAFFINITY               AffinityMask;
+	KPRIORITY               Priority;
+	KPRIORITY               BasePriority;
+} THREAD_BASIC_INFORMATION, * PTHREAD_BASIC_INFORMATION;
 
 typedef NTSTATUS(__stdcall* NtQueryVirtualMemory_t)(HANDLE, void*, MEMORY_INFORMATION_CLASS, void*, SIZE_T, SIZE_T*);
 typedef NTSTATUS(NTAPI* NtQueryInformationThread_t) (HANDLE, THREADINFOCLASS, void*, uint32_t, uint32_t*);
