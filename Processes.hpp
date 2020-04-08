@@ -9,6 +9,9 @@ namespace Memory {
 	typedef class Entity;
 }
 typedef class MemDump;
+namespace Processes {
+	typedef class Process;
+}
 
 namespace Processes {
 	enum class MemorySelection_t {
@@ -22,12 +25,16 @@ namespace Processes {
 	public:
 		uint32_t GetTid() const { return this->Id; }
 		const void* GetEntryPoint() const { return this->StartAddress; }
+		const void* GetStackAddress() const { return this->StackAddress; }
+		const void* GetTebAddress() const { return this->TebAddress; }
 		void SetEntryPoint(const void*);
-		Thread(uint32_t);
-		Thread(uint32_t dwTid, const void* pStartAddress);
+		Thread(uint32_t dwTid, Processes::Process& OwnerProc);
+		//Thread(uint32_t dwTid, const void* pStartAddress);
 	protected:
 		uint32_t Id;
 		const void* StartAddress;
+		const void* TebAddress;
+		const void* StackAddress;
 	};
 
 	class Process {

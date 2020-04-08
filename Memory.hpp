@@ -1,4 +1,6 @@
 #define MEMORY_SUBREGION_FLAG_HEAP 0x1
+#define MEMORY_SUBREGION_FLAG_STACK 0x2
+#define MEMORY_SUBREGION_FLAG_TEB 0x4
 
 typedef class Thread;
 typedef class MemDump;

@@ -62,7 +62,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		"\\____|__  /\\____/|___|  /\\___  >__| (____  /\r\n"
 		"        \\/            \\/     \\/          \\/ \r\n"
 		"\r\n"
-		"Moneta v1.0 | Forrest Orr | 2020\r\n"
+		"Moneta v1.0 | Forrest Orr | 2020\r\n\r\n"
 	);
 
 	SYSTEM_INFO SystemInfo = { 0 };

@@ -188,6 +188,11 @@ struct PEB64
 //
 struct TEB64
 {
+    void* ExceptionList;                              //0x0000 / Current Structured Exception Handling (SEH) frame
+    void* StackBase;
+    //uint32_t StackBase;                                  //0x0004 / Bottom of stack (high address)
+    //uint32_t StackLimit;                                 //0x0008 / Ceiling of stack (low address)
+    /*
     BYTE                            NtTib[56];                          //0x0000 / NT_TIB64 structure
     PTR64                           EnvironmentPointer;                 //0x0038
     CLIENT_ID64                     ClientId;                           //0x0040
@@ -206,6 +211,7 @@ struct TEB64
     PTR64                           SystemReserved1[54];                //0x0110
     DWORD                           ExceptionCode;                      //0x02C0
     PTR64                           ActivationContextStackPointer;      //0x02C8
+    */
 
 }; //struct TEB64
 

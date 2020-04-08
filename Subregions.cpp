@@ -43,7 +43,16 @@ Subregion::Subregion(Processes::Process &OwnerProc, const MEMORY_BASIC_INFORMATI
 
 	for (vector<Processes::Thread*>::const_iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
 		if ((*ThItr)->GetEntryPoint() >= this->Basic->BaseAddress && (*ThItr)->GetEntryPoint() < (static_cast<uint8_t *>(this->Basic->BaseAddress) + this->Basic->RegionSize)) {
-			this->Threads.push_back(new Processes::Thread((*ThItr)->GetTid(), (*ThItr)->GetEntryPoint()));
+			this->Threads.push_back(new Processes::Thread((*ThItr)->GetTid(), OwnerProc));
+		}
+
+		//if ((*ThItr)->GetStackAddress() == this->Basic->BaseAddress) {
+		if ((*ThItr)->GetStackAddress() >= this->Basic->BaseAddress && (*ThItr)->GetStackAddress() < (static_cast<uint8_t*>(this->Basic->BaseAddress) + this->Basic->RegionSize)) {
+			this->Flags |= MEMORY_SUBREGION_FLAG_STACK;
+		}
+
+		if ((*ThItr)->GetTebAddress() >= this->Basic->BaseAddress && (*ThItr)->GetTebAddress() < (static_cast<uint8_t*>(this->Basic->BaseAddress) + this->Basic->RegionSize)) {
+			this->Flags |= MEMORY_SUBREGION_FLAG_TEB;
 		}
 	}
 

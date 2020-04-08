@@ -31,15 +31,12 @@ ________________________________________________________________________________
 #include "StdAfx.h"
 #include "Interface.hpp"
 #include "Processes.hpp"
+#include "PEB.h"
 
 using namespace std;
 using namespace Processes;
 
-void Thread::SetEntryPoint(const void* pStartAddress) {
-	this->StartAddress = pStartAddress;
-}
-
-Thread::Thread(uint32_t dwTid) : Id(dwTid) {
+Thread::Thread(uint32_t dwTid, Processes::Process &OwnerProc) : Id(dwTid) {
 	HANDLE hThread = OpenThread(THREAD_QUERY_INFORMATION, false, this->Id); // OpenThreadToken consistently failed even with impersonation (ERROR_NO_TOKEN). The idea was abandoned due to lack of relevance. Get-InjectedThread returns the user as SYSTEM even when it was a regular user which launched the remote thread.
 
 	if (hThread != nullptr) {
@@ -59,13 +56,52 @@ Thread::Thread(uint32_t dwTid) : Id(dwTid) {
 
 			if (NT_SUCCESS(NtStatus)) {
 				Interface::Log(VerbosityLevel::Debug, "... TEB of 0x%p\r\n", Tbi.TebBaseAddress);
+				this->TebAddress = Tbi.TebBaseAddress;
+
+				if (OwnerProc.IsWow64()) {
+					TEB32* LocalTeb = new TEB32;
+					uint32_t dwTebSize = sizeof(TEB32);
+
+					if (ReadProcessMemory(OwnerProc.GetHandle(), Tbi.TebBaseAddress, LocalTeb, dwTebSize, nullptr)) {
+						//Interface::Log(VerbosityLevel::Debug, "... successfully read remote TEB to local memory.\r\n");
+						Interface::Log(VerbosityLevel::Debug, "... stack base: 0x%08x\r\n", LocalTeb->StackBase);
+						this->StackAddress = reinterpret_cast<void*>(LocalTeb->StackBase);
+					}
+					else {
+						throw 4;
+					}
+
+					delete LocalTeb;
+				}
+				else {
+					TEB64* LocalTeb = new TEB64;
+					uint32_t dwTebSize = sizeof(TEB64);
+
+					if (ReadProcessMemory(OwnerProc.GetHandle(), Tbi.TebBaseAddress, LocalTeb, dwTebSize, nullptr)) {
+						//Interface::Log(VerbosityLevel::Debug, "... successfully read remote TEB to local memory.\r\n");
+						Interface::Log(VerbosityLevel::Debug, "... stack base: 0x%p\r\n", LocalTeb->StackBase);
+						this->StackAddress = LocalTeb->StackBase;
+					}
+					else {
+						throw 4;
+					}
+
+					delete LocalTeb;
+				}
+			}
+			else {
+				throw 3;
 			}
 
 			CloseHandle(hDupThread);
 		}
+		else {
+			throw 2;
+		}
 
 		CloseHandle(hThread);
 	}
+	else {
+		throw 1;
+	}
 }
-
-Thread::Thread(uint32_t dwTid, const void* pStartAddress) : Id(dwTid), StartAddress(pStartAddress) {}
