@@ -99,9 +99,43 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				}
 			}
 		}
+		/*
+		HEAPLIST32 hl;
+
+		HANDLE hHeapSnap = CreateToolhelp32Snapshot(TH32CS_SNAPHEAPLIST, this->Pid);
+
+		hl.dwSize = sizeof(HEAPLIST32);
+
+		if (hHeapSnap == INVALID_HANDLE_VALUE)
+		{
+			printf("CreateToolhelp32Snapshot failed (%d)\n", GetLastError());
+		}
+
+		if (Heap32ListFirst(hHeapSnap, &hl))
+		{
+			do
+			{
+				HEAPENTRY32 he;
+				ZeroMemory(&he, sizeof(HEAPENTRY32));
+				he.dwSize = sizeof(HEAPENTRY32);
+
+				if (Heap32First(&he, this->Pid, hl.th32HeapID))
+				{
+					printf("\nHeap ID: 0x%p\n", hl.th32HeapID);
+					do
+					{
+						printf("Sub-heap 0x%p : Block size: %d\n", he.dwAddress, he.dwBlockSize);
+						this->Heaps.push_back(reinterpret_cast<void*>(he.dwAddress));
+						he.dwSize = sizeof(HEAPENTRY32);
+					} while (Heap32Next(&he));
+				}
+				hl.dwSize = sizeof(HEAPLIST32);
+			} while (Heap32ListNext(hHeapSnap, &hl));
+		}
+		else printf("Cannot list first heap (%d)\n", GetLastError());*/
 
 		//
-		// CreateToolhelp32Snapshot doesn't work work cross-arhitecture heap enumeration - use the PEB to walk the heaps
+		// CreateToolhelp32Snapshot doesn't work work cross-arhitecture heap enumeration - use the PEB to walk the heaps. Note that it was confirmed private +RWX entries in .NET process (other than executable primary heaps) are not sub-heaps which can be enumerated with Heap32First/Next
 		//
 
 		static NtQueryInformationProcess_t NtQueryInformationProcess = reinterpret_cast<NtQueryInformationProcess_t>(GetProcAddress(GetModuleHandleW(L"Ntdll.dll"), "NtQueryInformationProcess"));
@@ -232,6 +266,27 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	}
 }
 
+PeVm::Body* Process::GetLoadedModule(wstring Name) const {
+	wstring SanitizedName = Name;
+
+	transform(SanitizedName.begin(), SanitizedName.end(), SanitizedName.begin(), ::toupper);
+
+	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
+		if (Itr->second->GetType() == Entity::Type::PE_FILE) {
+			PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
+			wstring CurrentName = PeEntity->GetPebModule().GetName();
+
+			transform(CurrentName.begin(), CurrentName.end(), CurrentName.begin(), ::toupper);
+
+			if (CurrentName == SanitizedName) {
+				return PeEntity;
+			}
+		}
+	}
+
+	return nullptr;
+}
+
 void AlignName(const wchar_t* pOriginalName, wchar_t* pAlignedName, int32_t nAlignTo) { // Make generic and move to interface?
 	assert(nAlignTo >= 1);
 	assert(wcslen(pOriginalName) <= nAlignTo);
@@ -289,7 +344,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 				for (int32_t nSuspIndex = 0; !bReWalkMap && SuspItr != SbMapItr->second.end(); ++SuspItr, nSuspIndex++) {
 					switch ((*SuspItr)->GetType()) {
 					case Suspicion::Type::XPRV: {
-						if (((*SuspItr)->GetBlock()->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP)&&false) {
+						if (((*SuspItr)->GetSubregion()->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP&&false)) {
 							bReWalkMap = true;
 							RefSuspList.erase(SuspItr);
 
@@ -302,6 +357,39 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 
 								if (!RefSbMap.size()) {
 									SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
+								}
+							}
+						}
+						else {
+							//
+							// Check if the owner process of this suspicion has clr.dll loaded - if it does, scan its .data for references to this region
+							//
+							
+							PeVm::Body* PeEntity;
+
+							if ((PeEntity = (*SuspItr)->GetProcess()->GetLoadedModule(L"clr.dll")) != nullptr) {
+								Interface::Log(VerbosityLevel::Surface, "... found private +x region at 0x%p within process with clr.dll loaded.\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
+								PeVm::Section *DataSect = PeEntity->GetSection(".data");
+
+								if (DataSect != nullptr) {
+									Interface::Log(VerbosityLevel::Surface, "... clr.dll .data section located at 0x%p\r\n", DataSect->GetStartVa());
+									uint8_t* Buf = new uint8_t[DataSect->GetEntitySize()];
+
+									if (ReadProcessMemory((*SuspItr)->GetProcess()->GetHandle(), DataSect->GetStartVa(), Buf, DataSect->GetEntitySize(), nullptr)) {
+										uint32_t dwChunkSize = 4;
+										uint32_t dwChunkCount = (DataSect->GetEntitySize() / dwChunkSize);
+										Interface::Log(VerbosityLevel::Surface, "... successfully read %d bytes of .data section memory\r\n", DataSect->GetEntitySize());
+
+										for (uint32_t dwX = 0; dwX < DataSect->GetEntitySize(); dwX += dwChunkSize) {
+											if (*(uint32_t*)&Buf[dwX] == reinterpret_cast<uint32_t>((*SuspItr)->GetSubregion()->GetBasic()->BaseAddress)) {
+												Interface::Log(VerbosityLevel::Surface, "... found private executable region address 0x%p at 0x%p (offset 0x%08x) in clr.dll .data section\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress, static_cast<uint8_t *>(const_cast<void*>(DataSect->GetStartVa())) + dwX, dwX);
+											}
+										}
+									}
+
+									delete[] Buf;
+
+									//system("pause");
 								}
 							}
 						}
@@ -324,7 +412,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 							static const wchar_t* pWinmbExt = L".winmd";
 
 							if (_wcsicmp(PeEntity->GetFileBase()->GetPath().c_str() + PeEntity->GetFileBase()->GetPath().length() - wcslen(pWinmbExt), pWinmbExt) == 0) {
-								if (PeEntity->GetPe() != nullptr && PeEntity->GetPe()->GetEntryPoint() == 0) {
+								if (PeEntity->GetPeFile() != nullptr && PeEntity->GetPeFile()->GetEntryPoint() == 0) {
 									bReWalkMap = true;
 									RefSuspList.erase(SuspItr);
 
@@ -411,11 +499,11 @@ int32_t SubEntitySuspCount(map<uint8_t*, list<Suspicion*>>* Suspicions, uint8_t*
 	return nCount;
 }
 
-bool Process::DumpBlock(MemDump &ProcDmp, const MEMORY_BASIC_INFORMATION *Mbi, wstring Indent) {
+bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, wstring Indent) {
 	wchar_t DumFilePath[MAX_PATH + 1] = { 0 };
 
 	if (Mbi->State == MEM_COMMIT) {
-		if (ProcDmp.Create(Mbi, DumFilePath, MAX_PATH + 1)) {
+		if (DmpCtx.Create(Mbi, DumFilePath, MAX_PATH + 1)) {
 			Interface::Log("%ws~ Memory dumped to %ws\r\n", Indent.c_str(), DumFilePath);
 			return true;
 		}
@@ -450,7 +538,7 @@ bool Process::DumpBlock(MemDump &ProcDmp, const MEMORY_BASIC_INFORMATION *Mbi, w
 
 vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t MemSelectType, const uint8_t *pSelectAddress) {
 	bool bShownProc = false;
-	MemDump ProcDmp(this->Handle, this->Pid);
+	MemDump DmpCtx(this->Handle, this->Pid);
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
 	map <uint8_t*, map<uint8_t*, list<Suspicion *>>> SuspicionsMap; // More efficient to only filter this map once. Currently filtering it for every single entity
 	vector<Subregion*> SelectedSbrs;
@@ -578,7 +666,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 			}
 
 			//
-			// Display the section/sblock information associated with this eneity provided it meets the selection criteria
+			// Display the section/sblock information associated with this entity provided it meets the selection criteria
 			//
 
 			vector<Subregion*> Subregions = Itr->second->GetSubregions();
@@ -633,7 +721,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 
 					if (Interface::GetVerbosity() == VerbosityLevel::Detail) {
 						Interface::Log("    |__ Base address: 0x%p\r\n", (*SbrItr)->GetBasic()->BaseAddress);
-						Interface::Log("      | Size: 0x%d\r\n", (*SbrItr)->GetBasic()->RegionSize);
+						Interface::Log("      | Size: %d\r\n", (*SbrItr)->GetBasic()->RegionSize);
 						Interface::Log("      | Permissions: %ws\r\n", Subregion::ProtectSymbol((*SbrItr)->GetBasic()->Protect));
 						Interface::Log("      | Type: %ws\r\n", Subregion::TypeSymbol((*SbrItr)->GetBasic()->Type));
 						Interface::Log("      | State: %ws\r\n", Subregion::StateSymbol((*SbrItr)->GetBasic()->State));
@@ -646,7 +734,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 
 					if ((qwOptFlags & PROCESS_ENUM_FLAG_MEMDUMP)) {
 						if (!(qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE)) {
-							this->DumpBlock(ProcDmp, (*SbrItr)->GetBasic(), L"      ");
+							this->DumpBlock(DmpCtx, (*SbrItr)->GetBasic(), L"      ");
 						}
 					}
 
@@ -656,7 +744,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 
 			if ((qwOptFlags & PROCESS_ENUM_FLAG_MEMDUMP)) {
 				if ((qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE)) {
-					if (Entity::Dump(ProcDmp, *Itr->second)) {
+					if (Itr->second->Dump(DmpCtx)) {
 						Interface::Log("      ~ Generated full region dump at 0x%p\r\n", Itr->second->GetStartVa());
 					}
 					else {

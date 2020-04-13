@@ -40,10 +40,10 @@ ________________________________________________________________________________
 using namespace std;
 using namespace Memory;
 
-PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, const wchar_t* FilePath) : Region(OwnerProc.GetHandle(), Subregions), PeVm::Component(OwnerProc.GetHandle(), Subregions, static_cast<uint8_t *>((Subregions.front())->GetBasic()->BaseAddress)), MappedFile(OwnerProc.GetHandle(), Subregions, FilePath, false), PebMod(OwnerProc.GetHandle(), this->PeFile) {
+PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, const wchar_t* FilePath) : Region(OwnerProc.GetHandle(), Subregions), PeVm::Component(OwnerProc.GetHandle(), Subregions, static_cast<uint8_t *>((Subregions.front())->GetBasic()->BaseAddress)), MappedFile(OwnerProc.GetHandle(), Subregions, FilePath, false), PebMod(OwnerProc.GetHandle(), this->PeData) {
 	static NtQueryVirtualMemory_t NtQueryVirtualMemory = reinterpret_cast<NtQueryVirtualMemory_t>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory"));
 	MEMORY_IMAGE_INFORMATION Mii = { 0 };
-	NTSTATUS NtStatus = NtQueryVirtualMemory(OwnerProc.GetHandle(), this->PeFile, MemoryImageInformation, &Mii, sizeof(MEMORY_IMAGE_INFORMATION), nullptr);
+	NTSTATUS NtStatus = NtQueryVirtualMemory(OwnerProc.GetHandle(), this->PeData, MemoryImageInformation, &Mii, sizeof(MEMORY_IMAGE_INFORMATION), nullptr);
 
 	Interface::Log(VerbosityLevel::Debug, "... creating PE entity for %ws within %ws (PID %d)\r\n", FilePath, OwnerProc.GetName().c_str(), OwnerProc.GetPid());
 
@@ -60,26 +60,26 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 	if (!this->GetFileBase()->IsPhantom()) {
 		this->Signed = CheckSigning(FilePath);
 
-		if ((this->Pe = PeFile::Load(FilePath)) != nullptr) {
+		if ((this->FilePe = PeFile::Load(FilePath)) != nullptr) {
 			//
 			// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
 			//
 
-			for (int32_t nX = -1; nX < this->Pe->GetFileHdr()->NumberOfSections; nX++) {
+			for (int32_t nX = -1; nX < this->FilePe->GetFileHdr()->NumberOfSections; nX++) {
 				IMAGE_SECTION_HEADER ArtificialPeHdr = { 0 }; // This will initialize other relevant fields such as VirtualAddress to 0 for the PE header edge case.
 
 				if (nX == -1) {
 					strcpy_s(reinterpret_cast<char*>(ArtificialPeHdr.Name), sizeof(ArtificialPeHdr.Name), "Header");
-					ArtificialPeHdr.SizeOfRawData = this->Pe->GetSectHdrs()->VirtualAddress; // Consider the size of the PE headers to be all data leading up to the start of the first real section.
+					ArtificialPeHdr.SizeOfRawData = this->FilePe->GetSectHdrs()->VirtualAddress; // Consider the size of the PE headers to be all data leading up to the start of the first real section.
 				}
 				else {
-					memcpy(&ArtificialPeHdr, (this->Pe->GetSectHdrs() + nX), sizeof(IMAGE_SECTION_HEADER));
+					memcpy(&ArtificialPeHdr, (this->FilePe->GetSectHdrs() + nX), sizeof(IMAGE_SECTION_HEADER));
 				}
 
 				//uint32_t dwSectionSize = (ArtificialPeHdr.SizeOfRawData == 0 ? ArtificialPeHdr.Misc.VirtualSize : ArtificialPeHdr.SizeOfRawData);
 				uint32_t dwSectionSize = (ArtificialPeHdr.SizeOfRawData < ArtificialPeHdr.Misc.VirtualSize ? ArtificialPeHdr.Misc.VirtualSize : ArtificialPeHdr.SizeOfRawData); // .data sections will sometimes have a non-zero raw data where the virtual size is still larger than the raw size (copy-on-write)
-				uint8_t* pSectStartVa = this->PeFile + ArtificialPeHdr.VirtualAddress;
-				uint8_t* pSectEndVa = this->PeFile + ArtificialPeHdr.VirtualAddress + dwSectionSize;
+				uint8_t* pSectStartVa = this->PeData + ArtificialPeHdr.VirtualAddress;
+				uint8_t* pSectEndVa = this->PeData + ArtificialPeHdr.VirtualAddress + dwSectionSize;
 
 				//
 				// Calculate the sblocks overlapping between this PE entity and the current section.
@@ -99,7 +99,7 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 					}
 				}
 
-				this->Sections.push_back(new Section(OwnerProc.GetHandle(), OverlapSubregion, &ArtificialPeHdr, this->PeFile));
+				this->Sections.push_back(new Section(OwnerProc.GetHandle(), OverlapSubregion, &ArtificialPeHdr, this->PeData));
 			}
 		}
 		else {
@@ -113,9 +113,19 @@ PeVm::Body::~Body() {
 		delete* Itr;
 	}
 
-	if (this->Pe != nullptr) {
-		delete this->Pe;
+	if (this->FilePe != nullptr) {
+		delete this->FilePe;
 	}
+}
+
+PeVm::Section* PeVm::Body::GetSection(string Name) const {
+	for (vector<Section*>::const_iterator SectItr = this->Sections.begin(); SectItr != this->Sections.end(); ++SectItr) {
+		if (_stricmp(reinterpret_cast<const char *>((*SectItr)->GetHeader()->Name), Name.c_str()) == 0) {
+			return *SectItr;
+		}
+	}
+
+	return nullptr;
 }
 
 vector<PeVm::Section*> PeVm::Body::FindOverlapSect(Subregion& Address) {
@@ -162,11 +172,11 @@ PeVm::Body::PebModule::PebModule(HANDLE hProcess, const uint8_t* pModBase) {
 	}
 }
 
-PeVm::Component::Component(HANDLE hProcess, std::vector<Subregion*> Subregions, uint8_t* pPeBuf) : Region(hProcess, Subregions), PeFile(pPeBuf) {}
+PeVm::Component::Component(HANDLE hProcess, std::vector<Subregion*> Subregions, uint8_t* pPeBuf) : Region(hProcess, Subregions), PeData(pPeBuf) {}
 
 PeVm::Section::Section(HANDLE hProcess, vector<Subregion*> Subregions, IMAGE_SECTION_HEADER* SectHdr, uint8_t* pPeBuf) : Region(hProcess, Subregions), PeVm::Component(hProcess, Subregions, pPeBuf) {
 	memcpy(&this->Hdr, SectHdr, sizeof(IMAGE_SECTION_HEADER));
-	this->EntitySize = this->Hdr.SizeOfRawData == 0 ? this->Hdr.Misc.VirtualSize : this->Hdr.SizeOfRawData; // Overwrite default size determined by sblocks. Verified correct order.
+	this->EntitySize = this->Hdr.SizeOfRawData < this->Hdr.Misc.VirtualSize ? this->Hdr.Misc.VirtualSize : this->Hdr.SizeOfRawData; // Overwrite default size determined by sblocks. Verified correct order.
 }
 
 MappedFile::MappedFile(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* FilePath, bool bMemStore) : Region(hProcess, Subregions), MapFileBase(new FileBase(FilePath, bMemStore, false)) {}
@@ -230,17 +240,17 @@ Entity* Entity::Create(Processes::Process& OwnerProc, std::vector<Subregion*> Su
 	return pNewEntity;
 }
 
-bool Entity::Dump(MemDump& ProcDmp, Entity& Target) {
-	vector<Subregion*> Subregions = Target.GetSubregions(); // This must be done explicitly, otherwise each time GetSubregions is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
+bool Entity::Dump(MemDump& DmpCtx) const {
+	vector<Subregion*> Subregions = this->GetSubregions(); // This must be done explicitly, otherwise each time GetSubregions is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 	wchar_t DumpFolder[MAX_PATH + 1] = { 0 };
 	int32_t nDumpCount = 0;
 
-	swprintf_s(DumpFolder, MAX_PATH + 1, L"%d_%p_%ws", ProcDmp.GetPid(), Target.GetStartVa(), Subregion::TypeSymbol(Subregions.front()->GetBasic()->Type));
+	swprintf_s(DumpFolder, MAX_PATH + 1, L"%d_%p_%ws", DmpCtx.GetPid(), this->GetStartVa(), Subregion::TypeSymbol(Subregions.front()->GetBasic()->Type));
 
 	for (vector<Subregion*>::iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
 		if ((*SbrItr)->GetBasic()->State == MEM_COMMIT) {
 			wchar_t DumFilePath[MAX_PATH + 1] = { 0 };
-			if (ProcDmp.Create(DumpFolder, (*SbrItr)->GetBasic(), DumFilePath, MAX_PATH + 1)) {
+			if (DmpCtx.Create(DumpFolder, (*SbrItr)->GetBasic(), DumFilePath, MAX_PATH + 1)) {
 				nDumpCount++;
 			}
 		}

@@ -55,7 +55,7 @@ wstring Suspicion::GetDescription() const {
 	}
 }
 
-Suspicion::Suspicion(Process* ParentProc, Entity* ParentObj, Subregion* Block, Suspicion::Type Type) : ParentProcess(ParentProc), ParentObject(ParentObj), Block(Block), SuspicionType(Type) {}
+Suspicion::Suspicion(Process* ParentProc, Entity* ParentObj, Subregion* Block, Suspicion::Type Type) : ParentProcess(ParentProc), ParentObject(ParentObj), Sbr(Block), SuspicionType(Type) {}
 
 void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>& SuspicionsMap) {
 	for (map <uint8_t*, map<uint8_t*, list<Suspicion *>>>::const_iterator AbMapItr = SuspicionsMap.begin(); AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
@@ -64,7 +64,7 @@ void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>& S
 			printf("  0x%p [%d list elements]\r\n", SbMapItr->first, SbMapItr->second.size());
 			for (list<Suspicion *>::const_iterator ListItr = SbMapItr->second.begin(); ListItr != SbMapItr->second.end(); ++ListItr) {
 				if (!(*ListItr)->IsFullEntitySuspicion()) {
-					printf("    0x%p : %d : %ws\r\n", (*ListItr)->GetBlock()->GetBasic()->BaseAddress, (*ListItr)->GetType(), (*ListItr)->GetDescription().c_str());
+					printf("    0x%p : %d : %ws\r\n", (*ListItr)->GetSubregion()->GetBasic()->BaseAddress, (*ListItr)->GetType(), (*ListItr)->GetDescription().c_str());
 				}
 				else {
 					printf("    0x%p : %d : %ws : Full entity\r\n", (*ListItr)->GetParentObject()->GetStartVa(), (*ListItr)->GetType(), (*ListItr)->GetDescription().c_str());
@@ -119,7 +119,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 					}
 				}
 
-				if (PeEntity->GetPe() != nullptr) {
+				if (PeEntity->GetPeFile() != nullptr) {
 					vector<PeVm::Section*> Sections = PeEntity->GetSections();
 					for (vector<PeVm::Section*>::const_iterator SectItr = Sections.begin(); SectItr != Sections.end(); ++SectItr) {
 						vector<Subregion*> Subregions = (*SectItr)->GetSubregions();

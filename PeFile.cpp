@@ -92,6 +92,14 @@ PeFile* PeFile::Load(const wstring PeFilePath) {
 	return NewPe;
 }
 
+bool PeFile::IsExe() {
+	return (this->GetFileHdr()->Characteristics & IMAGE_FILE_EXECUTABLE_IMAGE);
+}
+
+bool PeFile::IsDll() {
+	return (this->GetFileHdr()->Characteristics & IMAGE_FILE_DLL);
+}
+
 template<typename NtHdrType> PeArch<NtHdrType>::PeArch(const uint8_t* pPeBuf, uint32_t dwPeFileSize) : PeFile(pPeBuf, dwPeFileSize) {}
 
 template<typename NtHdrType> NtHdrType* PeArch<NtHdrType>::GetNtHdrs() {
@@ -99,8 +107,8 @@ template<typename NtHdrType> NtHdrType* PeArch<NtHdrType>::GetNtHdrs() {
 	NtHdrType* pNtHdr = (NtHdrType*)(reinterpret_cast<uint8_t *>(this->DosHdr) + this->DosHdr->e_lfanew);
 
 	if (pNtHdr->Signature == 'EP') {
-		if (pNtHdr->FileHeader.Machine == GetPeArch()) {
-			if (pNtHdr->OptionalHeader.Magic == GetPeMagic()) {
+		if (pNtHdr->FileHeader.Machine == GetPeFileArch()) {
+			if (pNtHdr->OptionalHeader.Magic == GetPeFileMagic()) {
 				this->SectHdrs = reinterpret_cast<IMAGE_SECTION_HEADER *>(
 					reinterpret_cast<uint8_t *>(pNtHdr) + sizeof(NtHdrType)
 					);
@@ -177,6 +185,10 @@ template<typename NtHdrType> uint32_t PeArch<NtHdrType>::GetImageSize() {
 
 template<typename NtHdrType> uint8_t* PeArch<NtHdrType>::GetEntryPoint() {
 	return reinterpret_cast<uint8_t *>(GetNtHdrs()->OptionalHeader.AddressOfEntryPoint);
+}
+
+template<typename NtHdrType> bool PeArch<NtHdrType>::IsDotNet() {
+	return GetDataDir(IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR, nullptr, nullptr);
 }
 
 PeArch32::PeArch32(const uint8_t* pPeBuf, uint32_t dwPeFileSize) : PeArch<IMAGE_NT_HEADERS32>(pPeBuf, dwPeFileSize) {}

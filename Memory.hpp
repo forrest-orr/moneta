@@ -60,7 +60,7 @@ namespace Memory {
 		const void* GetEndVa() const { return this->EndVa; }
 		uint32_t GetEntitySize() const { return this->EntitySize; }
 		static Entity* Create(Processes::Process& OwnerProc, std::vector<Subregion*> Subregions); // Factory method for derived PE images, mapped files, unknown memory ranges.
-		static bool Dump(MemDump& ProcDmp, Entity& Target);
+		bool Dump(MemDump& DmpCtx) const;
 		void SetSubregions(std::vector<Subregion*>);
 		~Entity();
 		virtual Entity::Type GetType() = 0;
@@ -85,22 +85,25 @@ namespace Memory {
 	namespace PeVm {
 		class Component : virtual public Region {
 		public:
-			uint8_t* GetPeFile() const { return this->PeFile; }
+			uint8_t* GetDataPe() const { return this->PeData; }
 			Component(HANDLE hProcess, std::vector<Subregion*> Subregions, uint8_t* pPeBuf);
 		protected:
-			 uint8_t* PeFile;
+			 uint8_t* PeData;
 		};
 
 		typedef class Section;
 		class Body : public MappedFile, public Component {
 		protected:
 			std::vector<Section*> Sections;
-			::PeFile* Pe;
+			::PeFile* FilePe;
 			Signing_t Signed;
 			bool NonExecutableImage;
 			bool PartiallyMapped;
 			uint32_t ImageSize;
 			uint32_t SigningLevel;
+			bool DotNet;
+			bool Exe;
+			bool Dll;
 			class PebModule {
 			public:
 				const uint8_t* GetBase() const { return (const uint8_t*)this->Info.lpBaseOfDll; }
@@ -118,12 +121,13 @@ namespace Memory {
 			} PebMod;
 		public:
 			Entity::Type GetType() { return Entity::Type::PE_FILE; }
-			::PeFile* GetPe() const { return this->Pe; }
+			::PeFile* GetPeFile() const { return this->FilePe; }
 			bool IsSigned() const;
 			Signing_t GetSisningType() const;
 			bool IsNonExecutableImage() const { return this->NonExecutableImage; }
 			bool IsPartiallyMapped() const { return this->PartiallyMapped; }
 			std::vector<Section*> GetSections() const { return Sections; }
+			Section* GetSection(std::string) const;
 			PebModule& GetPebModule() { return PebMod; }
 			std::vector<Section*> FindOverlapSect(Subregion& Address);
 			uint32_t GetImageSize() const { return this->ImageSize; }

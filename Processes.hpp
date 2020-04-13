@@ -7,6 +7,11 @@ typedef class Suspicion;
 namespace Memory {
 	typedef class Subregion;
 	typedef class Entity;
+
+	namespace PeVm {
+		typedef class Body;
+	}
+	
 }
 typedef class MemDump;
 namespace Processes {
@@ -54,6 +59,7 @@ namespace Processes {
 		std::vector<Thread*> GetThreads() const { return this->Threads; }
 		std::wstring GetName() const { return this->Name; }
 		std::wstring GetImageFilePath() const { return this->ImageFilePath; }
+		Memory::PeVm::Body* GetLoadedModule(std::wstring Name) const;
 		bool DumpBlock(MemDump& ProcDmp, const MEMORY_BASIC_INFORMATION* Mbi, std::wstring Indent);
 		BOOL IsWow64() const { return this->Wow64; }
 		Process(uint32_t);

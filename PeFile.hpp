@@ -11,8 +11,8 @@ protected:
 public:
 	virtual bool IsPe32() = 0;
 	virtual bool IsPe64() = 0;
-	virtual uint16_t GetPeMagic() = 0;
-	virtual uint16_t GetPeArch() = 0;
+	virtual uint16_t GetPeFileMagic() = 0;
+	virtual uint16_t GetPeFileArch() = 0;
 	virtual bool Validate() = 0;
 	virtual bool GetDataDir(int8_t nIndex, uint32_t* pdwRva, uint32_t* pdwSize) = 0;
 	virtual uint32_t RefreshCrc32() = 0;
@@ -26,11 +26,14 @@ public:
 	virtual uint16_t GetDllCharacteristics() = 0;
 	virtual void SetDllCharacteristics(uint16_t wDllCharacteristics) = 0;
 	virtual uint32_t GetImageSize() = 0;
+	virtual bool IsDotNet() = 0;
 	uint8_t* GetData() const { return this->Data; }
 	uint32_t GetSize() const { return this->Size; }
 	PIMAGE_DOS_HEADER GetDosHdr() const { return this->DosHdr; }
 	IMAGE_FILE_HEADER* GetFileHdr() const { return this->FileHdr; }
 	IMAGE_SECTION_HEADER* GetSectHdrs() const { return this->SectHdrs; }
+	bool IsExe();
+	bool IsDll();
 	~PeFile();
 	static PeFile* Load(const uint8_t* pPeBuf, uint32_t dwPeFileSize); // Factory
 	static PeFile* Load(const std::wstring PeFilePath); // Factory
@@ -59,14 +62,15 @@ public:
 	uint16_t GetDllCharacteristics();
 	void SetDllCharacteristics(uint16_t wDllCharacteristics);
 	uint32_t GetImageSize();
+	bool IsDotNet();
 };
 
 class PeArch32 : public PeArch<IMAGE_NT_HEADERS32> {
 public:
 	bool IsPe32() { return true; }
 	bool IsPe64() { return false; }
-	uint16_t GetPeMagic() { return IMAGE_NT_OPTIONAL_HDR32_MAGIC; }
-	uint16_t GetPeArch() { return IMAGE_FILE_MACHINE_I386; }
+	uint16_t GetPeFileMagic() { return IMAGE_NT_OPTIONAL_HDR32_MAGIC; }
+	uint16_t GetPeFileArch() { return IMAGE_FILE_MACHINE_I386; }
 	PeArch32(const uint8_t* pPeBuf, uint32_t dwPeFileSize);
 };
 
@@ -74,7 +78,7 @@ class PeArch64 : public PeArch<IMAGE_NT_HEADERS64> {
 public:
 	bool IsPe32() { return false; }
 	bool IsPe64() { return true; }
-	uint16_t GetPeMagic() { return IMAGE_NT_OPTIONAL_HDR64_MAGIC; }
-	uint16_t GetPeArch() { return IMAGE_FILE_MACHINE_AMD64; }
+	uint16_t GetPeFileMagic() { return IMAGE_NT_OPTIONAL_HDR64_MAGIC; }
+	uint16_t GetPeFileArch() { return IMAGE_FILE_MACHINE_AMD64; }
 	PeArch64(const uint8_t* pPeBuf, uint32_t dwPeFileSize);
 };
