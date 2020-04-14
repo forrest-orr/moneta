@@ -483,6 +483,7 @@ int32_t AppendSubregionAttributes(Subregion *Sbr) {
 
 	return nCount;
 }
+
 int32_t SubEntitySuspCount(map<uint8_t*, list<Suspicion*>>* Suspicions, uint8_t* pSbAddress) {
 	int32_t nCount = 0;
 
@@ -593,15 +594,32 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 
 			if (Itr->second->GetType() == Entity::Type::PE_FILE) {
 				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
-				Interface::Log("| ");
+				wchar_t ImgType[22], AlignedImgType[22]; // Length of 20, + 1 for prefix, +1 for null
+				Interface::Log("|");
+
+				wcscpy_s(ImgType, 22, L" ");
+
+				if (PeEntity->GetPeFile()->IsDotNet()) {
+					wcscat_s(ImgType, 22, L".NET ");
+				}
+
+				if (PeEntity->GetPeFile()->IsExe()) {
+					wcscat_s(ImgType, 22, L"EXE ");
+				}
+				else if (PeEntity->GetPeFile()->IsDll()) {
+					wcscat_s(ImgType, 22, L"DLL ");
+				}
 
 				if (PeEntity->IsNonExecutableImage()) {
-					Interface::Log(ConsoleColor::Gold, "Unexecutable image  ");
+					wcscat_s(ImgType, 22, L"NX-Image");
 				}
 				else {
-					Interface::Log(ConsoleColor::Gold, "Executable image    ");
+					wcscat_s(ImgType, 22, L"Image");
 				}
 
+
+				AlignName(ImgType, AlignedImgType, 21);
+				Interface::Log(ConsoleColor::Gold, "%ws", AlignedImgType);
 				Interface::Log("| %ws", PeEntity->GetFileBase()->GetPath().c_str());
 			}
 			else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
@@ -635,6 +653,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 					Interface::Log("    | Mapped file size: %d\r\n", PeEntity->GetEntitySize());
 					Interface::Log("    | Mapped file path: %ws\r\n", PeEntity->GetFileBase()->GetPath().c_str());
 					Interface::Log("    | Size of image: %d\r\n", PeEntity->GetImageSize());
+					Interface::Log("    | PE type: %ws%ws\r\n", PeEntity->GetPeFile()->IsDotNet() ? L".NET " : L"", PeEntity->GetPeFile()->IsDll() ? L"DLL" : L"EXE");
 					Interface::Log("    | Non-executable: %ws\r\n", PeEntity->IsNonExecutableImage() ? L"yes" : L"no");
 					Interface::Log("    | Partially mapped: %ws\r\n", PeEntity->IsPartiallyMapped() ? L"yes" : L"no");
 					Interface::Log("    | Signed: %ws [%ws]\r\n", PeEntity->IsSigned() ? L"yes" : L"no", TranslateSigningType(PeEntity->GetSisningType()));

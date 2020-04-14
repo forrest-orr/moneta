@@ -54,7 +54,7 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 		this->SigningLevel = Mii.ImageSigningLevel;
 	}
 	else {
-		Interface::Log(VerbosityLevel::Debug, "- NtQueryVirtualMemory failed for image information (0x%08x)\r\n", NtStatus);
+		Interface::Log(VerbosityLevel::Debug, "... NtQueryVirtualMemory failed for image information (0x%08x)\r\n", NtStatus);
 	}
 
 	if (!this->GetFileBase()->IsPhantom()) {

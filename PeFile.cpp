@@ -93,7 +93,7 @@ PeFile* PeFile::Load(const wstring PeFilePath) {
 }
 
 bool PeFile::IsExe() {
-	return (this->GetFileHdr()->Characteristics & IMAGE_FILE_EXECUTABLE_IMAGE);
+	return !(this->GetFileHdr()->Characteristics & IMAGE_FILE_DLL); // IMAGE_FILE_EXECUTABLE_IMAGE appears on DLLs as well
 }
 
 bool PeFile::IsDll() {
