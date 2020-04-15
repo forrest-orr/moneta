@@ -51,6 +51,7 @@ wstring Suspicion::GetDescription() const {
 	case XMAP: return L"Abnormal executable memory type";
 	case PHANTOM_IMAGE: return L"Phantom image";
 	case XPRV: return L"Abnormal executable memory type";
+	case NON_IMAGE_THREAD: return L"Thread within non-image memory region";
 	default: return L"?";
 	}
 }
@@ -157,9 +158,18 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 			vector<Subregion*> Subregions = ParentObj.GetSubregions(); // This must be done explicitly, otherwise each time GetSubregions is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 			for (vector<Subregion*>::iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
 				list<Suspicion *> SbSuspList;
+				vector<Processes::Thread*> Threads = ParentProc.GetThreads();
+
+				for (vector<Processes::Thread*>::const_iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
+					if ((*ThItr)->GetEntryPoint() >= (*SbrItr)->GetBasic()->BaseAddress && (*ThItr)->GetEntryPoint() < (static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress) + (*SbrItr)->GetBasic()->RegionSize)) {
+						SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbrItr, NON_IMAGE_THREAD));
+					}
+				}
+				
 				if (Subregion::PageExecutable((*SbrItr)->GetBasic()->Protect)) {
 					SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbrItr, XMAP));
 				}
+
 				if (SbSuspList.size()) {
 					RefSbMap.insert(make_pair(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), SbSuspList));
 				}
@@ -175,6 +185,14 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 					list<Suspicion *> SbSuspList;
 					if (Subregion::PageExecutable((*SbrItr)->GetBasic()->Protect)) {
 						SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbrItr, XPRV));
+					}
+
+					vector<Processes::Thread*> Threads = ParentProc.GetThreads();
+
+					for (vector<Processes::Thread*>::const_iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
+						if ((*ThItr)->GetEntryPoint() >= (*SbrItr)->GetBasic()->BaseAddress && (*ThItr)->GetEntryPoint() < (static_cast<uint8_t*>((*SbrItr)->GetBasic()->BaseAddress) + (*SbrItr)->GetBasic()->RegionSize)) {
+							SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbrItr, NON_IMAGE_THREAD));
+						}
 					}
 
 					if (SbSuspList.size()) {
