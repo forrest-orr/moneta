@@ -364,7 +364,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 							//
 							// Check if the owner process of this suspicion has clr.dll loaded - if it does, scan its .data for references to this region
 							//
-							
+							/*
 							PeVm::Body* PeEntity;
 
 							if ((PeEntity = (*SuspItr)->GetProcess()->GetLoadedModule(L"clr.dll")) != nullptr) {
@@ -391,19 +391,20 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 
 									//system("pause");
 								}
-							}
+							}*/
 						}
 
 						break;
 					}
 					case Suspicion::Type::MISSING_PEB_MODULE: {
 						/* Filter cases for missing PEB modules:
-							 ~ Signed metadata PEs. These appear in the C:\Windows\System32\WinMetadata folder with the .winmd extension. They've also been noted to appear in WindpwsApps, SystemApps and others.
+						   
+						   Signed metadata PEs. These appear in the C:\Windows\System32\WinMetadata folder with the .winmd extension. They've also been noted to appear in WindpwsApps, SystemApps and others.
 
-							   0x000000000F3E0000:0x0009e000 | Executable image | C:\Windows\System32\WinMetadata\Windows.UI.winmd | Missing PEB module
-							   0x000000000F3E0000:0x0009e000 | R        | Header   | 0x00000000
-							   0x000000000F3E0000:0x0009e000 | R        | .text    | 0x00000000
-							   0x000000000F3E0000:0x0009e000 | R        | .rsrc    | 0x00000000
+						   0x000000000F3E0000:0x0009e000 | Executable image | C:\Windows\System32\WinMetadata\Windows.UI.winmd | Missing PEB module
+						   0x000000000F3E0000:0x0009e000 | R        | Header   | 0x00000000
+						   0x000000000F3E0000:0x0009e000 | R        | .text    | 0x00000000
+						   0x000000000F3E0000:0x0009e000 | R        | .rsrc    | 0x00000000
 						*/
 
 						const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*SuspItr)->GetParentObject());
