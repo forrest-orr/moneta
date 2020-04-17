@@ -205,7 +205,7 @@ Region::Region(HANDLE hProcess, vector<Subregion*> Subregions) { // Removed as a
 }
 
 Entity* Entity::Create(Processes::Process& OwnerProc, std::vector<Subregion*> Subregions) {
-	Entity* pNewEntity = nullptr;
+	Entity* NewEntity = nullptr;
 
 	if (Subregions.front()->GetBasic()->Type == MEM_MAPPED || Subregions.front()->GetBasic()->Type == MEM_IMAGE) {
 		wchar_t DevFilePath[MAX_PATH + 1] = { 0 };
@@ -227,17 +227,17 @@ Entity* Entity::Create(Processes::Process& OwnerProc, std::vector<Subregion*> Su
 		}
 
 		if (Subregions.front()->GetBasic()->Type == MEM_MAPPED) {
-			pNewEntity = new MappedFile(OwnerProc.GetHandle(), Subregions, MaFilePath);
+			NewEntity = new MappedFile(OwnerProc.GetHandle(), Subregions, MaFilePath);
 		}
 		else if (Subregions.front()->GetBasic()->Type == MEM_IMAGE) {
-			pNewEntity = new PeVm::Body(OwnerProc, Subregions, MaFilePath);
+			NewEntity = new PeVm::Body(OwnerProc, Subregions, MaFilePath);
 		}
 	}
 	else {
-		pNewEntity = new Region(OwnerProc.GetHandle(), Subregions);
+		NewEntity = new Region(OwnerProc.GetHandle(), Subregions);
 	}
 
-	return pNewEntity;
+	return NewEntity;
 }
 
 bool Entity::Dump(MemDump& DmpCtx) const {

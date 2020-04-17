@@ -522,6 +522,7 @@ bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, ws
 	   mselect == process
 	   mselect == sblock and this eneity contains the sblock
 	   mselect == suspicious and there is 1 or more suspicions
+	   mselect == referenced and this entity contains 1 or more
 	4. Show the process if it has not been shown before
 	5. Display entity info (exe image, private, mapped + total size) ALWAYS (criteria already applied going into loop) along with suspicions (if any)
 	5. For PEs, loop sblocks/sections. Enum if:
@@ -533,10 +534,21 @@ bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, ws
 	8. For private/mapped loop sblocks and enum if:
 		mselect == process
 		mselect == sblock && sblock == current, or the  "from base" option is set
-		or mselect == suspicious and the current sblock has a suspicion or the  "from base" option is set
+		mselect == suspicious and the current sblock has a suspicion or the  "from base" option is set
+		mselect == referenced and this sblock contains one or more reference
 	9. Dump the current sblock based on the same criteria as above but ONLY if the "from base" option is not set.
 	10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
 */
+
+int32_t Process::SearchReferences(map <uint8_t*, vector<uint8_t*>> ReferencesMap, const uint8_t* pReferencedAddress) {
+	int32_t nRefTotal = 0;
+
+	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
+		//MemDmp each sblock in the entity and sweep it for address references. if one is found, create the entity base as a key in the map if it doesn['t already exist and then add the sblock to the vector
+	}
+
+	return nRefTotal;
+}
 
 vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t MemSelectType, const uint8_t *pSelectAddress) {
 	bool bShownProc = false;
@@ -544,6 +556,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
 	map <uint8_t*, map<uint8_t*, list<Suspicion *>>> SuspicionsMap; // More efficient to only filter this map once. Currently filtering it for every single entity
 	vector<Subregion*> SelectedSbrs;
+	map <uint8_t*, vector<uint8_t *>> ReferencesMap;
 
 	//
 	// Build suspicions list for following memory selection and apply filters to it.
@@ -555,6 +568,10 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 
 	if (SuspicionsMap.size()) {
 		FilterSuspicions(SuspicionsMap);
+	}
+
+	if (MemSelectType == MemorySelection_t::Referenced) {
+		//
 	}
 
 	//

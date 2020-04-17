@@ -65,6 +65,7 @@ namespace Processes {
 		BOOL IsWow64() const { return this->Wow64; }
 		Process(uint32_t);
 		std::vector<Memory::Subregion*> Enumerate(uint64_t qwOptFlags, MemorySelection_t MemSelectType, const uint8_t* pSelectAddress = nullptr);
+		int32_t SearchReferences(std::map <uint8_t*, std::vector<uint8_t*>> ReferencesMap, const uint8_t* pReferencedAddress);
 		~Process();
 	};
 }
