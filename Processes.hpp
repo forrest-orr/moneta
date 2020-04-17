@@ -23,7 +23,8 @@ namespace Processes {
 		Invalid,
 		Block,
 		All,
-		Suspicious
+		Suspicious,
+		Referenced
 	};
 
 	class Thread {

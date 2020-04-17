@@ -118,6 +118,9 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				else if (*(i + 1) == L"suspicious") {
 					MemSelectType = MemorySelection_t::Suspicious;
 				}
+				else if (*(i + 1) == L"referenced") {
+					MemSelectType = MemorySelection_t::Referenced;
+				}
 			}
 			else if (Arg == L"--address") {
 				pAddress = reinterpret_cast<uint8_t *>(wcstoull((*(i + 1)).c_str(), NULL, 0));
