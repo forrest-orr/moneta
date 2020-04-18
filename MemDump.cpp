@@ -35,12 +35,32 @@ bool MemDump::Create(wstring Folder, const MEMORY_BASIC_INFORMATION *Mbi,  wchar
 		return DumpFile.ToDisk();
 	}
 	else {
+		delete[] Buf;
 		return false;
 	}
 }
 
 bool MemDump::Create(const MEMORY_BASIC_INFORMATION* Mbi, wchar_t* DumFilePath, size_t ccDumFilePathLen) const {
 	return Create(L"", Mbi, DumFilePath, ccDumFilePathLen);
+}
+
+bool MemDump::Create(const MEMORY_BASIC_INFORMATION* Mbi, uint8_t** ppDmpBuf, uint32_t* pdwDmpSize) const {
+	assert(ppDmpBuf != nullptr);
+	assert(pdwDmpSize != nullptr);
+
+	SIZE_T cbBytesRead = 0;
+	uint8_t* Buf = new uint8_t[Mbi->RegionSize];
+
+	if (ReadProcessMemory(this->Handle, Mbi->BaseAddress, Buf, Mbi->RegionSize, static_cast<SIZE_T*>(&cbBytesRead))) {
+		*pdwDmpSize = cbBytesRead;
+		*ppDmpBuf = Buf;
+		return true;
+	}
+	else {
+		delete[] Buf;
+	}
+
+	return false;
 }
 
 bool MemDump::Initialize() {

@@ -88,7 +88,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	}
 	else {
 		SelectedProcess_t ProcType = SelectedProcess_t::InvalidPid;
-		MemorySelection_t MemSelectType = MemorySelection_t::Invalid;
+		MemorySelection_t MemorySelectionType = MemorySelection_t::Invalid;
 		uint32_t dwSelectedPid = 0;
 		uint8_t* pAddress = nullptr;
 
@@ -111,16 +111,16 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			}
 			else if (Arg == L"-m") {
 				if (*(i + 1) == L"block") {
-					MemSelectType = MemorySelection_t::Block;
+					MemorySelectionType = MemorySelection_t::Block;
 				}
 				else if (*(i + 1) == L"*") {
-					MemSelectType = MemorySelection_t::All;
+					MemorySelectionType = MemorySelection_t::All;
 				}
 				else if (*(i + 1) == L"suspicious") {
-					MemSelectType = MemorySelection_t::Suspicious;
+					MemorySelectionType = MemorySelection_t::Suspicious;
 				}
 				else if (*(i + 1) == L"referenced") {
-					MemSelectType = MemorySelection_t::Referenced;
+					MemorySelectionType = MemorySelection_t::Referenced;
 				}
 			}
 			else if (Arg == L"--address") {
@@ -153,8 +153,13 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			return 0;
 		}
 
-		if (MemSelectType == MemorySelection_t::Invalid) {
+		if (MemorySelectionType == MemorySelection_t::Invalid) {
 			Interface::Log("... invalid memory selection type\r\n");
+			return 0;
+		}
+
+		if ((MemorySelectionType == MemorySelection_t::Referenced || MemorySelectionType == MemorySelection_t::Block) && pAddress == nullptr) {
+			Interface::Log("... address must be specified for the provided memory selection type.\r\n");
 			return 0;
 		}
 
@@ -177,7 +182,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		// Analyze processes and generate memory maps/suspicions
 		//
 
-		ScannerContext ScannerCtx(qwOptFlags, MemSelectType, pAddress);
+		ScannerContext ScannerCtx(qwOptFlags, MemorySelectionType, pAddress);
 		uint64_t qwStartTick = GetTickCount64();
 
 		if (ProcType == SelectedProcess_t::SelfPid || ProcType == SelectedProcess_t::SpecificPid) {
@@ -238,5 +243,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 
 		float fElapsedTime = GetTickCount64() - qwStartTick;
 		Interface::Log("\r\n... scan completed (%f second duration)\r\n", fElapsedTime / 1000.0);
+		return 1;
 	}
 }

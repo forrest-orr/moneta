@@ -541,13 +541,25 @@ bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, ws
 	10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
 */
 
-int32_t Process::SearchReferences(map <uint8_t*, vector<uint8_t*>> ReferencesMap, const uint8_t* pReferencedAddress) {
+int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t*>> ReferencesMap, const uint8_t* pReferencedAddress) {
 	int32_t nRefTotal = 0;
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		//MemDmp each sblock in the entity and sweep it for address references. if one is found, create the entity base as a key in the map if it doesn['t already exist and then add the sblock to the vector
+		vector<Subregion*> Subregions = Itr->second->GetSubregions();
+
+		for (vector<Subregion*>::const_iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
+			uint8_t* pDmpBuf = nullptr;
+			uint32_t dwDmpSize = 0;
+
+			if (DmpCtx.Create((*SbrItr)->GetBasic(), &pDmpBuf, &dwDmpSize)) {
+				Interface::Log("... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
+				delete [] pDmpBuf;
+			}
+		}
 	}
 
+	system("pause");
 	return nRefTotal;
 }
 
@@ -572,7 +584,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 	}
 
 	if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Referenced) {
-		//
+		this->SearchReferences(DmpCtx, ReferencesMap, ScannerCtx.GetAddress());
 	}
 
 	//
