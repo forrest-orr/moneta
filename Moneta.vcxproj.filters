@@ -104,6 +104,9 @@
     <ClInclude Include="PEB.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Scanner.hpp">
+      <Filter>Header Files\Classes</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Moneta.rc">

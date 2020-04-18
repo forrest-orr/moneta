@@ -36,6 +36,7 @@ ________________________________________________________________________________
 #include "Interface.hpp"
 #include "MemDump.hpp"
 #include "Suspicions.hpp"
+#include "Scanner.hpp"
 #include "Signing.h"
 #include "PEB.h"
 
@@ -550,7 +551,7 @@ int32_t Process::SearchReferences(map <uint8_t*, vector<uint8_t*>> ReferencesMap
 	return nRefTotal;
 }
 
-vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t MemSelectType, const uint8_t *pSelectAddress) {
+vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 	bool bShownProc = false;
 	MemDump DmpCtx(this->Handle, this->Pid);
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
@@ -570,7 +571,7 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 		FilterSuspicions(SuspicionsMap);
 	}
 
-	if (MemSelectType == MemorySelection_t::Referenced) {
+	if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Referenced) {
 		//
 	}
 
@@ -586,9 +587,9 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 			SbrMap = &SuspicionsMap.at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
 		}
 
-		if (MemSelectType == MemorySelection_t::All ||
-			(MemSelectType == MemorySelection_t::Block && ((pSelectAddress >= Itr->second->GetStartVa()) && (pSelectAddress < Itr->second->GetEndVa()))) ||
-			(MemSelectType == MemorySelection_t::Suspicious && AbMapItr != SuspicionsMap.end())) {
+		if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::All ||
+			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Block && ((ScannerCtx.GetAddress() >= Itr->second->GetStartVa()) && (ScannerCtx.GetAddress() < Itr->second->GetEndVa()))) ||
+			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious && AbMapItr != SuspicionsMap.end())) {
 
 			//
 			// Display process and/or entity information: the criteria has already been met for this to be done without further checks
@@ -709,9 +710,9 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 			vector<Subregion*> Subregions = Itr->second->GetSubregions();
 
 			for (vector<Subregion*>::iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
-				if (MemSelectType == MemorySelection_t::All ||
-					(MemSelectType == MemorySelection_t::Block && (pSelectAddress == (*SbrItr)->GetBasic()->BaseAddress || (qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE))) ||
-					(MemSelectType == MemorySelection_t::Suspicious && ((qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE) || 
+				if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::All ||
+					(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Block && (ScannerCtx.GetAddress() == (*SbrItr)->GetBasic()->BaseAddress || (ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE))) ||
+					(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious && ((ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE) || 
 																		  (SbrMap != nullptr &&
 																		   SbrMap->count(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress))) &&
 																		   SubEntitySuspCount(SbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress)) > 0))) {
@@ -769,8 +770,8 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 
 					EnumerateThreads(L"      ", (*SbrItr)->GetThreads());
 
-					if ((qwOptFlags & PROCESS_ENUM_FLAG_MEMDUMP)) {
-						if (!(qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE)) {
+					if ((ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_MEMDUMP)) {
+						if (!(ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE)) {
 							this->DumpBlock(DmpCtx, (*SbrItr)->GetBasic(), L"      ");
 						}
 					}
@@ -779,8 +780,8 @@ vector<Subregion*> Process::Enumerate(uint64_t qwOptFlags, MemorySelection_t Mem
 				}
 			}
 
-			if ((qwOptFlags & PROCESS_ENUM_FLAG_MEMDUMP)) {
-				if ((qwOptFlags & PROCESS_ENUM_FLAG_FROM_BASE)) {
+			if ((ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_MEMDUMP)) {
+				if ((ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE)) {
 					if (Itr->second->Dump(DmpCtx)) {
 						Interface::Log("      ~ Generated full region dump at 0x%p\r\n", Itr->second->GetStartVa());
 					}

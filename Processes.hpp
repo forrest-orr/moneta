@@ -17,16 +17,9 @@ typedef class MemDump;
 namespace Processes {
 	typedef class Process;
 }
+typedef class ScannerContext;
 
 namespace Processes {
-	enum class MemorySelection_t {
-		Invalid,
-		Block,
-		All,
-		Suspicious,
-		Referenced
-	};
-
 	class Thread {
 	public:
 		uint32_t GetTid() const { return this->Id; }
@@ -64,7 +57,7 @@ namespace Processes {
 		bool DumpBlock(MemDump& ProcDmp, const MEMORY_BASIC_INFORMATION* Mbi, std::wstring Indent);
 		BOOL IsWow64() const { return this->Wow64; }
 		Process(uint32_t);
-		std::vector<Memory::Subregion*> Enumerate(uint64_t qwOptFlags, MemorySelection_t MemSelectType, const uint8_t* pSelectAddress = nullptr);
+		std::vector<Memory::Subregion*> Enumerate(ScannerContext &ScannerCtx);
 		int32_t SearchReferences(std::map <uint8_t*, std::vector<uint8_t*>> ReferencesMap, const uint8_t* pReferencedAddress);
 		~Process();
 	};

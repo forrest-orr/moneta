@@ -35,6 +35,7 @@ ________________________________________________________________________________
 #include "Memory.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
+#include "Scanner.hpp"
 #include "Privileges.h"
 
 using namespace std;
@@ -176,12 +177,13 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		// Analyze processes and generate memory maps/suspicions
 		//
 
+		ScannerContext ScannerCtx(qwOptFlags, MemSelectType, pAddress);
 		uint64_t qwStartTick = GetTickCount64();
 
 		if (ProcType == SelectedProcess_t::SelfPid || ProcType == SelectedProcess_t::SpecificPid) {
 			try {
 				Process TargetProc(dwSelectedPid);
-				vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, pAddress);
+				vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(ScannerCtx);
 
 				if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
 					PermissionRecord* MemPermRec = new PermissionRecord(SelectedSbrs);
@@ -204,7 +206,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 					do {
 						try {
 							Process TargetProc(ProcEntry.th32ProcessID);
-							vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(qwOptFlags, MemSelectType, pAddress);
+							vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(ScannerCtx);
 
 							if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
 								if (MemPermRec == nullptr) {

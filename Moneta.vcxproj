@@ -152,6 +152,7 @@
     <ClInclude Include="PeFile.hpp" />
     <ClInclude Include="Privileges.h" />
     <ClInclude Include="Processes.hpp" />
+    <ClInclude Include="Scanner.hpp" />
     <ClInclude Include="Signing.h" />
     <ClInclude Include="StdAfx.h" />
     <ClInclude Include="Suspicions.hpp" />
