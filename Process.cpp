@@ -544,16 +544,27 @@ bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, ws
 int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t*>> ReferencesMap, const uint8_t* pReferencedAddress) {
 	int32_t nRefTotal = 0;
 
-	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
+	for (map<uint8_t*, Entity*>::const_iterator EntItr = this->Entities.begin(); EntItr != this->Entities.end(); ++EntItr) {
 		//MemDmp each sblock in the entity and sweep it for address references. if one is found, create the entity base as a key in the map if it doesn['t already exist and then add the sblock to the vector
-		vector<Subregion*> Subregions = Itr->second->GetSubregions();
+		vector<Subregion*> Subregions = EntItr->second->GetSubregions();
 
 		for (vector<Subregion*>::const_iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
+			if ((*SbrItr)->GetBasic()->Type == MEM_MAPPED && (*SbrItr)->GetBasic()->Protect == PAGE_READONLY) continue; // Optimize out readonly mapped files (these can be fonts, .dat, etc. which can produce false positive and waste scanner time)
 			uint8_t* pDmpBuf = nullptr;
 			uint32_t dwDmpSize = 0;
 
 			if (DmpCtx.Create((*SbrItr)->GetBasic(), &pDmpBuf, &dwDmpSize)) {
-				Interface::Log("... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
+				//Interface::Log("... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
+
+				uint32_t dwChunkSize = 4;
+				uint32_t dwChunkCount = (dwDmpSize / dwChunkSize);
+
+				for (uint32_t dwX = 0; dwX < dwDmpSize; dwX++) {
+					if (*(uint32_t*)&pDmpBuf[dwX] == reinterpret_cast<uint32_t>(pReferencedAddress)) {
+						Interface::Log(VerbosityLevel::Surface, "... found referenced address 0x%p at 0x%p (offset 0x%08x within 0x%p)\r\n", pReferencedAddress, static_cast<uint8_t*>(const_cast<void*>((*SbrItr)->GetBasic()->BaseAddress)) + dwX, dwX, (*SbrItr)->GetBasic()->BaseAddress);
+					}
+				}
+
 				delete [] pDmpBuf;
 			}
 		}
