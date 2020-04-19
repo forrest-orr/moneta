@@ -517,6 +517,71 @@ bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, ws
 	}
 }
 
+void EnumReferencesMap(map <uint8_t*, vector<uint8_t*>> ReferencesMap) {
+	for (map <uint8_t*, vector<uint8_t*>>::const_iterator AbMapItr = ReferencesMap.begin(); AbMapItr != ReferencesMap.end(); ++AbMapItr) {
+		printf("0x%p [%d sblocks]\r\n", AbMapItr->first, AbMapItr->second.size());
+		for (vector<uint8_t*>::const_iterator RefAddrItr = AbMapItr->second.begin(); RefAddrItr != AbMapItr->second.end(); RefAddrItr++) {
+			printf("  0x%p\r\n", (*RefAddrItr));
+		}
+	}
+}
+
+template<typename Address_t> int32_t ScanChunkForAddress(uint8_t *pBuf, uint32_t dwSize, const uint8_t* pReferencedAddress) {
+	int32_t nOffset = 0;
+
+	for (; nOffset < dwSize; nOffset++) {
+		if (*(Address_t*)&pBuf[nOffset] == reinterpret_cast<Address_t>(pReferencedAddress)) {
+			return nOffset;
+		}
+	}
+
+	return nOffset;
+}
+
+
+int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t*>> ReferencesMap, const uint8_t* pReferencedAddress) {
+	int32_t nRefTotal = 0;
+
+	for (map<uint8_t*, Entity*>::const_iterator EntItr = this->Entities.begin(); EntItr != this->Entities.end(); ++EntItr) {
+		vector<Subregion*> Subregions = EntItr->second->GetSubregions();
+
+		for (vector<Subregion*>::const_iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
+			if ((*SbrItr)->GetBasic()->Type == MEM_MAPPED && (*SbrItr)->GetBasic()->Protect == PAGE_READONLY) continue; // Optimize out readonly mapped files (these can be fonts, .dat, etc. which can produce false positive and waste scanner time)
+			if ((*SbrItr)->GetBasic()->Type != MEM_IMAGE) continue;
+			uint8_t* pDmpBuf = nullptr;
+			uint32_t dwDmpSize = 0;
+
+			if (DmpCtx.Create((*SbrItr)->GetBasic(), &pDmpBuf, &dwDmpSize)) {
+				int32_t nOffset;
+				//Interface::Log("... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
+
+				if((nOffset = ScanChunkForAddress<uint64_t>(pDmpBuf, dwDmpSize, pReferencedAddress)) != -1) {
+					//
+					// In the event that an entry does not already exist in the reference map for this entity, create one with an empty vector. Otherwise, point the vector reference at the existing vector
+					//
+
+					auto AbMapItr = ReferencesMap.find(static_cast<unsigned char*>(const_cast<void*>(EntItr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sub-region vector.
+					vector<uint8_t*>* SbrMap = nullptr;
+
+					if (AbMapItr == ReferencesMap.end()) {
+						ReferencesMap.insert(make_pair(static_cast<unsigned char*>(const_cast<void*>(EntItr->second->GetStartVa())), vector<uint8_t*>()));
+					}
+
+					SbrMap = &ReferencesMap.at(static_cast<unsigned char*>(const_cast<void*>(EntItr->second->GetStartVa()))); // Thhis will always be successful
+					SbrMap->push_back(static_cast<uint8_t*>(const_cast<void*>((*SbrItr)->GetBasic()->BaseAddress)));
+					Interface::Log(VerbosityLevel::Surface, "... found referenced address 0x%p at 0x%p (offset 0x%08x within 0x%p)\r\n", pReferencedAddress, static_cast<uint8_t*>(const_cast<void*>((*SbrItr)->GetBasic()->BaseAddress)) + nOffset, nOffset, (*SbrItr)->GetBasic()->BaseAddress);
+				}
+
+				delete [] pDmpBuf;
+			}
+		}
+	}
+	printf("Enum map:\r\n");
+	EnumReferencesMap(ReferencesMap);
+	system("pause");
+	return nRefTotal;
+}
+
 /* Process memory enumeration
 	1. Loop entities to build suspicions list
 	2. Filter suspicions
@@ -531,6 +596,7 @@ bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, ws
 		mselect == process
 		mselect == sblock && sblock == current, or the  "from base" option is set
 		or mselect == suspicious and the current sblock has a suspicion or the  "from base" option is set
+		mselect == referenced and this sblock contains one or more reference
 	6. Dump the current sblock based on the same criteria as above but ONLY if the "from base" option is not set.
 	7. Dump the entire PE entity if it met the initial enum criteria and "from base" option is set
 	8. For private/mapped loop sblocks and enum if:
@@ -541,48 +607,6 @@ bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, ws
 	9. Dump the current sblock based on the same criteria as above but ONLY if the "from base" option is not set.
 	10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
 */
-
-template<typename Address_t> int32_t ScanChunkForAddress(uint8_t *pBuf, uint32_t dwSize, const uint8_t* pReferencedAddress) {
-	int32_t nOffset = 0;
-
-	for (; nOffset < dwSize; nOffset++) {
-		if (*(Address_t*)&pBuf[nOffset] == reinterpret_cast<Address_t>(pReferencedAddress)) {
-			return nOffset;
-		}
-	}
-
-	return nOffset;
-}
-
-int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t*>> ReferencesMap, const uint8_t* pReferencedAddress) {
-	int32_t nRefTotal = 0;
-
-	for (map<uint8_t*, Entity*>::const_iterator EntItr = this->Entities.begin(); EntItr != this->Entities.end(); ++EntItr) {
-		vector<Subregion*> Subregions = EntItr->second->GetSubregions();
-		auto AbMapItr = ReferencesMap.find(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
-
-		for (vector<Subregion*>::const_iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
-			if ((*SbrItr)->GetBasic()->Type == MEM_MAPPED && (*SbrItr)->GetBasic()->Protect == PAGE_READONLY) continue; // Optimize out readonly mapped files (these can be fonts, .dat, etc. which can produce false positive and waste scanner time)
-			uint8_t* pDmpBuf = nullptr;
-			uint32_t dwDmpSize = 0;
-
-			if (DmpCtx.Create((*SbrItr)->GetBasic(), &pDmpBuf, &dwDmpSize)) {
-				int32_t nOffset;
-				//Interface::Log("... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
-
-				if((nOffset = ScanChunkForAddress<uint64_t>(pDmpBuf, dwDmpSize, pReferencedAddress)) != -1) {
-					RefSbMap.insert(make_pair(static_cast<uint8_t*>((*SbrItr)->GetBasic()->BaseAddress), SbSuspList));
-					Interface::Log(VerbosityLevel::Surface, "... found referenced address 0x%p at 0x%p (offset 0x%08x within 0x%p)\r\n", pReferencedAddress, static_cast<uint8_t*>(const_cast<void*>((*SbrItr)->GetBasic()->BaseAddress)) + nOffset, nOffset, (*SbrItr)->GetBasic()->BaseAddress);
-				}
-
-				delete [] pDmpBuf;
-			}
-		}
-	}
-
-	system("pause");
-	return nRefTotal;
-}
 
 vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 	bool bShownProc = false;
@@ -617,16 +641,23 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 	//
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-		auto AbMapItr = SuspicionsMap.find(static_cast<unsigned char *>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
-		map<uint8_t*, list<Suspicion *>>* SbrMap = nullptr;
+		auto SuspMapAbItr = SuspicionsMap.find(static_cast<unsigned char *>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
+		auto RefMapAbItr = ReferencesMap.find(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
+		map<uint8_t*, list<Suspicion *>>* SuspSbrMap = nullptr;
+		vector<uint8_t*>* RefSbrVec = nullptr;
 
-		if (AbMapItr != SuspicionsMap.end()) {
-			SbrMap = &SuspicionsMap.at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
+		if (SuspMapAbItr != SuspicionsMap.end()) {
+			SuspSbrMap = &SuspicionsMap.at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
+		}
+
+		if (RefMapAbItr != ReferencesMap.end()) {
+			RefSbrVec = &ReferencesMap.at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
 		}
 
 		if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::All ||
 			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Block && ((ScannerCtx.GetAddress() >= Itr->second->GetStartVa()) && (ScannerCtx.GetAddress() < Itr->second->GetEndVa()))) ||
-			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious && AbMapItr != SuspicionsMap.end())) {
+			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious && SuspMapAbItr != SuspicionsMap.end()) ||
+			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Referenced && RefMapAbItr != ReferencesMap.end())) {
 
 			//
 			// Display process and/or entity information: the criteria has already been met for this to be done without further checks
@@ -698,7 +729,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 			//
 
 			//AppendSubregionAttributes(Itr->second->GetSubregions().front());
-			AppendOverlapSuspicion(SbrMap, static_cast<uint8_t*>(const_cast<void *>(Itr->second->GetStartVa())), true);
+			AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t*>(const_cast<void *>(Itr->second->GetStartVa())), true);
 			Interface::Log("\r\n");
 
 			if (Interface::GetVerbosity() == VerbosityLevel::Detail) {
@@ -750,9 +781,9 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 				if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::All ||
 					(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Block && (ScannerCtx.GetAddress() == (*SbrItr)->GetBasic()->BaseAddress || (ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE))) ||
 					(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious && ((ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE) || 
-																		  (SbrMap != nullptr &&
-																		   SbrMap->count(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress))) &&
-																		   SubEntitySuspCount(SbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress)) > 0))) {
+																		  (SuspSbrMap != nullptr &&
+																		   SuspSbrMap->count(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress))) &&
+																		   SubEntitySuspCount(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress)) > 0))) {
 					wchar_t AlignedAttribDesc[9] = { 0 };
 
 					AlignName(Subregion::AttribDesc((*SbrItr)->GetBasic()), AlignedAttribDesc, 8);
@@ -767,7 +798,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 						if (OverlapSections.empty()) {
 							Interface::Log("    0x%p:0x%08x | %ws | ?        | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
 							AppendSubregionAttributes(*SbrItr);
-							AppendOverlapSuspicion(SbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
+							AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
 							Interface::Log("\r\n");
 						}
 						else{
@@ -781,7 +812,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 
 								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName, (*SbrItr)->GetPrivateSize());
 								AppendSubregionAttributes(*SbrItr);
-								AppendOverlapSuspicion(SbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
+								AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
 								Interface::Log("\r\n");
 
 							}
@@ -790,7 +821,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 					else {
 						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
 						AppendSubregionAttributes(*SbrItr);
-						AppendOverlapSuspicion(SbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
+						AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
 						Interface::Log("\r\n");
 					}
 
