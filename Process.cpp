@@ -527,19 +527,17 @@ void EnumReferencesMap(map <uint8_t*, vector<uint8_t*>> ReferencesMap) {
 }
 
 template<typename Address_t> int32_t ScanChunkForAddress(uint8_t *pBuf, uint32_t dwSize, const uint8_t* pReferencedAddress) {
-	int32_t nOffset = 0;
-
-	for (; nOffset < dwSize; nOffset++) {
+	for (int32_t nOffset = 0; nOffset < dwSize; nOffset++) {
 		if (*(Address_t*)&pBuf[nOffset] == reinterpret_cast<Address_t>(pReferencedAddress)) {
 			return nOffset;
 		}
 	}
 
-	return nOffset;
+	return -1;
 }
 
 
-int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t*>> ReferencesMap, const uint8_t* pReferencedAddress) {
+int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t*>> &ReferencesMap, const uint8_t* pReferencedAddress) {
 	int32_t nRefTotal = 0;
 
 	for (map<uint8_t*, Entity*>::const_iterator EntItr = this->Entities.begin(); EntItr != this->Entities.end(); ++EntItr) {
@@ -547,7 +545,7 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 
 		for (vector<Subregion*>::const_iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
 			if ((*SbrItr)->GetBasic()->Type == MEM_MAPPED && (*SbrItr)->GetBasic()->Protect == PAGE_READONLY) continue; // Optimize out readonly mapped files (these can be fonts, .dat, etc. which can produce false positive and waste scanner time)
-			if ((*SbrItr)->GetBasic()->Type != MEM_IMAGE) continue;
+			//if ((*SbrItr)->GetBasic()->Type != MEM_IMAGE) continue;
 			uint8_t* pDmpBuf = nullptr;
 			uint32_t dwDmpSize = 0;
 
@@ -576,9 +574,9 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 			}
 		}
 	}
-	printf("Enum map:\r\n");
+	
 	EnumReferencesMap(ReferencesMap);
-	system("pause");
+
 	return nRefTotal;
 }
 
@@ -596,7 +594,7 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 		mselect == process
 		mselect == sblock && sblock == current, or the  "from base" option is set
 		or mselect == suspicious and the current sblock has a suspicion or the  "from base" option is set
-		mselect == referenced and this sblock contains one or more reference
+		mselect == referenced and this sblock contains one or more reference or the "from base" option is set
 	6. Dump the current sblock based on the same criteria as above but ONLY if the "from base" option is not set.
 	7. Dump the entire PE entity if it met the initial enum criteria and "from base" option is set
 	8. For private/mapped loop sblocks and enum if:
@@ -776,14 +774,17 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 			//
 
 			vector<Subregion*> Subregions = Itr->second->GetSubregions();
-
+		
 			for (vector<Subregion*>::iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
 				if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::All ||
 					(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Block && (ScannerCtx.GetAddress() == (*SbrItr)->GetBasic()->BaseAddress || (ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE))) ||
 					(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious && ((ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE) || 
 																		  (SuspSbrMap != nullptr &&
 																		   SuspSbrMap->count(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress))) &&
-																		   SubEntitySuspCount(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress)) > 0))) {
+																		   SubEntitySuspCount(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress)) > 0)) || 
+					(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Referenced && (ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE) ||
+																		  (RefSbrVec != nullptr &&
+																		  find(RefSbrVec->begin(), RefSbrVec->end(), static_cast<uint8_t*>((*SbrItr)->GetBasic()->BaseAddress)) != RefSbrVec->end()))) { // mselect == referenced and this sblock contains one or more reference or the "from base" option is set
 					wchar_t AlignedAttribDesc[9] = { 0 };
 
 					AlignName(Subregion::AttribDesc((*SbrItr)->GetBasic()), AlignedAttribDesc, 8);
