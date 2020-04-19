@@ -503,11 +503,11 @@ int32_t SubEntitySuspCount(map<uint8_t*, list<Suspicion*>>* Suspicions, uint8_t*
 }
 
 bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, wstring Indent) {
-	wchar_t DumFilePath[MAX_PATH + 1] = { 0 };
+	wchar_t DmpFilePath[MAX_PATH + 1] = { 0 };
 
 	if (Mbi->State == MEM_COMMIT) {
-		if (DmpCtx.Create(Mbi, DumFilePath, MAX_PATH + 1)) {
-			Interface::Log("%ws~ Memory dumped to %ws\r\n", Indent.c_str(), DumFilePath);
+		if (DmpCtx.Create(Mbi, DmpFilePath, MAX_PATH + 1)) {
+			Interface::Log("%ws~ Memory dumped to %ws\r\n", Indent.c_str(), DmpFilePath);
 			return true;
 		}
 		else {
@@ -516,6 +516,7 @@ bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, ws
 		}
 	}
 }
+
 /* Process memory enumeration
 	1. Loop entities to build suspicions list
 	2. Filter suspicions
@@ -541,12 +542,24 @@ bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, ws
 	10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
 */
 
+template<typename Address_t> int32_t ScanChunkForAddress(uint8_t *pBuf, uint32_t dwSize, const uint8_t* pReferencedAddress) {
+	int32_t nOffset = 0;
+
+	for (; nOffset < dwSize; nOffset++) {
+		if (*(Address_t*)&pBuf[nOffset] == reinterpret_cast<Address_t>(pReferencedAddress)) {
+			return nOffset;
+		}
+	}
+
+	return nOffset;
+}
+
 int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t*>> ReferencesMap, const uint8_t* pReferencedAddress) {
 	int32_t nRefTotal = 0;
 
 	for (map<uint8_t*, Entity*>::const_iterator EntItr = this->Entities.begin(); EntItr != this->Entities.end(); ++EntItr) {
-		//MemDmp each sblock in the entity and sweep it for address references. if one is found, create the entity base as a key in the map if it doesn['t already exist and then add the sblock to the vector
 		vector<Subregion*> Subregions = EntItr->second->GetSubregions();
+		auto AbMapItr = ReferencesMap.find(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
 
 		for (vector<Subregion*>::const_iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
 			if ((*SbrItr)->GetBasic()->Type == MEM_MAPPED && (*SbrItr)->GetBasic()->Protect == PAGE_READONLY) continue; // Optimize out readonly mapped files (these can be fonts, .dat, etc. which can produce false positive and waste scanner time)
@@ -554,15 +567,12 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 			uint32_t dwDmpSize = 0;
 
 			if (DmpCtx.Create((*SbrItr)->GetBasic(), &pDmpBuf, &dwDmpSize)) {
+				int32_t nOffset;
 				//Interface::Log("... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
 
-				uint32_t dwChunkSize = 4;
-				uint32_t dwChunkCount = (dwDmpSize / dwChunkSize);
-
-				for (uint32_t dwX = 0; dwX < dwDmpSize; dwX++) {
-					if (*(uint32_t*)&pDmpBuf[dwX] == reinterpret_cast<uint32_t>(pReferencedAddress)) {
-						Interface::Log(VerbosityLevel::Surface, "... found referenced address 0x%p at 0x%p (offset 0x%08x within 0x%p)\r\n", pReferencedAddress, static_cast<uint8_t*>(const_cast<void*>((*SbrItr)->GetBasic()->BaseAddress)) + dwX, dwX, (*SbrItr)->GetBasic()->BaseAddress);
-					}
+				if((nOffset = ScanChunkForAddress<uint64_t>(pDmpBuf, dwDmpSize, pReferencedAddress)) != -1) {
+					RefSbMap.insert(make_pair(static_cast<uint8_t*>((*SbrItr)->GetBasic()->BaseAddress), SbSuspList));
+					Interface::Log(VerbosityLevel::Surface, "... found referenced address 0x%p at 0x%p (offset 0x%08x within 0x%p)\r\n", pReferencedAddress, static_cast<uint8_t*>(const_cast<void*>((*SbrItr)->GetBasic()->BaseAddress)) + nOffset, nOffset, (*SbrItr)->GetBasic()->BaseAddress);
 				}
 
 				delete [] pDmpBuf;
@@ -593,6 +603,10 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 	if (SuspicionsMap.size()) {
 		FilterSuspicions(SuspicionsMap);
 	}
+
+	//
+	// Build map of references to user-specified address if applicable for scanner context
+	//
 
 	if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Referenced) {
 		this->SearchReferences(DmpCtx, ReferencesMap, ScannerCtx.GetAddress());
