@@ -545,7 +545,6 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 
 		for (vector<Subregion*>::const_iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
 			if ((*SbrItr)->GetBasic()->Type == MEM_MAPPED && (*SbrItr)->GetBasic()->Protect == PAGE_READONLY) continue; // Optimize out readonly mapped files (these can be fonts, .dat, etc. which can produce false positive and waste scanner time)
-			//if ((*SbrItr)->GetBasic()->Type != MEM_IMAGE) continue;
 			uint8_t* pDmpBuf = nullptr;
 			uint32_t dwDmpSize = 0;
 
@@ -565,7 +564,7 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 						ReferencesMap.insert(make_pair(static_cast<unsigned char*>(const_cast<void*>(EntItr->second->GetStartVa())), vector<uint8_t*>()));
 					}
 
-					SbrMap = &ReferencesMap.at(static_cast<unsigned char*>(const_cast<void*>(EntItr->second->GetStartVa()))); // Thhis will always be successful
+					SbrMap = &ReferencesMap.at(static_cast<unsigned char*>(const_cast<void*>(EntItr->second->GetStartVa()))); // This will always be successful
 					SbrMap->push_back(static_cast<uint8_t*>(const_cast<void*>((*SbrItr)->GetBasic()->BaseAddress)));
 					Interface::Log(VerbosityLevel::Surface, "... found referenced address 0x%p at 0x%p (offset 0x%08x within 0x%p)\r\n", pReferencedAddress, static_cast<uint8_t*>(const_cast<void*>((*SbrItr)->GetBasic()->BaseAddress)) + nOffset, nOffset, (*SbrItr)->GetBasic()->BaseAddress);
 				}
@@ -580,7 +579,7 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 	return nRefTotal;
 }
 
-/* Process memory enumeration
+/*  vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx)
 	1. Loop entities to build suspicions list
 	2. Filter suspicions
 	3. Loop entities for enumeration if:
