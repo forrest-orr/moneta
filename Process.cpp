@@ -736,6 +736,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 					Interface::Log("  |__ Mapped file base: 0x%p\r\n", PeEntity->GetStartVa());
 					Interface::Log("    | Mapped file size: %d\r\n", PeEntity->GetEntitySize());
 					Interface::Log("    | Mapped file path: %ws\r\n", PeEntity->GetFileBase()->GetPath().c_str());
+					Interface::Log("    | Architecture: %ws\r\n", PeEntity->GetPeFile()->IsPe32() ? L"32-bit" : L"64-bit");
 					Interface::Log("    | Size of image: %d\r\n", PeEntity->GetImageSize());
 					Interface::Log("    | PE type: %ws%ws\r\n", PeEntity->GetPeFile()->IsDotNet() ? L".NET " : L"", PeEntity->GetPeFile()->IsDll() ? L"DLL" : L"EXE");
 					Interface::Log("    | Non-executable: %ws\r\n", PeEntity->IsNonExecutableImage() ? L"yes" : L"no");
