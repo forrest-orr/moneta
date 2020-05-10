@@ -362,6 +362,11 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 							}
 						}
 						else {
+							/*
+							char Command[1000] = { 0 };
+							sprintf_s(Command, sizeof(Command), "HuntManagedAddress.exe --mode scan --pid %d --address 0x%p --size %d", (*SuspItr)->GetProcess()->GetPid(), (*SuspItr)->GetParentObject()->GetStartVa(), (*SuspItr)->GetParentObject()->GetEntitySize());
+							Interface::Log(VerbosityLevel::Surface, "... executing command: %s\r\n", Command);
+							system(Command);*/
 							//
 							// Check if the owner process of this suspicion has clr.dll loaded - if it does, scan its .data for references to this region
 							//
@@ -649,6 +654,13 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 
 		if (RefMapAbItr != ReferencesMap.end()) {
 			RefSbrVec = &ReferencesMap.at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
+		}
+
+		if (Itr->second->GetSubregions().front()->GetBasic()->Type == MEM_PRIVATE && Itr->second->GetSubregions().front()->GetBasic()->Protect == PAGE_EXECUTE_READWRITE) {
+			char Command[1000] = { 0 };
+			sprintf_s(Command, sizeof(Command), "HuntManagedAddress.exe --mode scan --pid %d --address 0x%p --size %d", this->GetPid(), Itr->second->GetStartVa(), Itr->second->GetEntitySize());
+			Interface::Log(VerbosityLevel::Surface, "... executing command: %s\r\n", Command);
+			system(Command);
 		}
 
 		if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::All ||
