@@ -91,6 +91,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		MemorySelection_t MemorySelectionType = MemorySelection_t::Invalid;
 		uint32_t dwSelectedPid = 0;
 		uint8_t* pAddress = nullptr;
+		vector<Filter_t> Filters;
 
 		for (vector<wstring>::const_iterator i = Args.begin(); i != Args.end(); ++i) {
 			wstring Arg = *i;
@@ -142,8 +143,27 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 					}
 				}
 			}
-		}
+			else if (Arg == L"--filter") {
+				for (vector<wstring>::const_iterator FilterItr = i; FilterItr != Args.end(); ++FilterItr) {
+					wstring FilterArg = *FilterItr;
+					transform(FilterArg.begin(), FilterArg.end(), FilterArg.begin(), ::tolower);
 
+					if (FilterArg == L"unsigned-modules") {
+						Filters.push_back(Filter_t::UnsignedModules);
+					}
+					else if (FilterArg == L"metadata-modules") {
+						Filters.push_back(Filter_t::MetadataModules);
+					}
+					else if (FilterArg == L"clr-prv-rwx") {
+						Filters.push_back(Filter_t::ClrPrvRwxRegion);
+					}
+					else if (FilterArg == L"clr-heap") {
+						Filters.push_back(Filter_t::ClrPrvRwxHeap);
+					}
+				}
+			}
+		}
+		
 		//
 		// Validate user input
 		//
@@ -182,7 +202,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		// Analyze processes and generate memory maps/suspicions
 		//
 
-		ScannerContext ScannerCtx(qwOptFlags, MemorySelectionType, pAddress);
+		ScannerContext ScannerCtx(qwOptFlags, MemorySelectionType, pAddress, Filters);
 		uint64_t qwStartTick = GetTickCount64();
 
 		if (ProcType == SelectedProcess_t::SelfPid || ProcType == SelectedProcess_t::SpecificPid) {

@@ -313,7 +313,7 @@ void EnumerateThreads(const wstring Indent, vector<Processes::Thread*> Threads) 
 	}
 }
 
-int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&SuspicionsMap) {
+int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&SuspicionsMap, vector<Filter_t> Filters) {
 	bool bReWalkMap = false;
 
 	do {
@@ -345,7 +345,69 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 				for (int32_t nSuspIndex = 0; !bReWalkMap && SuspItr != SbMapItr->second.end(); ++SuspItr, nSuspIndex++) {
 					switch ((*SuspItr)->GetType()) {
 					case Suspicion::Type::XPRV: {
-						if (((*SuspItr)->GetSubregion()->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP&&false)) {
+						if ((*SuspItr)->GetSubregion()->GetBasic()->Protect == PAGE_EXECUTE_READWRITE) {
+							if (find(Filters.begin(), Filters.end(), Filter_t::ClrPrvRwxHeap) != Filters.end()) {
+								if (((*SuspItr)->GetSubregion()->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP)) {
+									bReWalkMap = true;
+									RefSuspList.erase(SuspItr);
+
+									if (!RefSuspList.size()) {
+										//
+										// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
+										//
+
+										RefSbMap.erase(SbMapItr);
+
+										if (!RefSbMap.size()) {
+											SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
+										}
+									}
+								}
+							}
+							else {
+								/*
+								char Command[1000] = { 0 };
+								sprintf_s(Command, sizeof(Command), "HuntManagedAddress.exe --mode scan --pid %d --address 0x%p --size %d", (*SuspItr)->GetProcess()->GetPid(), (*SuspItr)->GetParentObject()->GetStartVa(), (*SuspItr)->GetParentObject()->GetEntitySize());
+								Interface::Log(VerbosityLevel::Surface, "... executing command: %s\r\n", Command);
+								system(Command);*/
+								//
+								// Check if the owner process of this suspicion has clr.dll loaded - if it does, scan its .data for references to this region
+								//
+								/*
+								PeVm::Body* PeEntity;
+
+								if ((PeEntity = (*SuspItr)->GetProcess()->GetLoadedModule(L"clr.dll")) != nullptr) {
+									Interface::Log(VerbosityLevel::Surface, "... found private +x region at 0x%p within process with clr.dll loaded.\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
+									PeVm::Section *DataSect = PeEntity->GetSection(".data");
+
+									if (DataSect != nullptr) {
+										Interface::Log(VerbosityLevel::Surface, "... clr.dll .data section located at 0x%p\r\n", DataSect->GetStartVa());
+										uint8_t* Buf = new uint8_t[DataSect->GetEntitySize()];
+
+										if (ReadProcessMemory((*SuspItr)->GetProcess()->GetHandle(), DataSect->GetStartVa(), Buf, DataSect->GetEntitySize(), nullptr)) {
+											uint32_t dwChunkSize = 4;
+											uint32_t dwChunkCount = (DataSect->GetEntitySize() / dwChunkSize);
+											Interface::Log(VerbosityLevel::Surface, "... successfully read %d bytes of .data section memory\r\n", DataSect->GetEntitySize());
+
+											for (uint32_t dwX = 0; dwX < DataSect->GetEntitySize(); dwX += dwChunkSize) {
+												if (*(uint32_t*)&Buf[dwX] == reinterpret_cast<uint32_t>((*SuspItr)->GetSubregion()->GetBasic()->BaseAddress)) {
+													Interface::Log(VerbosityLevel::Surface, "... found private executable region address 0x%p at 0x%p (offset 0x%08x) in clr.dll .data section\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress, static_cast<uint8_t *>(const_cast<void*>(DataSect->GetStartVa())) + dwX, dwX);
+												}
+											}
+										}
+
+										delete[] Buf;
+
+										//system("pause");
+									}
+								}*/
+							}
+						}
+
+						break;
+					}
+					case Suspicion::Type::UNSIGNED_MODULE: {
+						if (find(Filters.begin(), Filters.end(), Filter_t::UnsignedModules) != Filters.end()) {
 							bReWalkMap = true;
 							RefSuspList.erase(SuspItr);
 
@@ -361,44 +423,6 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 								}
 							}
 						}
-						else {
-							/*
-							char Command[1000] = { 0 };
-							sprintf_s(Command, sizeof(Command), "HuntManagedAddress.exe --mode scan --pid %d --address 0x%p --size %d", (*SuspItr)->GetProcess()->GetPid(), (*SuspItr)->GetParentObject()->GetStartVa(), (*SuspItr)->GetParentObject()->GetEntitySize());
-							Interface::Log(VerbosityLevel::Surface, "... executing command: %s\r\n", Command);
-							system(Command);*/
-							//
-							// Check if the owner process of this suspicion has clr.dll loaded - if it does, scan its .data for references to this region
-							//
-							/*
-							PeVm::Body* PeEntity;
-
-							if ((PeEntity = (*SuspItr)->GetProcess()->GetLoadedModule(L"clr.dll")) != nullptr) {
-								Interface::Log(VerbosityLevel::Surface, "... found private +x region at 0x%p within process with clr.dll loaded.\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
-								PeVm::Section *DataSect = PeEntity->GetSection(".data");
-
-								if (DataSect != nullptr) {
-									Interface::Log(VerbosityLevel::Surface, "... clr.dll .data section located at 0x%p\r\n", DataSect->GetStartVa());
-									uint8_t* Buf = new uint8_t[DataSect->GetEntitySize()];
-
-									if (ReadProcessMemory((*SuspItr)->GetProcess()->GetHandle(), DataSect->GetStartVa(), Buf, DataSect->GetEntitySize(), nullptr)) {
-										uint32_t dwChunkSize = 4;
-										uint32_t dwChunkCount = (DataSect->GetEntitySize() / dwChunkSize);
-										Interface::Log(VerbosityLevel::Surface, "... successfully read %d bytes of .data section memory\r\n", DataSect->GetEntitySize());
-
-										for (uint32_t dwX = 0; dwX < DataSect->GetEntitySize(); dwX += dwChunkSize) {
-											if (*(uint32_t*)&Buf[dwX] == reinterpret_cast<uint32_t>((*SuspItr)->GetSubregion()->GetBasic()->BaseAddress)) {
-												Interface::Log(VerbosityLevel::Surface, "... found private executable region address 0x%p at 0x%p (offset 0x%08x) in clr.dll .data section\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress, static_cast<uint8_t *>(const_cast<void*>(DataSect->GetStartVa())) + dwX, dwX);
-											}
-										}
-									}
-
-									delete[] Buf;
-
-									//system("pause");
-								}
-							}*/
-						}
 
 						break;
 					}
@@ -413,25 +437,27 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 						   0x000000000F3E0000:0x0009e000 | R        | .rsrc    | 0x00000000
 						*/
 
-						const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*SuspItr)->GetParentObject());
+						if (find(Filters.begin(), Filters.end(), Filter_t::MetadataModules) != Filters.end()) {
+							const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*SuspItr)->GetParentObject());
 
-						if (PeEntity->IsSigned()) {
-							static const wchar_t* pWinmbExt = L".winmd";
+							if (PeEntity->IsSigned()) {
+								static const wchar_t* WinmdExt = L".winmd";
 
-							if (_wcsicmp(PeEntity->GetFileBase()->GetPath().c_str() + PeEntity->GetFileBase()->GetPath().length() - wcslen(pWinmbExt), pWinmbExt) == 0) {
-								if (PeEntity->GetPeFile() != nullptr && PeEntity->GetPeFile()->GetEntryPoint() == 0) {
-									bReWalkMap = true;
-									RefSuspList.erase(SuspItr);
+								if (_wcsicmp(PeEntity->GetFileBase()->GetPath().c_str() + PeEntity->GetFileBase()->GetPath().length() - wcslen(WinmdExt), WinmdExt) == 0) {
+									if (PeEntity->GetPeFile() != nullptr && PeEntity->GetPeFile()->GetEntryPoint() == 0) {
+										bReWalkMap = true;
+										RefSuspList.erase(SuspItr);
 
-									if (!RefSuspList.size()) {
-										//
-										// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
-										//
+										if (!RefSuspList.size()) {
+											//
+											// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
+											//
 
-										RefSbMap.erase(SbMapItr);
+											RefSbMap.erase(SbMapItr);
 
-										if (!RefSbMap.size()) {
-											SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
+											if (!RefSbMap.size()) {
+												SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
+											}
 										}
 									}
 								}
@@ -627,7 +653,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 	}
 
 	if (SuspicionsMap.size()) {
-		FilterSuspicions(SuspicionsMap);
+		FilterSuspicions(SuspicionsMap, ScannerCtx.GetFilters());
 	}
 
 	//
@@ -655,13 +681,13 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 		if (RefMapAbItr != ReferencesMap.end()) {
 			RefSbrVec = &ReferencesMap.at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
 		}
-
-		if (Itr->second->GetSubregions().front()->GetBasic()->Type == MEM_PRIVATE && Itr->second->GetSubregions().front()->GetBasic()->Protect == PAGE_EXECUTE_READWRITE) {
+		/*
+		if (Itr->second->GetSubregions().front()->GetBasic()->Type == MEM_PRIVATE && Itr->second->IsPartiallyExecutable()) {
 			char Command[1000] = { 0 };
 			sprintf_s(Command, sizeof(Command), "HuntManagedAddress.exe --mode scan --pid %d --address 0x%p --size %d", this->GetPid(), Itr->second->GetStartVa(), Itr->second->GetEntitySize());
 			Interface::Log(VerbosityLevel::Surface, "... executing command: %s\r\n", Command);
 			system(Command);
-		}
+		}*/
 
 		if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::All ||
 			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Block && ((ScannerCtx.GetAddress() >= Itr->second->GetStartVa()) && (ScannerCtx.GetAddress() < Itr->second->GetEndVa()))) ||

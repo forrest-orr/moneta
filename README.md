@@ -46,14 +46,33 @@ Dump selected memory: -d
   be dumped to a physical file on disk.
 
 Memory selection options: --option ["from-base", "statistics"]
-  + Optionally select memory "from base"
+  + "from-base"
 	All selected blocks will implicitly also select all other
 	blocks which share their allocation base. For example, a
 	block within a PE image will implicitly select all blocks
 	within the PE image region.
-  + Optionally calculate the attribute statistics for all selected
+  + "statistics"
+    Optionally calculate the attribute statistics for all selected
     memory regions/subregions. These are based upon the memory
 	permissions and types.
+	
+Filter options: --filter ["unsigned-modules", "clr-prv-rwx", "metadata-modules", "clr-heap"]
+  + "unsigned-module"
+    All loaded modules will have the "unsigned module" suspicion
+	filtered off of them.
+  + "metadata-modules"
+    All signed modules with the ".winmd" file extension and a blank
+	entry point in their PE header will have the "missing PEB entry"
+	suspicion filtered off of them.
+  + "clr-prv-rwx"
+    All private memory allocated with an initial permission of
+	PAGE_NOACCESS which contain subregions that are +RWX within a
+	process in which the CLR has been initialized will have their
+	"abnormal executable memory type" suspicion filtered off.
+  + "clr-heap"
+    Private RWX regions corresponding to a known process heap
+	from the PEB will be filtered if the containing process has had
+	a CLR initialization.
 	
 Examples:
 

@@ -62,6 +62,7 @@ namespace Memory {
 		static Entity* Create(Processes::Process& OwnerProc, std::vector<Subregion*> Subregions); // Factory method for derived PE images, mapped files, unknown memory ranges.
 		bool Dump(MemDump& DmpCtx) const;
 		void SetSubregions(std::vector<Subregion*>);
+		bool IsPartiallyExecutable() const;
 		~Entity();
 		virtual Entity::Type GetType() = 0;
 	};
