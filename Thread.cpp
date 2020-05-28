@@ -41,7 +41,7 @@ Thread::~Thread() {
 }
 
 Thread::Thread(uint32_t dwTid, Processes::Process &OwnerProc) : Id(dwTid) {
-	this->Handle = OpenThread(THREAD_QUERY_INFORMATION, false, this->Id); // OpenThreadToken consistently failed even with impersonation (ERROR_NO_TOKEN). The idea was abandoned due to lack of relevance. Get-InjectedThread returns the user as SYSTEM even when it was a regular user which launched the remote thread.
+	this->Handle = OpenThread(THREAD_QUERY_INFORMATION | THREAD_GET_CONTEXT, false, this->Id); // OpenThreadToken consistently failed even with impersonation (ERROR_NO_TOKEN). The idea was abandoned due to lack of relevance. Get-InjectedThread returns the user as SYSTEM even when it was a regular user which launched the remote thread.
 
 	if (this->Handle != nullptr) {
 		static NtQueryInformationThread_t NtQueryInformationThread = reinterpret_cast<NtQueryInformationThread_t>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationThread"));

@@ -243,25 +243,31 @@ public:
 	}
 
 	virtual HRESULT STDMETHODCALLTYPE GetThreadContext(
-		/* [in] */ ULONG32 threadID,
+		/* [in] */ ULONG32 dwTid,
 		/* [in] */ ULONG32 contextFlags,
 		/* [in] */ ULONG32 contextSize,
 		/* [size_is][out] */ BYTE* context)
 	{
-		printf("GetThreadContext\r\n");
 		vector<Processes::Thread *> Threads = this->ProcessObj->GetThreads();
 		HANDLE hThread = nullptr;
 
 		for (vector<Processes::Thread*>::const_iterator Itr = Threads.begin(); Itr != Threads.end(); ++Itr) {
-			if () {
-				//
+			if ((*Itr)->GetTid() == dwTid) {
+				hThread = (*Itr)->GetHandle();
 			}
 		}
 
-		if (::GetThreadContext()) {
-
+		if (hThread != nullptr) {
+			if (::GetThreadContext(hThread, (LPCONTEXT)context)) {
+				printf("... GetThreadContext successful\r\n");
+				return S_OK;
+			}
+			else {
+				printf("... GetThreadContext successful\r\n");
+			}
 		}
-		//throw;
+
+		return S_FALSE;
 	}
 
 	virtual HRESULT STDMETHODCALLTYPE SetThreadContext(
@@ -345,8 +351,7 @@ bool EnumerateClrMemoryRegions(Process* ProcessObj, HMODULE hMscordacwksDll) {
 		if (hRes == S_OK) {
 			CustomMemoryEnumCallback *EnumCallback = new CustomMemoryEnumCallback();
 			printf("... successfully resolved a new ICLRDataEnumMemoryRegions interface to 0x%p\r\n", Enumerator);
-			Enumerator->EnumMemoryRegions(EnumCallback, 0, CLRDATA_ENUM_MEM_DEFAULT);
-			system("pause");
+			Enumerator->EnumMemoryRegions(EnumCallback, 0, CLRDATA_ENUM_MEM_HEAP); // Synchronous
 		}
 		else {
 			printf("... failed to resolve ICLRDataEnumMemoryRegions interface\r\n");
