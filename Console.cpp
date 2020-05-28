@@ -37,6 +37,7 @@ ________________________________________________________________________________
 #include "MemDump.hpp"
 #include "Scanner.hpp"
 #include "Privileges.h"
+#include "DotNetNative.h"
 
 using namespace std;
 using namespace Memory;
@@ -208,6 +209,11 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		if (ProcType == SelectedProcess_t::SelfPid || ProcType == SelectedProcess_t::SpecificPid) {
 			try {
 				Process TargetProc(dwSelectedPid);
+
+				int32_t nDotNetVersion = QueryDotNetVersion(dwSelectedPid);
+				void* pMscordacwksDllBase = LoadMscordacwksDll(nDotNetVersion, TargetProc.IsWow64());
+				EnumerateClrMemoryRegions(&TargetProc, (HMODULE)pMscordacwksDllBase);
+
 				vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(ScannerCtx);
 
 				if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
