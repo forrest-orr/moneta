@@ -121,6 +121,7 @@ public:
 		/* [in] */ REFIID riid,
 		/* [iid_is][out] */ PVOID* ppvObject)
 	{
+		printf("... ICLRDataTarget QueryInterface called\r\n");
 		if (
 			IsEqualIID(riid, IID_IUnknown) ||
 			IsEqualIID(riid, IID_ICLRDataTarget)
@@ -193,13 +194,16 @@ public:
 		/* [in] */ CLRDATA_ADDRESS address,
 		/* [length_is][size_is][out] */ BYTE* buffer,
 		/* [in] */ ULONG32 bytesRequested,
-		/* [out] */ ULONG32* bytesRead)
+		/* [out] */ ULONG32* pdwBytesRead)
 	{
-		PULONG bRead = reinterpret_cast<PULONG>(bytesRead);
-		printf("... custom ReadVirtual called\r\n");
-		system("pause");
+		//printf("... custom ReadVirtual called\r\n");
+		SIZE_T cbBytesRead = 0;
+		if (ReadProcessMemory(this->ProcessObj->GetHandle(), (void *)address, buffer, bytesRequested, &cbBytesRead)) {
+			*pdwBytesRead = cbBytesRead;
+			return S_OK;
+		}
+
 		return S_FALSE;
-		//return this->m_debugNative->m_ExtData2->ReadVirtual(address, buffer, bytesRequested, bRead);
 	}
 
 	virtual HRESULT STDMETHODCALLTYPE WriteVirtual(
@@ -208,6 +212,7 @@ public:
 		/* [in] */ ULONG32 bytesRequested,
 		/* [out] */ ULONG32* bytesWritten)
 	{
+		printf("WriteVirtual\r\n");
 		throw;
 	}
 
@@ -216,6 +221,7 @@ public:
 		/* [in] */ ULONG32 index,
 		/* [out] */ CLRDATA_ADDRESS* value)
 	{
+		printf("GetTLSValue\r\n");
 		throw;
 	}
 
@@ -224,12 +230,14 @@ public:
 		/* [in] */ ULONG32 index,
 		/* [in] */ CLRDATA_ADDRESS value)
 	{
+		printf("SetTLSValue\r\n");
 		throw;
 	}
 
 	virtual HRESULT STDMETHODCALLTYPE GetCurrentThreadID(
 		/* [out] */ ULONG32* threadID)
 	{
+		printf("GetCurrentThreadID\r\n");
 		throw;
 	}
 
@@ -239,6 +247,7 @@ public:
 		/* [in] */ ULONG32 contextSize,
 		/* [size_is][out] */ BYTE* context)
 	{
+		printf("GetThreadContext\r\n");
 		throw;
 	}
 
@@ -247,6 +256,7 @@ public:
 		/* [in] */ ULONG32 contextSize,
 		/* [size_is][in] */ BYTE* context)
 	{
+		printf("SetThreadContext\r\n");
 		throw;
 	}
 
@@ -257,10 +267,53 @@ public:
 		/* [in] */ ULONG32 outBufferSize,
 		/* [size_is][out] */ BYTE* outBuffer)
 	{
+		printf("Request\r\n");
 		throw;
 	}
 
 	Process* ProcessObj;
+};
+
+class CustomMemoryEnumCallback : public ICLRDataEnumMemoryRegionsCallback {
+public:
+	HRESULT STDMETHODCALLTYPE QueryInterface(
+		/* [in] */ REFIID riid,
+		/* [iid_is][out] */ PVOID* ppvObject)
+	{
+		printf("... ICLRDataEnumMemoryRegionsCallback QueryInterface called\r\n");
+		if (
+			IsEqualIID(riid, IID_IUnknown) ||
+			IsEqualIID(riid, IID_ICLRDataTarget)
+			)
+		{
+			this->AddRef();
+			*ppvObject = this;
+			return S_OK;
+		}
+		else
+		{
+			*ppvObject = NULL;
+			return E_NOINTERFACE;
+		}
+	}
+
+	ULONG STDMETHODCALLTYPE AddRef(void)
+	{
+		return 1;
+	}
+
+	ULONG STDMETHODCALLTYPE Release(void)
+	{
+		return 0;
+	}
+
+	HRESULT EnumMemoryRegion(
+		CLRDATA_ADDRESS  address,
+		ULONG32          size
+	) {
+		printf("Region 0x%p - size %d\r\n", address, size);
+		return S_OK;
+	}
 };
 
 ICLRDataTarget* CreateClrDataTarget(Process* ProcessObj) {
@@ -277,7 +330,10 @@ bool EnumerateClrMemoryRegions(Process* ProcessObj, HMODULE hMscordacwksDll) {
 		HRESULT hRes = ClrDataCreateInstance(IID_ICLRDataEnumMemoryRegions, ClrDataTarget, reinterpret_cast<void**>(&Enumerator));
 
 		if (hRes == S_OK) {
+			CustomMemoryEnumCallback *EnumCallback = new CustomMemoryEnumCallback();
 			printf("... successfully resolved a new ICLRDataEnumMemoryRegions interface to 0x%p\r\n", Enumerator);
+			Enumerator->EnumMemoryRegions(EnumCallback, 0, CLRDATA_ENUM_MEM_DEFAULT);
+			system("pause");
 		}
 		else {
 			printf("... failed to resolve ICLRDataEnumMemoryRegions interface\r\n");
