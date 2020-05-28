@@ -514,6 +514,12 @@ int32_t AppendSubregionAttributes(Subregion *Sbr) {
 		nCount++;
 	}
 
+	if ((Sbr->GetFlags() & MEMORY_SUBREGION_FLAG_DOTNET)) {
+		Interface::Log(" | ");
+		Interface::Log(ConsoleColor::Yellow, ".NET");
+		nCount++;
+	}
+
 	return nCount;
 }
 
