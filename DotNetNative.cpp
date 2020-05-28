@@ -295,6 +295,8 @@ public:
 
 class CustomMemoryEnumCallback : public ICLRDataEnumMemoryRegionsCallback {
 public:
+	CustomMemoryEnumCallback(Process* ProcessObj) : ProcessObj(ProcessObj) {}
+
 	HRESULT STDMETHODCALLTYPE QueryInterface(
 		/* [in] */ REFIID riid,
 		/* [iid_is][out] */ PVOID* ppvObject)
@@ -330,9 +332,20 @@ public:
 		CLRDATA_ADDRESS  address,
 		ULONG32          size
 	) {
-		printf("Region 0x%p - size %d\r\n", address, size);
+		MEMORY_BASIC_INFORMATION Mbi = { 0 };
+		VirtualQueryEx(ProcessObj->GetHandle(), (void*)address, &Mbi, sizeof(Mbi));
+		//printf("Region 0x%p - size %d\r\n", address, size);
+
+		if (find(Addresses.begin(), Addresses.end(), Mbi.AllocationBase) == Addresses.end()) {
+			printf("Region 0x%p\r\n", Mbi.AllocationBase);
+			Addresses.push_back(Mbi.AllocationBase);
+		}
+
 		return S_OK;
 	}
+protected:
+	Process* ProcessObj;
+	vector<void*> Addresses;
 };
 
 ICLRDataTarget* CreateClrDataTarget(Process* ProcessObj) {
@@ -349,7 +362,7 @@ bool EnumerateClrMemoryRegions(Process* ProcessObj, HMODULE hMscordacwksDll) {
 		HRESULT hRes = ClrDataCreateInstance(IID_ICLRDataEnumMemoryRegions, ClrDataTarget, reinterpret_cast<void**>(&Enumerator));
 
 		if (hRes == S_OK) {
-			CustomMemoryEnumCallback *EnumCallback = new CustomMemoryEnumCallback();
+			CustomMemoryEnumCallback *EnumCallback = new CustomMemoryEnumCallback(ProcessObj);
 			printf("... successfully resolved a new ICLRDataEnumMemoryRegions interface to 0x%p\r\n", Enumerator);
 			Enumerator->EnumMemoryRegions(EnumCallback, 0, CLRDATA_ENUM_MEM_HEAP); // Synchronous
 		}
