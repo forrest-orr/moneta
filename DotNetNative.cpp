@@ -4,6 +4,7 @@
 #include "Processes.hpp"
 #include "Memory.hpp"
 
+using namespace std;
 using namespace Memory;
 using namespace Processes;
 
@@ -248,7 +249,19 @@ public:
 		/* [size_is][out] */ BYTE* context)
 	{
 		printf("GetThreadContext\r\n");
-		throw;
+		vector<Processes::Thread *> Threads = this->ProcessObj->GetThreads();
+		HANDLE hThread = nullptr;
+
+		for (vector<Processes::Thread*>::const_iterator Itr = Threads.begin(); Itr != Threads.end(); ++Itr) {
+			if () {
+				//
+			}
+		}
+
+		if (::GetThreadContext()) {
+
+		}
+		//throw;
 	}
 
 	virtual HRESULT STDMETHODCALLTYPE SetThreadContext(

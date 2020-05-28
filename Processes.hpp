@@ -27,10 +27,12 @@ namespace Processes {
 		const void* GetStackAddress() const { return this->StackAddress; }
 		const void* GetTebAddress() const { return this->TebAddress; }
 		void SetEntryPoint(const void*);
+		HANDLE GetHandle() const { return this->Handle; }
 		Thread(uint32_t dwTid, Processes::Process& OwnerProc);
-		//Thread(uint32_t dwTid, const void* pStartAddress);
+		~Thread();
 	protected:
 		uint32_t Id;
+		HANDLE Handle;
 		const void* StartAddress;
 		const void* TebAddress;
 		const void* StackAddress;

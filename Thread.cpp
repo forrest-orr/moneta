@@ -36,15 +36,19 @@ ________________________________________________________________________________
 using namespace std;
 using namespace Processes;
 
-Thread::Thread(uint32_t dwTid, Processes::Process &OwnerProc) : Id(dwTid) {
-	HANDLE hThread = OpenThread(THREAD_QUERY_INFORMATION, false, this->Id); // OpenThreadToken consistently failed even with impersonation (ERROR_NO_TOKEN). The idea was abandoned due to lack of relevance. Get-InjectedThread returns the user as SYSTEM even when it was a regular user which launched the remote thread.
+Thread::~Thread() {
+	CloseHandle(this->Handle);
+}
 
-	if (hThread != nullptr) {
+Thread::Thread(uint32_t dwTid, Processes::Process &OwnerProc) : Id(dwTid) {
+	this->Handle = OpenThread(THREAD_QUERY_INFORMATION, false, this->Id); // OpenThreadToken consistently failed even with impersonation (ERROR_NO_TOKEN). The idea was abandoned due to lack of relevance. Get-InjectedThread returns the user as SYSTEM even when it was a regular user which launched the remote thread.
+
+	if (this->Handle != nullptr) {
 		static NtQueryInformationThread_t NtQueryInformationThread = reinterpret_cast<NtQueryInformationThread_t>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationThread"));
 		void* pStartAddress = nullptr;
 		HANDLE hDupThread = nullptr;
 
-		if (DuplicateHandle(GetCurrentProcess(), hThread, GetCurrentProcess(), &hDupThread, THREAD_QUERY_INFORMATION, FALSE, 0)) { // Without duplicating this handle NtQueryInformationThread will consistently fail to query the start address.
+		if (DuplicateHandle(GetCurrentProcess(), this->Handle, GetCurrentProcess(), &hDupThread, THREAD_QUERY_INFORMATION, FALSE, 0)) { // Without duplicating this handle NtQueryInformationThread will consistently fail to query the start address.
 			NTSTATUS NtStatus = NtQueryInformationThread(hDupThread, static_cast<THREADINFOCLASS>(ThreadQuerySetWin32StartAddress), &pStartAddress, sizeof(pStartAddress), nullptr);
 			THREAD_BASIC_INFORMATION Tbi = { 0 };
 
@@ -98,8 +102,6 @@ Thread::Thread(uint32_t dwTid, Processes::Process &OwnerProc) : Id(dwTid) {
 		else {
 			throw 2;
 		}
-
-		CloseHandle(hThread);
 	}
 	else {
 		throw 1;
