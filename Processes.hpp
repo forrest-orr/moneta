@@ -55,6 +55,7 @@ namespace Processes {
 		std::vector<Thread*> GetThreads() const { return this->Threads; }
 		std::wstring GetName() const { return this->Name; }
 		std::wstring GetImageFilePath() const { return this->ImageFilePath; }
+		std::map<uint8_t*, Memory::Entity*> GetEntities() const { return this->Entities; }
 		Memory::PeVm::Body* GetLoadedModule(std::wstring Name) const;
 		bool DumpBlock(MemDump& ProcDmp, const MEMORY_BASIC_INFORMATION* Mbi, std::wstring Indent);
 		BOOL IsWow64() const { return this->Wow64; }

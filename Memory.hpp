@@ -1,6 +1,7 @@
 #define MEMORY_SUBREGION_FLAG_HEAP 0x1
 #define MEMORY_SUBREGION_FLAG_STACK 0x2
 #define MEMORY_SUBREGION_FLAG_TEB 0x4
+#define MEMORY_SUBREGION_FLAG_DOTNET 0x8
 
 typedef class Thread;
 typedef class MemDump;
@@ -30,6 +31,7 @@ namespace Memory {
 		uint32_t GetPrivateSize() const { return this->PrivateSize; }
 		uint32_t QueryPrivateSize() const;
 		uint64_t GetFlags() const { return this->Flags; }
+		void SetFlags(uint64_t qwFlags) { this->Flags = qwFlags; }
 		static const wchar_t* ProtectSymbol(uint32_t dwProtect);
 		static const wchar_t* AttribDesc(const MEMORY_BASIC_INFORMATION* Mbi);
 		static const wchar_t* TypeSymbol(uint32_t dwType);
@@ -51,6 +53,7 @@ namespace Memory {
 		std::vector<Subregion*> Subregions;
 		const void* StartVa, * EndVa;
 		uint32_t EntitySize;
+		bool DotNetRegion;
 		//MEMORY_REGION_INFORMATION* RegionInfo;
 	public:
 		enum Type { UNKNOWN, PE_FILE, MAPPED_FILE, PE_SECTION };
@@ -59,6 +62,7 @@ namespace Memory {
 		const void* GetStartVa() const { return this->StartVa; }
 		const void* GetEndVa() const { return this->EndVa; }
 		uint32_t GetEntitySize() const { return this->EntitySize; }
+		bool IsDotNetRegion() const { return this->DotNetRegion; }
 		static Entity* Create(Processes::Process& OwnerProc, std::vector<Subregion*> Subregions); // Factory method for derived PE images, mapped files, unknown memory ranges.
 		bool Dump(MemDump& DmpCtx) const;
 		void SetSubregions(std::vector<Subregion*>);
@@ -102,7 +106,6 @@ namespace Memory {
 			bool PartiallyMapped;
 			uint32_t ImageSize;
 			uint32_t SigningLevel;
-			bool DotNet;
 			bool Exe;
 			bool Dll;
 			class PebModule {
