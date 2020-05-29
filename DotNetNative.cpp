@@ -455,6 +455,11 @@ bool EnumerateClrMemoryRegions(Process* ProcessObj, HMODULE hMscordacwksDll) {
 					if (EntItr->second->IsPartiallyExecutable()) {
 						Interface::Log("... private +x region at 0x%p(+%d)\r\n", EntItr->second->GetStartVa(), EntItr->second->GetEntitySize());
 						Interface::Log("    native .NET: %ws\r\n", EntItr->second->ContainsFlag(MEMORY_SUBREGION_FLAG_DOTNET) ? L"yes" : L"no");
+						char Command[1000] = { 0 };
+						sprintf_s(Command, sizeof(Command), "HuntManagedAddress.exe --mode scan --pid %d --address 0x%p --size %d", ProcessObj->GetPid(), EntItr->second->GetStartVa(), EntItr->second->GetEntitySize());
+						Interface::Log(VerbosityLevel::Surface, "... executing command: %s\r\n", Command);
+						system(Command);
+						Interface::Log("\r\n\r\n");
 					}
 				}
 			}

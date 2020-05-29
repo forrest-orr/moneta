@@ -100,40 +100,6 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				}
 			}
 		}
-		/*
-		HEAPLIST32 hl;
-
-		HANDLE hHeapSnap = CreateToolhelp32Snapshot(TH32CS_SNAPHEAPLIST, this->Pid);
-
-		hl.dwSize = sizeof(HEAPLIST32);
-
-		if (hHeapSnap == INVALID_HANDLE_VALUE)
-		{
-			printf("CreateToolhelp32Snapshot failed (%d)\n", GetLastError());
-		}
-
-		if (Heap32ListFirst(hHeapSnap, &hl))
-		{
-			do
-			{
-				HEAPENTRY32 he;
-				ZeroMemory(&he, sizeof(HEAPENTRY32));
-				he.dwSize = sizeof(HEAPENTRY32);
-
-				if (Heap32First(&he, this->Pid, hl.th32HeapID))
-				{
-					printf("\nHeap ID: 0x%p\n", hl.th32HeapID);
-					do
-					{
-						printf("Sub-heap 0x%p : Block size: %d\n", he.dwAddress, he.dwBlockSize);
-						this->Heaps.push_back(reinterpret_cast<void*>(he.dwAddress));
-						he.dwSize = sizeof(HEAPENTRY32);
-					} while (Heap32Next(&he));
-				}
-				hl.dwSize = sizeof(HEAPLIST32);
-			} while (Heap32ListNext(hHeapSnap, &hl));
-		}
-		else printf("Cannot list first heap (%d)\n", GetLastError());*/
 
 		//
 		// CreateToolhelp32Snapshot doesn't work work cross-arhitecture heap enumeration - use the PEB to walk the heaps. Note that it was confirmed private +RWX entries in .NET process (other than executable primary heaps) are not sub-heaps which can be enumerated with Heap32First/Next
