@@ -252,6 +252,18 @@ bool Entity::IsPartiallyExecutable() const {
 	return false;
 }
 
+bool Entity::ContainsFlag(uint64_t qwFlag) const {
+	vector<Subregion*> Subregions = this->GetSubregions();
+
+	for (vector<Subregion*>::iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
+		if (((*SbrItr)->GetFlags() & qwFlag)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool Entity::Dump(MemDump& DmpCtx) const {
 	vector<Subregion*> Subregions = this->GetSubregions(); // This must be done explicitly, otherwise each time GetSubregions is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 	wchar_t DumpFolder[MAX_PATH + 1] = { 0 };

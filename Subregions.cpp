@@ -46,7 +46,6 @@ Subregion::Subregion(Processes::Process &OwnerProc, const MEMORY_BASIC_INFORMATI
 			this->Threads.push_back(new Processes::Thread((*ThItr)->GetTid(), OwnerProc));
 		}
 
-		//if ((*ThItr)->GetStackAddress() == this->Basic->BaseAddress) {
 		if ((*ThItr)->GetStackAddress() >= this->Basic->BaseAddress && (*ThItr)->GetStackAddress() < (static_cast<uint8_t*>(this->Basic->BaseAddress) + this->Basic->RegionSize)) {
 			this->Flags |= MEMORY_SUBREGION_FLAG_STACK;
 		}
@@ -57,7 +56,6 @@ Subregion::Subregion(Processes::Process &OwnerProc, const MEMORY_BASIC_INFORMATI
 	}
 
 	if (find(Heaps.begin(), Heaps.end(), Mbi->BaseAddress) != Heaps.end()) {
-		//printf("Heap found 0x%p\r\n", Mbi->BaseAddress);
 		this->Flags |= MEMORY_SUBREGION_FLAG_HEAP;
 	}
 

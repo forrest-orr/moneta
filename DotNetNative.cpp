@@ -1,6 +1,7 @@
 #include "StdAfx.h"
 #include <ClrData.h>
 
+#include "Interface.hpp"
 #include "Processes.hpp"
 #include "Memory.hpp"
 
@@ -387,7 +388,7 @@ public:
 				}
 
 				if (bOverlap) {
-					printf("... enumerated region 0x%p(+%d) overlaps with subregion at 0x%p(+%d)\r\n", pTargetRegionAddress, dwTargetRegionSize, pSearchRegionAddress, dwSearchRegionSize);
+					//printf("... enumerated region 0x%p(+%d) overlaps with subregion at 0x%p(+%d)\r\n", pTargetRegionAddress, dwTargetRegionSize, pSearchRegionAddress, dwSearchRegionSize);
 					(*SbrItr)->SetFlags((*SbrItr)->GetFlags() | MEMORY_SUBREGION_FLAG_DOTNET);
 				}
 			}
@@ -443,6 +444,21 @@ bool EnumerateClrMemoryRegions(Process* ProcessObj, HMODULE hMscordacwksDll) {
 			Enumerator->EnumMemoryRegions(EnumCallback, 0, CLRDATA_ENUM_MEM_HEAP); // Synchronous
 			//EnumCallback->PrintRanges();
 			//EnumCallback->PrintBases();
+
+			//
+			// For each entity which is private and partially executable, print whether or not it is partially .NET - then run hunt scan on its base address via command line
+			//
+			map<uint8_t*, Entity*> Entities = ProcessObj->GetEntities();
+
+			for (map<uint8_t*, Entity*>::const_iterator EntItr = Entities.begin(); EntItr != Entities.end(); ++EntItr) {
+				if (EntItr->second->GetSubregions().front()->GetBasic()->Type == MEM_PRIVATE) {
+					if (EntItr->second->IsPartiallyExecutable()) {
+						Interface::Log("... private +x region at 0x%p(+%d)\r\n", EntItr->second->GetStartVa(), EntItr->second->GetEntitySize());
+						Interface::Log("    native .NET: %ws\r\n", EntItr->second->ContainsFlag(MEMORY_SUBREGION_FLAG_DOTNET) ? L"yes" : L"no");
+					}
+				}
+			}
+			system("pause");
 		}
 		else {
 			printf("... failed to resolve ICLRDataEnumMemoryRegions interface\r\n");

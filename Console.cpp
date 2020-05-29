@@ -209,7 +209,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		if (ProcType == SelectedProcess_t::SelfPid || ProcType == SelectedProcess_t::SpecificPid) {
 			try {
 				Process TargetProc(dwSelectedPid);
-
 				int32_t nDotNetVersion = QueryDotNetVersion(dwSelectedPid);
 				void* pMscordacwksDllBase = LoadMscordacwksDll(nDotNetVersion, TargetProc.IsWow64());
 				EnumerateClrMemoryRegions(&TargetProc, (HMODULE)pMscordacwksDllBase);

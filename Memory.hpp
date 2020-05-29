@@ -53,7 +53,6 @@ namespace Memory {
 		std::vector<Subregion*> Subregions;
 		const void* StartVa, * EndVa;
 		uint32_t EntitySize;
-		bool DotNetRegion;
 		//MEMORY_REGION_INFORMATION* RegionInfo;
 	public:
 		enum Type { UNKNOWN, PE_FILE, MAPPED_FILE, PE_SECTION };
@@ -62,7 +61,7 @@ namespace Memory {
 		const void* GetStartVa() const { return this->StartVa; }
 		const void* GetEndVa() const { return this->EndVa; }
 		uint32_t GetEntitySize() const { return this->EntitySize; }
-		bool IsDotNetRegion() const { return this->DotNetRegion; }
+		bool ContainsFlag(uint64_t qwFlag) const;
 		static Entity* Create(Processes::Process& OwnerProc, std::vector<Subregion*> Subregions); // Factory method for derived PE images, mapped files, unknown memory ranges.
 		bool Dump(MemDump& DmpCtx) const;
 		void SetSubregions(std::vector<Subregion*>);
