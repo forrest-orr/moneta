@@ -334,16 +334,16 @@ public:
 		ULONG32          dwSize
 	) {
 		uint8_t* pTargetRegionAddress = reinterpret_cast<uint8_t *>(pAddress);
-		/*
+		
 		this->Ranges.push_back(make_pair((void*)pTargetRegionAddress, dwSize));
 		MEMORY_BASIC_INFORMATION Mbi = { 0 };
 		VirtualQueryEx(ProcessObj->GetHandle(), (void*)pTargetRegionAddress, &Mbi, sizeof(Mbi));
 		//printf("Region 0x%p - size %d\r\n", address, size);
 
-		if (find(BaseAddresses.begin(), BaseAddresses.end(), Mbi.AllocationBase) == BaseAddresses.end()) {
-			BaseAddresses.push_back(Mbi.AllocationBase);
+		if (find(BaseAddresses.begin(), BaseAddresses.end(), Mbi.BaseAddress) == BaseAddresses.end()) {
+			BaseAddresses.push_back(Mbi.BaseAddress);
 			//printf("%d region 0x%p\r\n", Addresses.size(), Mbi.AllocationBase);
-		}*/
+		}
 
 		map<uint8_t*, Entity*> Entities = this->ProcessObj->GetEntities();
 
@@ -441,7 +441,7 @@ bool EnumerateClrMemoryRegions(Process* ProcessObj, HMODULE hMscordacwksDll) {
 		if (hRes == S_OK) {
 			CustomMemoryEnumCallback *EnumCallback = new CustomMemoryEnumCallback(ProcessObj);
 			//printf("... successfully resolved a new ICLRDataEnumMemoryRegions interface to 0x%p\r\n", Enumerator);
-			Enumerator->EnumMemoryRegions(EnumCallback, 0, CLRDATA_ENUM_MEM_HEAP); // Synchronous
+			Enumerator->EnumMemoryRegions(EnumCallback, 0, (CLRDataEnumMemoryFlags)-1); // Synchronous
 			//EnumCallback->PrintRanges();
 			//EnumCallback->PrintBases();
 
@@ -455,7 +455,7 @@ bool EnumerateClrMemoryRegions(Process* ProcessObj, HMODULE hMscordacwksDll) {
 					if (EntItr->second->IsPartiallyExecutable()) {
 						Interface::Log("... private +x region at 0x%p(+%d)\r\n", EntItr->second->GetStartVa(), EntItr->second->GetEntitySize());
 						Interface::Log("    native .NET: %ws\r\n", EntItr->second->ContainsFlag(MEMORY_SUBREGION_FLAG_DOTNET) ? L"yes" : L"no");
-						char Command[1000] = { 0 };
+						char Command[1000] = { 0 };  // FOUND IT https://github.com/HarmJ0y/KeeThief/blob/53d4b81c8efe19bbf1163ed257a17bc7b09f6fe6/KeeTheft/ClrMD/src/Microsoft.Diagnostics.Runtime/Desktop/runtimebase.cs this is the source code of C# EnumerateMemoryRegions. It is NOT the same as native
 						sprintf_s(Command, sizeof(Command), "HuntManagedAddress.exe --mode scan --pid %d --address 0x%p --size %d", ProcessObj->GetPid(), EntItr->second->GetStartVa(), EntItr->second->GetEntitySize());
 						Interface::Log(VerbosityLevel::Surface, "... executing command: %s\r\n", Command);
 						system(Command);
