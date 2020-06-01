@@ -50,6 +50,30 @@ enum class SelectedProcess_t {
 	SelfPid
 };
 
+void ScanPrvRwx(Processes::Process * ProcessObj) {
+	//
+// For each entity which is private and partially executable, print whether or not it is partially .NET - then run hunt scan on its base address via command line
+//
+	map<uint8_t*, Entity*> Entities = ProcessObj->GetEntities();
+
+	for (map<uint8_t*, Entity*>::const_iterator EntItr = Entities.begin(); EntItr != Entities.end(); ++EntItr) {
+		if (EntItr->second->GetSubregions().front()->GetBasic()->Type == MEM_PRIVATE) {
+			if (EntItr->second->IsPartiallyExecutable()) {
+
+				Interface::Log("... private +x region at 0x%p(+%d)\r\n", EntItr->second->GetStartVa(), EntItr->second->GetEntitySize());
+				Interface::Log("    native .NET: %ws\r\n", EntItr->second->ContainsFlag(MEMORY_SUBREGION_FLAG_DOTNET) ? L"yes" : L"no");
+				char Command[1000] = { 0 };  // FOUND IT https://github.com/HarmJ0y/KeeThief/blob/53d4b81c8efe19bbf1163ed257a17bc7b09f6fe6/KeeTheft/ClrMD/src/Microsoft.Diagnostics.Runtime/Desktop/runtimebase.cs this is the source code of C# EnumerateMemoryRegions. It is NOT the same as native
+				sprintf_s(Command, sizeof(Command), "C:\\Users\\Forrest\\Documents\\GitHub\\HuntManagedAddress\\HuntManagedAddress\\bin\\Release\\HuntManagedAddress.exe --mode scan --pid %d --address 0x%p --size %d", ProcessObj->GetPid(), EntItr->second->GetStartVa(), EntItr->second->GetEntitySize());
+				Interface::Log(VerbosityLevel::Surface, "... executing command: %s\r\n", Command);
+				system(Command);
+				Interface::Log("\r\n\r\n");
+
+			}
+		}
+	}
+	system("pause");
+}
+
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	vector<wstring> Args(&pArgv[0], &pArgv[0 + nArgc]);
 	Interface::Initialize(Args);
@@ -213,9 +237,9 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			try {
 				Process TargetProc(dwSelectedPid);
 				int32_t nDotNetVersion = QueryDotNetVersion(dwSelectedPid);
-				void* pMscordacwksDllBase = LoadMscordacwksDll(nDotNetVersion, TargetProc.IsWow64());
+				void* pMscordacwksDllBase = LoadMscordacwksDll(nDotNetVersion, false); // Wow64 for the current process, not the target process since it is this tool itself which must load the DAC DLL
 				EnumerateClrMemoryRegions(&TargetProc, (HMODULE)pMscordacwksDllBase);
-
+				ScanPrvRwx(&TargetProc);
 				vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(ScannerCtx);
 
 				if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
