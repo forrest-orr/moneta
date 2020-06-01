@@ -44,7 +44,7 @@ int32_t QueryDotNetVersion(uint32_t dwPid) {
 		nDotNetVersion = 4;
 	}
 	else {
-		printf("... section object does not exist: %wZ\r\n", &usSectionName);
+		//printf("... section object does not exist: %wZ\r\n", &usSectionName);
 	}
 
 	//RtlFreeUnicodeString(&usSectionName);
@@ -67,7 +67,7 @@ int32_t QueryDotNetVersion(uint32_t dwPid) {
 			nDotNetVersion = 2;
 		}
 		else {
-			printf("... section object does not exist: %wZ\r\n", &usSectionName);
+			//printf("... section object does not exist: %wZ\r\n", &usSectionName);
 		}
 
 		//RtlFreeUnicodeString(&usSectionName);
@@ -101,10 +101,10 @@ void* LoadMscordacwksDll(int32_t nDotNetVersion, bool bIsWow64) {
 	pModuleBase = LoadLibraryW(MscordacwksPath);
 
 	if (pModuleBase != nullptr) {
-		printf("... successfully loaded %ws to 0x%p\r\n", MscordacwksPath, pModuleBase);
+		//printf("... successfully loaded %ws to 0x%p\r\n", MscordacwksPath, pModuleBase);
 	}
 	else {
-		printf("... failed to load %ws to 0x%p\r\n", MscordacwksPath, pModuleBase);
+		//printf("... failed to load %ws to 0x%p\r\n", MscordacwksPath, pModuleBase);
 	}
 
 	return pModuleBase;
@@ -129,20 +129,20 @@ public:
 			IsEqualIID(riid, IID_ICLRDataTarget)
 			)
 		{
-			printf("... known ICLRDataTarget QueryInterface called\r\n");
+			//printf("... known ICLRDataTarget QueryInterface called\r\n");
 			this->AddRef();
 			*ppvObject = this;
 			return S_OK;
 		}
 		else
 		{
-			printf("... unknown ICLRDataTarget QueryInterface called\r\n");
+			//printf("... unknown ICLRDataTarget QueryInterface called\r\n");
 			GUID guid;
 			CoCreateGuid(&guid);
 
 			OLECHAR* guidString;
 			StringFromCLSID(guid, &guidString);
-			printf("%ws\r\n", guidString);
+			//printf("%ws\r\n", guidString);
 
 			// use guidString...
 
@@ -195,10 +195,10 @@ public:
 		/* [out] */ CLRDATA_ADDRESS* baseAddress)
 	{
 		PeVm::Body* Module;
-		printf("... custom GetImageBase called with image path of %ws\r\n", imagePath);
+		//printf("... custom GetImageBase called with image path of %ws\r\n", imagePath);
 
 		if ((Module = this->ProcessObj->GetLoadedModule(imagePath)) != nullptr) {
-			printf("... successfully resolved a base address of 0x%p for module %ws\r\n", Module->GetPebModule().GetBase(), Module->GetPebModule().GetName().c_str());
+			//printf("... successfully resolved a base address of 0x%p for module %ws\r\n", Module->GetPebModule().GetBase(), Module->GetPebModule().GetName().c_str());
 			*baseAddress = reinterpret_cast<CLRDATA_ADDRESS>(const_cast<uint8_t *>(Module->GetPebModule().GetBase()));
 		}
 
@@ -211,7 +211,7 @@ public:
 		/* [in] */ ULONG32 bytesRequested,
 		/* [out] */ ULONG32* pdwBytesRead)
 	{
-		//printf("... custom ReadVirtual called\r\n");
+		////printf("... custom ReadVirtual called\r\n");
 		SIZE_T cbBytesRead = 0;
 		if (ReadProcessMemory(this->ProcessObj->GetHandle(), (void *)address, buffer, bytesRequested, &cbBytesRead)) {
 			*pdwBytesRead = cbBytesRead;
@@ -227,7 +227,7 @@ public:
 		/* [in] */ ULONG32 bytesRequested,
 		/* [out] */ ULONG32* bytesWritten)
 	{
-		printf("WriteVirtual\r\n");
+		//printf("WriteVirtual\r\n");
 		throw;
 	}
 
@@ -236,7 +236,7 @@ public:
 		/* [in] */ ULONG32 index,
 		/* [out] */ CLRDATA_ADDRESS* value)
 	{
-		printf("GetTLSValue\r\n");
+		//printf("GetTLSValue\r\n");
 		throw;
 	}
 
@@ -245,14 +245,14 @@ public:
 		/* [in] */ ULONG32 index,
 		/* [in] */ CLRDATA_ADDRESS value)
 	{
-		printf("SetTLSValue\r\n");
+		//printf("SetTLSValue\r\n");
 		throw;
 	}
 
 	virtual HRESULT STDMETHODCALLTYPE GetCurrentThreadID(
 		/* [out] */ ULONG32* threadID)
 	{
-		printf("GetCurrentThreadID\r\n");
+		//printf("GetCurrentThreadID\r\n");
 		throw;
 	}
 
@@ -273,11 +273,11 @@ public:
 
 		if (hThread != nullptr) {
 			if (::GetThreadContext(hThread, (LPCONTEXT)context)) {
-				//printf("... GetThreadContext successful\r\n");
+				////printf("... GetThreadContext successful\r\n");
 				return S_OK;
 			}
 			else {
-				printf("... GetThreadContext successful\r\n");
+				//printf("... GetThreadContext successful\r\n");
 			}
 		}
 
@@ -289,7 +289,7 @@ public:
 		/* [in] */ ULONG32 contextSize,
 		/* [size_is][in] */ BYTE* context)
 	{
-		printf("SetThreadContext\r\n");
+		//printf("SetThreadContext\r\n");
 		throw;
 	}
 
@@ -300,7 +300,7 @@ public:
 		/* [in] */ ULONG32 outBufferSize,
 		/* [size_is][out] */ BYTE* outBuffer)
 	{
-		printf("Request\r\n");
+		//printf("Request\r\n");
 		throw;
 	}
 
@@ -321,7 +321,7 @@ public:
 		/* [in] */ REFIID riid,
 		/* [iid_is][out] */ PVOID* ppvObject)
 	{
-		//printf("... ICLRDataEnumMemoryRegionsCallback2 QueryInterface called\r\n");
+		////printf("... ICLRDataEnumMemoryRegionsCallback2 QueryInterface called\r\n");
 		if (
 			IsEqualIID(riid, IID_IUnknown) ||
 			IsEqualIID(riid, IID_ICLRDataEnumMemoryRegionsCallback2)
@@ -333,13 +333,13 @@ public:
 		}
 		else
 		{
-			printf("... unknown ICLRDataEnumMemoryRegionsCallback2 QueryInterface called\r\n");
+			//printf("... unknown ICLRDataEnumMemoryRegionsCallback2 QueryInterface called\r\n");
 			GUID guid;
 			CoCreateGuid(&guid);
 
 			OLECHAR* guidString;
 			StringFromCLSID(guid, &guidString);
-			printf("%ws\r\n", guidString);
+			//printf("%ws\r\n", guidString);
 			*ppvObject = NULL;
 			return E_NOINTERFACE;
 		}
@@ -364,11 +364,11 @@ public:
 		this->Ranges.push_back(make_pair((void*)pTargetRegionAddress, dwSize));
 		MEMORY_BASIC_INFORMATION Mbi = { 0 };
 		VirtualQueryEx(ProcessObj->GetHandle(), (void*)pTargetRegionAddress, &Mbi, sizeof(Mbi));
-		//printf("Region 0x%p - size %d\r\n", address, size);
+		////printf("Region 0x%p - size %d\r\n", address, size);
 
 		if (find(BaseAddresses.begin(), BaseAddresses.end(), Mbi.BaseAddress) == BaseAddresses.end()) {
 			BaseAddresses.push_back(Mbi.BaseAddress);
-			//printf("%d region 0x%p\r\n", Addresses.size(), Mbi.AllocationBase);
+			////printf("%d region 0x%p\r\n", Addresses.size(), Mbi.AllocationBase);
 		}
 
 		map<uint8_t*, Entity*> Entities = this->ProcessObj->GetEntities();
@@ -414,7 +414,7 @@ public:
 				}
 
 				if (bOverlap) {
-					//printf("... enumerated region 0x%p(+%d) overlaps with subregion at 0x%p(+%d)\r\n", pTargetRegionAddress, dwTargetRegionSize, pSearchRegionAddress, dwSearchRegionSize);
+					////printf("... enumerated region 0x%p(+%d) overlaps with subregion at 0x%p(+%d)\r\n", pTargetRegionAddress, dwTargetRegionSize, pSearchRegionAddress, dwSearchRegionSize);
 					(*SbrItr)->SetFlags((*SbrItr)->GetFlags() | MEMORY_SUBREGION_FLAG_DOTNET);
 				}
 			}
@@ -428,7 +428,7 @@ public:
 
 		for (vector<pair<void*, uint32_t>>::const_iterator Itr = this->Ranges.begin(); Itr != this->Ranges.end(); ++Itr) {
 			nTotalRanges++;
-			printf("%d 0x%p - %d\r\n", nTotalRanges, Itr->first, Itr->second);
+			//printf("%d 0x%p - %d\r\n", nTotalRanges, Itr->first, Itr->second);
 		}
 
 		return nTotalRanges;
@@ -439,7 +439,7 @@ public:
 
 		for (vector<void*>::const_iterator Itr = this->BaseAddresses.begin(); Itr != this->BaseAddresses.end(); ++Itr) {
 			nTotalBases++;
-			printf("%d 0x%p\r\n", nTotalBases, *Itr);
+			//printf("%d 0x%p\r\n", nTotalBases, *Itr);
 		}
 
 		return nTotalBases;
@@ -459,14 +459,14 @@ bool EnumerateClrMemoryRegions(Process* ProcessObj, HMODULE hMscordacwksDll) {
 	ICLRDataTarget* ClrDataTarget = CreateClrDataTarget(ProcessObj);
 
 	if (ClrDataTarget != nullptr) {
-		//printf("... successfully initialized ICLRDataTarget interface\r\n");
+		////printf("... successfully initialized ICLRDataTarget interface\r\n");
 		PFN_CLRDataCreateInstance ClrDataCreateInstance = reinterpret_cast<PFN_CLRDataCreateInstance>(GetProcAddress(hMscordacwksDll, "CLRDataCreateInstance"));
 		ICLRDataEnumMemoryRegions* Enumerator = nullptr;
 		HRESULT hRes = ClrDataCreateInstance(IID_ICLRDataEnumMemoryRegions, ClrDataTarget, reinterpret_cast<void**>(&Enumerator));
 
 		if (hRes == S_OK) {
 			CustomMemoryEnumCallback *EnumCallback = new CustomMemoryEnumCallback(ProcessObj);
-			//printf("... successfully resolved a new ICLRDataEnumMemoryRegions interface to 0x%p\r\n", Enumerator);
+			////printf("... successfully resolved a new ICLRDataEnumMemoryRegions interface to 0x%p\r\n", Enumerator);
 			Enumerator->EnumMemoryRegions(EnumCallback, 0, (CLRDataEnumMemoryFlags)-1); // Synchronous
 			//EnumCallback->PrintRanges();
 			//EnumCallback->PrintBases();
@@ -479,24 +479,26 @@ bool EnumerateClrMemoryRegions(Process* ProcessObj, HMODULE hMscordacwksDll) {
 			for (map<uint8_t*, Entity*>::const_iterator EntItr = Entities.begin(); EntItr != Entities.end(); ++EntItr) {
 				if (EntItr->second->GetSubregions().front()->GetBasic()->Type == MEM_PRIVATE) {
 					if (EntItr->second->IsPartiallyExecutable()) {
+						
 						Interface::Log("... private +x region at 0x%p(+%d)\r\n", EntItr->second->GetStartVa(), EntItr->second->GetEntitySize());
 						Interface::Log("    native .NET: %ws\r\n", EntItr->second->ContainsFlag(MEMORY_SUBREGION_FLAG_DOTNET) ? L"yes" : L"no");
 						char Command[1000] = { 0 };  // FOUND IT https://github.com/HarmJ0y/KeeThief/blob/53d4b81c8efe19bbf1163ed257a17bc7b09f6fe6/KeeTheft/ClrMD/src/Microsoft.Diagnostics.Runtime/Desktop/runtimebase.cs this is the source code of C# EnumerateMemoryRegions. It is NOT the same as native
-						sprintf_s(Command, sizeof(Command), "C:\\Users\\Forrest\\Documents\\GitHub\\HuntManagedAddress\\HuntManagedAddress\\bin\\x64\\Release\\HuntManagedAddress.exe --mode scan --pid %d --address 0x%p --size %d", ProcessObj->GetPid(), EntItr->second->GetStartVa(), EntItr->second->GetEntitySize());
+						sprintf_s(Command, sizeof(Command), "C:\\Users\\Forrest\\Documents\\GitHub\\HuntManagedAddress\\HuntManagedAddress\\bin\\Release\\HuntManagedAddress.exe --mode scan --pid %d --address 0x%p --size %d", ProcessObj->GetPid(), EntItr->second->GetStartVa(), EntItr->second->GetEntitySize());
 						Interface::Log(VerbosityLevel::Surface, "... executing command: %s\r\n", Command);
 						system(Command);
 						Interface::Log("\r\n\r\n");
+						
 					}
 				}
 			}
 			system("pause");
 		}
 		else {
-			printf("... failed to resolve ICLRDataEnumMemoryRegions interface\r\n");
+			//printf("... failed to resolve ICLRDataEnumMemoryRegions interface\r\n");
 		}
 	}
 	else {
-		printf("... failed to initialize ICLRDataTarget interface\r\n");
+		//printf("... failed to initialize ICLRDataTarget interface\r\n");
 	}
 
 	return true;

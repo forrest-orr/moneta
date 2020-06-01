@@ -577,7 +577,8 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 
 					SbrMap = &ReferencesMap.at(static_cast<unsigned char*>(const_cast<void*>(EntItr->second->GetStartVa()))); // This will always be successful
 					SbrMap->push_back(static_cast<uint8_t*>(const_cast<void*>((*SbrItr)->GetBasic()->BaseAddress)));
-					Interface::Log(VerbosityLevel::Surface, "... found referenced address 0x%p at 0x%p (offset 0x%08x within 0x%p)\r\n", pReferencedAddress, static_cast<uint8_t*>(const_cast<void*>((*SbrItr)->GetBasic()->BaseAddress)) + nOffset, nOffset, (*SbrItr)->GetBasic()->BaseAddress);
+					Interface::Log(VerbosityLevel::Debug, "... found referenced address 0x%p at 0x%p (offset 0x%08x within 0x%p)\r\n", pReferencedAddress, static_cast<uint8_t*>(const_cast<void*>((*SbrItr)->GetBasic()->BaseAddress)) + nOffset, nOffset, (*SbrItr)->GetBasic()->BaseAddress);
+					nRefTotal++;
 				}
 
 				delete [] pDmpBuf;
@@ -585,7 +586,38 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 		}
 	}
 	
-	EnumReferencesMap(ReferencesMap);
+	//EnumReferencesMap(ReferencesMap);
+
+	return nRefTotal;
+}
+
+int32_t Process::SearchClrDllDataReferences(MemDump& DmpCtx, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
+	int32_t nRefTotal = 0;
+
+	PeVm::Body* PeEntity = this->GetLoadedModule(L"clr.dll");
+
+	if (PeEntity != nullptr) {
+		//Interface::Log(VerbosityLevel::Surface, "... found private +x region at 0x%p within process with clr.dll loaded.\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
+		PeVm::Section* DataSect = PeEntity->GetSection(".data");
+
+		if (DataSect != nullptr) {
+			//Interface::Log(VerbosityLevel::Surface, "... clr.dll .data section located at 0x%p\r\n", DataSect->GetStartVa());
+			uint8_t* Buf = new uint8_t[DataSect->GetEntitySize()];
+
+			if (ReadProcessMemory(this->GetHandle(), DataSect->GetStartVa(), Buf, DataSect->GetEntitySize(), nullptr)) {
+				int32_t nOffset;
+				//Interface::Log("... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
+
+				if ((nOffset = ScanChunkForAddress<uint64_t>(Buf, DataSect->GetEntitySize(), pReferencedAddress, dwRegionSize)) != -1) {
+					//Interface::Log(VerbosityLevel::Surface, "... found private executable region address 0x%p at 0x%p (offset 0x%08x) in clr.dll .data sectio\r\n",
+					//	pReferencedAddress, (uint8_t *)DataSect->GetStartVa() + nOffset, nOffset);
+					nRefTotal++;
+				}
+			}
+
+			delete[] Buf;
+		}
+	}
 
 	return nRefTotal;
 }
@@ -641,7 +673,18 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 	//
 
 	if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Referenced) {
-		this->SearchReferences(DmpCtx, ReferencesMap, ScannerCtx.GetAddress(), ScannerCtx.GetRegionSize());
+		//this->SearchReferences(DmpCtx, ReferencesMap, ScannerCtx.GetAddress(), ScannerCtx.GetRegionSize());
+
+		for (map<uint8_t*, Entity*>::const_iterator EntItr = Entities.begin(); EntItr != Entities.end(); ++EntItr) {
+			if (EntItr->second->GetSubregions().front()->GetBasic()->Type == MEM_PRIVATE) {
+				if (EntItr->second->IsPartiallyExecutable()) {
+					if (this->SearchClrDllDataReferences(DmpCtx, static_cast<const uint8_t*>(EntItr->second->GetStartVa()), EntItr->second->GetEntitySize()) > 0) {
+						Interface::Log(VerbosityLevel::Surface, "... private executable region at 0x%p has references within clr.dll .data section\r\n", EntItr->second->GetStartVa());
+					}
+					//this->SearchReferences(DmpCtx, ReferencesMap, static_cast<const uint8_t*>(EntItr->second->GetStartVa()), EntItr->second->GetEntitySize());
+				}
+			}
+		}
 	}
 
 	//
