@@ -90,7 +90,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	else {
 		SelectedProcess_t ProcType = SelectedProcess_t::InvalidPid;
 		MemorySelection_t MemorySelectionType = MemorySelection_t::Invalid;
-		uint32_t dwSelectedPid = 0;
+		uint32_t dwSelectedPid = 0, dwRegionSize = 0;
 		uint8_t* pAddress = nullptr;
 		vector<Filter_t> Filters;
 
@@ -130,6 +130,9 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			}
 			else if (Arg == L"-d") {
 				qwOptFlags |= PROCESS_ENUM_FLAG_MEMDUMP;
+			}
+			else if (Arg == L"--region-size") {
+				dwRegionSize = _wtoi((*(i + 1)).c_str());
 			}
 			else if (Arg == L"--option") {
 				for (vector<wstring>::const_iterator OptZtr = i; OptZtr != Args.end(); ++OptZtr) {
@@ -203,7 +206,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		// Analyze processes and generate memory maps/suspicions
 		//
 
-		ScannerContext ScannerCtx(qwOptFlags, MemorySelectionType, pAddress, Filters);
+		ScannerContext ScannerCtx(qwOptFlags, MemorySelectionType, pAddress, dwRegionSize, Filters);
 		uint64_t qwStartTick = GetTickCount64();
 
 		if (ProcType == SelectedProcess_t::SelfPid || ProcType == SelectedProcess_t::SpecificPid) {

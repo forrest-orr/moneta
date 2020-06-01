@@ -529,9 +529,15 @@ void EnumReferencesMap(map <uint8_t*, vector<uint8_t*>> ReferencesMap) {
 	}
 }
 
-template<typename Address_t> int32_t ScanChunkForAddress(uint8_t *pBuf, uint32_t dwSize, const uint8_t* pReferencedAddress) {
+template<typename Address_t> int32_t ScanChunkForAddress(uint8_t *pBuf, uint32_t dwSize, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
 	for (int32_t nOffset = 0; nOffset < dwSize; nOffset++) {
-		if (*(Address_t*)&pBuf[nOffset] == reinterpret_cast<Address_t>(pReferencedAddress)) {
+		Address_t PotentialAddress = *(Address_t*)&pBuf[nOffset];
+
+		if (!dwRegionSize && PotentialAddress == reinterpret_cast<Address_t>(pReferencedAddress)) {
+			return nOffset;
+		}
+
+		if (PotentialAddress >= reinterpret_cast<Address_t>(pReferencedAddress) && PotentialAddress < reinterpret_cast<Address_t>(pReferencedAddress + dwRegionSize)) {
 			return nOffset;
 		}
 	}
@@ -540,7 +546,7 @@ template<typename Address_t> int32_t ScanChunkForAddress(uint8_t *pBuf, uint32_t
 }
 
 
-int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t*>> &ReferencesMap, const uint8_t* pReferencedAddress) {
+int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t*>> &ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
 	int32_t nRefTotal = 0;
 
 	for (map<uint8_t*, Entity*>::const_iterator EntItr = this->Entities.begin(); EntItr != this->Entities.end(); ++EntItr) {
@@ -557,7 +563,7 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 				int32_t nOffset;
 				//Interface::Log("... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
 
-				if((nOffset = ScanChunkForAddress<uint64_t>(pDmpBuf, dwDmpSize, pReferencedAddress)) != -1) {
+				if((nOffset = ScanChunkForAddress<uint64_t>(pDmpBuf, dwDmpSize, pReferencedAddress, dwRegionSize)) != -1) {
 					//
 					// In the event that an entry does not already exist in the reference map for this entity, create one with an empty vector. Otherwise, point the vector reference at the existing vector
 					//
@@ -635,7 +641,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 	//
 
 	if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Referenced) {
-		this->SearchReferences(DmpCtx, ReferencesMap, ScannerCtx.GetAddress());
+		this->SearchReferences(DmpCtx, ReferencesMap, ScannerCtx.GetAddress(), ScannerCtx.GetRegionSize());
 	}
 
 	//
