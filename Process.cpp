@@ -551,6 +551,8 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 			uint8_t* pDmpBuf = nullptr;
 			uint32_t dwDmpSize = 0;
 
+			if ((*SbrItr)->GetBasic()->State != MEM_COMMIT) continue;
+
 			if (DmpCtx.Create((*SbrItr)->GetBasic(), &pDmpBuf, &dwDmpSize)) {
 				int32_t nOffset;
 				//Interface::Log("... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);

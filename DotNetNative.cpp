@@ -1,5 +1,6 @@
 #include "StdAfx.h"
 #include <ClrData.h>
+#include <mscoree.h>
 
 #include "Interface.hpp"
 #include "Processes.hpp"
@@ -123,18 +124,30 @@ public:
 		/* [in] */ REFIID riid,
 		/* [iid_is][out] */ PVOID* ppvObject)
 	{
-		printf("... ICLRDataTarget QueryInterface called\r\n");
 		if (
 			IsEqualIID(riid, IID_IUnknown) ||
 			IsEqualIID(riid, IID_ICLRDataTarget)
 			)
 		{
+			printf("... known ICLRDataTarget QueryInterface called\r\n");
 			this->AddRef();
 			*ppvObject = this;
 			return S_OK;
 		}
 		else
 		{
+			printf("... unknown ICLRDataTarget QueryInterface called\r\n");
+			GUID guid;
+			CoCreateGuid(&guid);
+
+			OLECHAR* guidString;
+			StringFromCLSID(guid, &guidString);
+			printf("%ws\r\n", guidString);
+
+			// use guidString...
+
+			// ensure memory is freed
+			::CoTaskMemFree(guidString);
 			*ppvObject = NULL;
 			return E_NOINTERFACE;
 		}
@@ -294,18 +307,24 @@ public:
 	Process* ProcessObj;
 };
 
-class CustomMemoryEnumCallback : public ICLRDataEnumMemoryRegionsCallback {
+class CustomMemoryEnumCallback : public ICLRDataEnumMemoryRegionsCallback2 {
 public:
 	CustomMemoryEnumCallback(Process* ProcessObj) : ProcessObj(ProcessObj) {}
 
+	HRESULT STDMETHODCALLTYPE UpdateMemoryRegion(
+		/* [in] */ CLRDATA_ADDRESS address,
+		/* [in] */ ULONG32 bufferSize,
+		/* [size_is][in] */ BYTE* buffer) {
+		return S_OK;
+	}
 	HRESULT STDMETHODCALLTYPE QueryInterface(
 		/* [in] */ REFIID riid,
 		/* [iid_is][out] */ PVOID* ppvObject)
 	{
-		printf("... ICLRDataEnumMemoryRegionsCallback QueryInterface called\r\n");
+		//printf("... ICLRDataEnumMemoryRegionsCallback2 QueryInterface called\r\n");
 		if (
 			IsEqualIID(riid, IID_IUnknown) ||
-			IsEqualIID(riid, IID_ICLRDataTarget)
+			IsEqualIID(riid, IID_ICLRDataEnumMemoryRegionsCallback2)
 			)
 		{
 			this->AddRef();
@@ -314,6 +333,13 @@ public:
 		}
 		else
 		{
+			printf("... unknown ICLRDataEnumMemoryRegionsCallback2 QueryInterface called\r\n");
+			GUID guid;
+			CoCreateGuid(&guid);
+
+			OLECHAR* guidString;
+			StringFromCLSID(guid, &guidString);
+			printf("%ws\r\n", guidString);
 			*ppvObject = NULL;
 			return E_NOINTERFACE;
 		}
@@ -456,7 +482,7 @@ bool EnumerateClrMemoryRegions(Process* ProcessObj, HMODULE hMscordacwksDll) {
 						Interface::Log("... private +x region at 0x%p(+%d)\r\n", EntItr->second->GetStartVa(), EntItr->second->GetEntitySize());
 						Interface::Log("    native .NET: %ws\r\n", EntItr->second->ContainsFlag(MEMORY_SUBREGION_FLAG_DOTNET) ? L"yes" : L"no");
 						char Command[1000] = { 0 };  // FOUND IT https://github.com/HarmJ0y/KeeThief/blob/53d4b81c8efe19bbf1163ed257a17bc7b09f6fe6/KeeTheft/ClrMD/src/Microsoft.Diagnostics.Runtime/Desktop/runtimebase.cs this is the source code of C# EnumerateMemoryRegions. It is NOT the same as native
-						sprintf_s(Command, sizeof(Command), "HuntManagedAddress.exe --mode scan --pid %d --address 0x%p --size %d", ProcessObj->GetPid(), EntItr->second->GetStartVa(), EntItr->second->GetEntitySize());
+						sprintf_s(Command, sizeof(Command), "C:\\Users\\Forrest\\Documents\\GitHub\\HuntManagedAddress\\HuntManagedAddress\\bin\\x64\\Release\\HuntManagedAddress.exe --mode scan --pid %d --address 0x%p --size %d", ProcessObj->GetPid(), EntItr->second->GetStartVa(), EntItr->second->GetEntitySize());
 						Interface::Log(VerbosityLevel::Surface, "... executing command: %s\r\n", Command);
 						system(Command);
 						Interface::Log("\r\n\r\n");
