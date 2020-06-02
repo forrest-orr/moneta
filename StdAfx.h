@@ -26,4 +26,7 @@
 #include <vector>
 #include <algorithm>
 #include <codecvt>
+#include <cor.h>
+#include <clrdata.h>
+#include "xclrdata\xclrdata.h"
 #include "Typedefs.h"

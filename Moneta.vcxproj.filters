@@ -25,6 +25,9 @@
     <Filter Include="Source Files\Classes\Processes">
       <UniqueIdentifier>{c61e686a-46b3-45de-b235-3e17d7bd8260}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\XClrData">
+      <UniqueIdentifier>{27bf4103-3d08-4889-89d2-ee0e38b7d86d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FileIo.cpp">
@@ -113,10 +116,18 @@
     <ClInclude Include="DotNetNative.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="xclrdata\xclrdata.h">
+      <Filter>Header Files\XClrData</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Moneta.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Midl Include="xclrdata\xclrdata.idl">
+      <Filter>Header Files\XClrData</Filter>
+    </Midl>
   </ItemGroup>
 </Project>
