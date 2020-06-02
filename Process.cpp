@@ -625,7 +625,7 @@ int32_t Process::SearchClrDllDataReferences(const uint8_t* pReferencedAddress, c
 
 	return nRefTotal;
 }
-
+*/
 int32_t Process::SearchDllDataReferences(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
 	int32_t nRefTotal = 0;
 
@@ -633,7 +633,8 @@ int32_t Process::SearchDllDataReferences(const uint8_t* pReferencedAddress, cons
 		if (EntItr->second->GetType() == Entity::Type::PE_FILE) {
 			PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(EntItr->second);
 
-			if (PeEntity != nullptr){// && PeEntity->GetPeFile()->IsDotNet() || _wcsicmp(PeEntity->GetPebModule().GetName().c_str(), L"clr.dll") == 0) { // clr.dll is not technically a .NET module, neither is mscoree.dll, clr runtimes etc.
+			// https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/debugging-managed-code provides chart of CLR versions of their DLL: only mscorwks.dll and clr.dll are used.
+			if (PeEntity != nullptr && (_wcsicmp(PeEntity->GetPebModule().GetName().c_str(), L"clr.dll") == 0 || _wcsicmp(PeEntity->GetPebModule().GetName().c_str(), L"mscorwks.dll")) == 0) {
 				//Interface::Log(VerbosityLevel::Surface, "... found private +x region at 0x%p within process with clr.dll loaded.\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
 				PeVm::Section* DataSect = PeEntity->GetSection(".data");
 
@@ -646,29 +647,8 @@ int32_t Process::SearchDllDataReferences(const uint8_t* pReferencedAddress, cons
 						//Interface::Log("... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
 
 						if ((nOffset = ScanChunkForAddress<uint64_t>(Buf, DataSect->GetEntitySize(), pReferencedAddress, dwRegionSize)) != -1) {
-							Interface::Log(VerbosityLevel::Surface, "... found private executable region address 0x%p at 0x%p (offset 0x%08x) in %ws .data section\r\n",
-								pReferencedAddress, (uint8_t *)DataSect->GetStartVa() + nOffset, nOffset, PeEntity->GetPebModule().GetName().c_str());
-							nRefTotal++;
-							//break;
-						}
-					}
-
-					delete[] Buf;
-				}
-
-				DataSect = PeEntity->GetSection(".xdata");
-
-				if (DataSect != nullptr) {
-					//Interface::Log(VerbosityLevel::Surface, "... clr.dll .data section located at 0x%p\r\n", DataSect->GetStartVa());
-					uint8_t* Buf = new uint8_t[DataSect->GetEntitySize()];
-
-					if (ReadProcessMemory(this->GetHandle(), DataSect->GetStartVa(), Buf, DataSect->GetEntitySize(), nullptr)) {
-						int32_t nOffset;
-						//Interface::Log("... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
-
-						if ((nOffset = ScanChunkForAddress<uint64_t>(Buf, DataSect->GetEntitySize(), pReferencedAddress, dwRegionSize)) != -1) {
-							Interface::Log(VerbosityLevel::Surface, "... found private executable region address 0x%p at 0x%p (offset 0x%08x) in %ws .xdata section\r\n",
-								pReferencedAddress, (uint8_t*)DataSect->GetStartVa() + nOffset, nOffset, PeEntity->GetPebModule().GetName().c_str());
+							//Interface::Log(VerbosityLevel::Surface, "... found private executable region address 0x%p at 0x%p (offset 0x%08x) in %ws .data section\r\n",
+							//	pReferencedAddress, (uint8_t *)DataSect->GetStartVa() + nOffset, nOffset, PeEntity->GetPebModule().GetName().c_str());
 							nRefTotal++;
 							//break;
 						}
@@ -681,7 +661,7 @@ int32_t Process::SearchDllDataReferences(const uint8_t* pReferencedAddress, cons
 	}
 
 	return nRefTotal;
-}*/
+}
 
 int32_t Process::DotNetModuleRef(map <uint8_t*, vector<uint8_t*>> &ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
 	int32_t nRefTotal = 0;
@@ -692,7 +672,12 @@ int32_t Process::DotNetModuleRef(map <uint8_t*, vector<uint8_t*>> &ReferencesMap
 			PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(EntMapItr);
 
 			if (PeEntity != nullptr) {
-				Interface::Log(VerbosityLevel::Surface, "... private +x at 0x%p was referenced by module: %ws\r\n", RefItr->first, PeEntity->GetPebModule().GetName().c_str());
+				PeVm::Section* DataSect = PeEntity->GetSection(".data");
+
+				if (DataSect != nullptr) {
+
+					Interface::Log(VerbosityLevel::Surface, "... private +x at 0x%p was referenced by .data of module: %ws\r\n", RefItr->first, PeEntity->GetPebModule().GetName().c_str());
+				}
 				nRefTotal++;
 			}
 		}
@@ -704,17 +689,27 @@ int32_t Process::DotNetModuleRef(map <uint8_t*, vector<uint8_t*>> &ReferencesMap
 int32_t Process::SearchDataRefAllocBases(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
 	int32_t nRefTotal = 0;
 	map <uint8_t*, vector<uint8_t*>> PrvXRefMap;
-	bool bModuleRef = false;
+	//bool bModuleRef = false;
 
 	if (this->SearchReferences(*this->DmpCtx, PrvXRefMap, pReferencedAddress, dwRegionSize) > 0) {
-		//EnumReferencesMap(ReferencesMap);
+		//EnumReferencesMap(PrvXRefMap);
 
-		if ((nRefTotal = DotNetModuleRef(PrvXRefMap, pReferencedAddress, dwRegionSize)) <= 0) {
+		//if ((nRefTotal = DotNetModuleRef(PrvXRefMap, pReferencedAddress, dwRegionSize)) <= 0) {
+		if(!(nRefTotal = SearchDllDataReferences(pReferencedAddress, dwRegionSize))) {
 			for (map <uint8_t*, vector<uint8_t*>>::const_iterator RefItr = PrvXRefMap.begin(); RefItr != PrvXRefMap.end(); ++RefItr) {
 				map <uint8_t*, vector<uint8_t*>> RefMap;
-				this->SearchReferences(*this->DmpCtx, RefMap, RefItr->first, 0);
+				//this->SearchReferences(*this->DmpCtx, RefMap, RefItr->first, 0);
+				if(SearchDllDataReferences(RefItr->first, 0)){
+				//if (DotNetModuleRef(RefMap, pReferencedAddress, dwRegionSize) > 0) {
+					printf("!! prv +x 0x%p referenced by 0x%p which is referenced by a .NET .data module\r\n", pReferencedAddress, RefItr->first);
+					nRefTotal++;
+				}
 			}
 		}
+	}
+	else {
+		printf("no references at all to 0x%p(+%d)\r\n", pReferencedAddress, dwRegionSize); // There is only 1
+		system("pause");
 	}
 
 	// Build a reference map for each private RWX
