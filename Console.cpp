@@ -67,8 +67,9 @@ void ScanPrvRwx(Processes::Process * ProcessObj) {
 				Interface::Log(VerbosityLevel::Surface, "... executing command: %s\r\n", Command);
 				system(Command);
 
-				if (ProcessObj->SearchClrDllDataReferences(static_cast<const uint8_t*>(EntItr->second->GetStartVa()), EntItr->second->GetEntitySize()) > 0) {
-					//Interface::Log(VerbosityLevel::Surface, "... private executable region at 0x%p has references within clr.dll .data section\r\n", EntItr->second->GetStartVa());
+				//if (ProcessObj->SearchDataRefAllocBases(static_cast<const uint8_t*>(EntItr->second->GetStartVa()), 0) > 0) {
+				if (ProcessObj->SearchDataRefAllocBases(static_cast<const uint8_t*>(EntItr->second->GetStartVa()), EntItr->second->GetEntitySize()) > 0) {
+					Interface::Log(VerbosityLevel::Surface, "... private executable region at 0x%p has references within .data section\r\n", EntItr->second->GetStartVa());
 				}
 				else {
 					//Interface::Log(VerbosityLevel::Surface, "... private executable region at 0x%p does NOT have references within clr.dll .data section\r\n", EntItr->second->GetStartVa());

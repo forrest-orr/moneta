@@ -47,6 +47,7 @@ namespace Processes {
 		BOOL Wow64; // bool and BOOL translate to different sizes, IsWow64Process pointed at a bool will corrupt memory.
 		std::vector<Thread*> Threads;
 		std::vector<void*> Heaps;
+		MemDump* DmpCtx;
 		std::map<uint8_t*, Memory::Entity*> Entities; // A region can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
 	public:
 		HANDLE GetHandle() const { return this->Handle; }
@@ -61,7 +62,8 @@ namespace Processes {
 		BOOL IsWow64() const { return this->Wow64; }
 		Process(uint32_t);
 		std::vector<Memory::Subregion*> Enumerate(ScannerContext &ScannerCtx);
-		int32_t SearchClrDllDataReferences(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize);
+		int32_t SearchDataRefAllocBases(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize);
+		int32_t DotNetModuleRef(std::map <uint8_t*, std::vector<uint8_t*>>& ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize);
 		int32_t SearchReferences(MemDump &DmpCtx, std::map <uint8_t*, std::vector<uint8_t*>> &ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize);
 		~Process();
 	};
