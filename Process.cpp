@@ -591,6 +591,7 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 	return nRefTotal;
 }
 
+/*
 int32_t Process::SearchClrDllDataReferences(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
 	int32_t nRefTotal = 0;
 
@@ -616,6 +617,42 @@ int32_t Process::SearchClrDllDataReferences(const uint8_t* pReferencedAddress, c
 			}
 
 			delete[] Buf;
+		}
+	}
+
+	return nRefTotal;
+}*/
+
+int32_t Process::SearchClrDllDataReferences(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
+	int32_t nRefTotal = 0;
+
+	for (map<uint8_t*, Entity*>::const_iterator EntItr = this->Entities.begin(); EntItr != this->Entities.end(); ++EntItr) {
+		if (EntItr->second->GetType() == Entity::Type::PE_FILE) {
+			PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(EntItr->second);
+
+			if (PeEntity != nullptr && PeEntity->GetPeFile()->IsDotNet() || _wcsicmp(PeEntity->GetPebModule().GetName().c_str(), L"clr.dll") == 0) { // clr.dll is not technically a .NET module
+				//Interface::Log(VerbosityLevel::Surface, "... found private +x region at 0x%p within process with clr.dll loaded.\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
+				PeVm::Section* DataSect = PeEntity->GetSection(".data");
+
+				if (DataSect != nullptr) {
+					//Interface::Log(VerbosityLevel::Surface, "... clr.dll .data section located at 0x%p\r\n", DataSect->GetStartVa());
+					uint8_t* Buf = new uint8_t[DataSect->GetEntitySize()];
+
+					if (ReadProcessMemory(this->GetHandle(), DataSect->GetStartVa(), Buf, DataSect->GetEntitySize(), nullptr)) {
+						int32_t nOffset;
+						//Interface::Log("... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
+
+						if ((nOffset = ScanChunkForAddress<uint64_t>(Buf, DataSect->GetEntitySize(), pReferencedAddress, dwRegionSize)) != -1) {
+							Interface::Log(VerbosityLevel::Surface, "... found private executable region address 0x%p at 0x%p (offset 0x%08x) in %ws .data sectio\r\n",
+								pReferencedAddress, (uint8_t *)DataSect->GetStartVa() + nOffset, nOffset, PeEntity->GetPebModule().GetName().c_str());
+							nRefTotal++;
+							//break;
+						}
+					}
+
+					delete[] Buf;
+				}
+			}
 		}
 	}
 
