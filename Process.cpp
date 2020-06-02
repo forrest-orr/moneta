@@ -591,7 +591,7 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 	return nRefTotal;
 }
 
-int32_t Process::SearchClrDllDataReferences(MemDump& DmpCtx, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
+int32_t Process::SearchClrDllDataReferences(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
 	int32_t nRefTotal = 0;
 
 	PeVm::Body* PeEntity = this->GetLoadedModule(L"clr.dll");
@@ -678,9 +678,6 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 		for (map<uint8_t*, Entity*>::const_iterator EntItr = Entities.begin(); EntItr != Entities.end(); ++EntItr) {
 			if (EntItr->second->GetSubregions().front()->GetBasic()->Type == MEM_PRIVATE) {
 				if (EntItr->second->IsPartiallyExecutable()) {
-					if (this->SearchClrDllDataReferences(DmpCtx, static_cast<const uint8_t*>(EntItr->second->GetStartVa()), EntItr->second->GetEntitySize()) > 0) {
-						Interface::Log(VerbosityLevel::Surface, "... private executable region at 0x%p has references within clr.dll .data section\r\n", EntItr->second->GetStartVa());
-					}
 					//this->SearchReferences(DmpCtx, ReferencesMap, static_cast<const uint8_t*>(EntItr->second->GetStartVa()), EntItr->second->GetEntitySize());
 				}
 			}

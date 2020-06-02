@@ -318,12 +318,8 @@ public:
 	Process* ProcessObj;
 };
 
-ICLRDataTarget* CreateClrDataTarget(Process* ProcessObj) {
-	return new CustomCLRDataTarget(ProcessObj);
-}
-
 bool EnumerateClrMemoryRegions(Process* ProcessObj, HMODULE hMscordacwksDll) {
-	ICLRDataTarget* ClrDataTarget = CreateClrDataTarget(ProcessObj);
+	ICLRDataTarget* ClrDataTarget = new CustomCLRDataTarget(ProcessObj);
 
 	if (ClrDataTarget != nullptr) {
 		//printf("... successfully initialized ICLRDataTarget interface\r\n");
@@ -333,6 +329,14 @@ bool EnumerateClrMemoryRegions(Process* ProcessObj, HMODULE hMscordacwksDll) {
 
 		if (SUCCEEDED(hRes)) {
 			printf("... successfully resolved IXCLRDataProcess interface to 0x%p\r\n", DacInterface);
+			//hRes = DacInterface->Request();
+
+			if (SUCCEEDED(hRes)) {
+				//
+			}
+			else {
+				//
+			}
 		}
 		else {
 			printf("... failed to resolve IXCLRDataProcess interface (error 0x%08x)\r\n", hRes);
