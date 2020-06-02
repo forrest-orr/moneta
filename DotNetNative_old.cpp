@@ -1,4 +1,6 @@
 #include "StdAfx.h"
+#include <ClrData.h>
+#include <mscoree.h>
 
 #include "Interface.hpp"
 #include "Processes.hpp"
@@ -89,7 +91,7 @@ void* LoadMscordacwksDll(int32_t nDotNetVersion, bool bIsWow64) {
 			wcscat_s(MscordacwksPath, MAX_PATH + 1, L"\\Microsoft.NET\\Framework64\\v4.0.30319\\mscordacwks.dll");
 		}
 	}
-	else if (nDotNetVersion == 2) {
+	else if(nDotNetVersion == 2) {
 		if (bIsWow64) {
 			wcscat_s(MscordacwksPath, MAX_PATH + 1, L"\\Microsoft.NET\\Framework\\v2.0.50727\\mscordacwks.dll");
 		}
@@ -205,7 +207,7 @@ public:
 
 		if ((Module = this->ProcessObj->GetLoadedModule(imagePath)) != nullptr) {
 			printf("... successfully resolved a base address of 0x%p for module %ws\r\n", Module->GetPebModule().GetBase(), Module->GetPebModule().GetName().c_str());
-			*baseAddress = reinterpret_cast<CLRDATA_ADDRESS>(const_cast<uint8_t*>(Module->GetPebModule().GetBase()));
+			*baseAddress = reinterpret_cast<CLRDATA_ADDRESS>(const_cast<uint8_t *>(Module->GetPebModule().GetBase()));
 		}
 
 		return S_OK;
@@ -219,7 +221,7 @@ public:
 	{
 		//printf("... custom ReadVirtual called\r\n");
 		SIZE_T cbBytesRead = 0;
-		if (ReadProcessMemory(this->ProcessObj->GetHandle(), (void*)address, buffer, bytesRequested, &cbBytesRead)) {
+		if (ReadProcessMemory(this->ProcessObj->GetHandle(), (void *)address, buffer, bytesRequested, &cbBytesRead)) {
 			printf("... ICLRDataTarget!ReadVirtual ReadProcessMemory success (%d bytes)\r\n", cbBytesRead);
 			*pdwBytesRead = cbBytesRead;
 			return S_OK;
@@ -273,7 +275,7 @@ public:
 		/* [size_is][out] */ BYTE* context)
 	{
 		printf("... GetThreadContext\r\n");
-		vector<Processes::Thread*> Threads = this->ProcessObj->GetThreads();
+		vector<Processes::Thread *> Threads = this->ProcessObj->GetThreads();
 		HANDLE hThread = nullptr;
 
 		for (vector<Processes::Thread*>::const_iterator Itr = Threads.begin(); Itr != Threads.end(); ++Itr) {
@@ -318,6 +320,150 @@ public:
 	Process* ProcessObj;
 };
 
+class CustomMemoryEnumCallback : public ICLRDataEnumMemoryRegionsCallback2 {
+public:
+	CustomMemoryEnumCallback(Process* ProcessObj) : ProcessObj(ProcessObj) {}
+
+	HRESULT STDMETHODCALLTYPE UpdateMemoryRegion(
+		/* [in] */ CLRDATA_ADDRESS address,
+		/* [in] */ ULONG32 bufferSize,
+		/* [size_is][in] */ BYTE* buffer) {
+		return S_OK;
+	}
+	HRESULT STDMETHODCALLTYPE QueryInterface(
+		/* [in] */ REFIID riid,
+		/* [iid_is][out] */ PVOID* ppvObject)
+	{
+		//printf("... ICLRDataEnumMemoryRegionsCallback2 QueryInterface called\r\n");
+		if (
+			IsEqualIID(riid, IID_IUnknown) ||
+			IsEqualIID(riid, IID_ICLRDataEnumMemoryRegionsCallback2)
+			)
+		{
+			this->AddRef();
+			*ppvObject = this;
+			return S_OK;
+		}
+		else
+		{
+			printf("... unknown ICLRDataEnumMemoryRegionsCallback2 QueryInterface called\r\n");
+			GUID guid;
+			CoCreateGuid(&guid);
+
+			OLECHAR* guidString;
+			StringFromCLSID(guid, &guidString);
+			printf("%ws\r\n", guidString);
+			*ppvObject = NULL;
+			return E_NOINTERFACE;
+		}
+	}
+
+	ULONG STDMETHODCALLTYPE AddRef(void)
+	{
+		return 1;
+	}
+
+	ULONG STDMETHODCALLTYPE Release(void)
+	{
+		return 0;
+	}
+
+	HRESULT EnumMemoryRegion(
+		CLRDATA_ADDRESS  pAddress,
+		ULONG32          dwSize
+	) {
+		uint8_t* pTargetRegionAddress = reinterpret_cast<uint8_t *>(pAddress);
+		
+		this->Ranges.push_back(make_pair((void*)pTargetRegionAddress, dwSize));
+		MEMORY_BASIC_INFORMATION Mbi = { 0 };
+		VirtualQueryEx(ProcessObj->GetHandle(), (void*)pTargetRegionAddress, &Mbi, sizeof(Mbi));
+		//printf("Region 0x%p - size %d\r\n", address, size);
+
+		if (find(BaseAddresses.begin(), BaseAddresses.end(), Mbi.BaseAddress) == BaseAddresses.end()) {
+			BaseAddresses.push_back(Mbi.BaseAddress);
+			//printf("%d region 0x%p\r\n", Addresses.size(), Mbi.AllocationBase);
+		}
+
+		map<uint8_t*, Entity*> Entities = this->ProcessObj->GetEntities();
+
+		for (map<uint8_t*, Entity*>::const_iterator EntItr = Entities.begin(); EntItr != Entities.end(); ++EntItr) {
+			vector<Subregion*> Subregions = EntItr->second->GetSubregions();
+
+			for (vector<Subregion*>::iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
+				uint32_t dwSearchRegionSize = (*SbrItr)->GetBasic()->RegionSize;
+				uint32_t dwTargetRegionSize = dwSize;
+				uint8_t* pSearchRegionAddress = reinterpret_cast<uint8_t*>((*SbrItr)->GetBasic()->BaseAddress);
+				bool bOverlap = false;
+				
+				/* Search cases:
+				   1. A region is searched within a region - does the region begin or end within the search region? Does the search region fall within the target region?
+				   2. An address is searched within a region - the "start" of the target region (target address + 0) will fall within the search region.
+				   3. An address is searched within an address - compare the two addresses.
+				   4. A region is searched within an address - does the start address of the search region fall within the target region>
+				*/
+
+				if (dwTargetRegionSize == 0 && dwSearchRegionSize == 0) {
+					if (pTargetRegionAddress == pSearchRegionAddress) {
+						bOverlap = true;
+					}
+					else {
+						bOverlap = false;
+					}
+				}
+				else if (dwTargetRegionSize != 0 && dwSearchRegionSize == 0) {
+					if ((pSearchRegionAddress >= pTargetRegionAddress && pSearchRegionAddress < (pTargetRegionAddress + dwTargetRegionSize))) {
+						bOverlap = true;
+					}
+					else
+					{
+						bOverlap = false;
+					}
+				}
+				else if ((pTargetRegionAddress >= pSearchRegionAddress && pTargetRegionAddress < (pSearchRegionAddress + dwSearchRegionSize)) || // The target region starts within the search region
+						(((pTargetRegionAddress + dwTargetRegionSize) > pSearchRegionAddress && (pTargetRegionAddress + dwTargetRegionSize) <= (pSearchRegionAddress + dwSearchRegionSize)) || // The end of the target region falls within the search region
+						(pTargetRegionAddress < pSearchRegionAddress && (pTargetRegionAddress + dwTargetRegionSize) >(pSearchRegionAddress + dwSearchRegionSize)))) // The search region is within a (larger) target region
+				{
+					bOverlap = true;
+				}
+
+				if (bOverlap) {
+					//printf("... enumerated region 0x%p(+%d) overlaps with subregion at 0x%p(+%d)\r\n", pTargetRegionAddress, dwTargetRegionSize, pSearchRegionAddress, dwSearchRegionSize);
+					(*SbrItr)->SetFlags((*SbrItr)->GetFlags() | MEMORY_SUBREGION_FLAG_DOTNET);
+				}
+			}
+		}
+
+		return S_OK;
+	}
+
+	int32_t PrintRanges() {
+		int32_t nTotalRanges = 0;
+
+		for (vector<pair<void*, uint32_t>>::const_iterator Itr = this->Ranges.begin(); Itr != this->Ranges.end(); ++Itr) {
+			nTotalRanges++;
+			printf("%d 0x%p - %d\r\n", nTotalRanges, Itr->first, Itr->second);
+		}
+
+		return nTotalRanges;
+	}
+
+	int32_t PrintBases() {
+		int32_t nTotalBases = 0;
+
+		for (vector<void*>::const_iterator Itr = this->BaseAddresses.begin(); Itr != this->BaseAddresses.end(); ++Itr) {
+			nTotalBases++;
+			printf("%d 0x%p\r\n", nTotalBases, *Itr);
+		}
+
+		return nTotalBases;
+	}
+
+protected:
+	Process* ProcessObj;
+	vector<pair<void*, uint32_t>> Ranges;
+	vector<void*> BaseAddresses;
+};
+
 ICLRDataTarget* CreateClrDataTarget(Process* ProcessObj) {
 	return new CustomCLRDataTarget(ProcessObj);
 }
@@ -328,14 +474,44 @@ bool EnumerateClrMemoryRegions(Process* ProcessObj, HMODULE hMscordacwksDll) {
 	if (ClrDataTarget != nullptr) {
 		//printf("... successfully initialized ICLRDataTarget interface\r\n");
 		PFN_CLRDataCreateInstance ClrDataCreateInstance = reinterpret_cast<PFN_CLRDataCreateInstance>(GetProcAddress(hMscordacwksDll, "CLRDataCreateInstance"));
-		IXCLRDataProcess* DacInterface = nullptr;
-		HRESULT hRes = ClrDataCreateInstance(IID_IXCLRDataProcess, ClrDataTarget, reinterpret_cast<void**>(&DacInterface));
+		ICLRDataEnumMemoryRegions* Enumerator = nullptr;
+		HRESULT hRes = ClrDataCreateInstance(IID_ICLRDataEnumMemoryRegions, ClrDataTarget, reinterpret_cast<void**>(&Enumerator));
 
 		if (SUCCEEDED(hRes)) {
-			printf("... successfully resolved IXCLRDataProcess interface to 0x%p\r\n", DacInterface);
+			CustomMemoryEnumCallback *EnumCallback = new CustomMemoryEnumCallback(ProcessObj);
+			//printf("... successfully resolved a new ICLRDataEnumMemoryRegions interface to 0x%p\r\n", Enumerator);
+			Enumerator->EnumMemoryRegions(EnumCallback, 0, (CLRDataEnumMemoryFlags)-1); // Synchronous
+			//EnumCallback->PrintRanges();
+			//EnumCallback->PrintBases();
 		}
 		else {
-			printf("... failed to resolve IXCLRDataProcess interface (error 0x%08x)\r\n", hRes);
+			printf("... failed to resolve ICLRDataEnumMemoryRegions interface (error 0x%08x)\r\n", hRes);
+
+			wchar_t* errorText = NULL;
+
+			FormatMessageW(
+				// use system message tables to retrieve error text
+				FORMAT_MESSAGE_FROM_SYSTEM
+				// allocate buffer on local heap for error text
+				| FORMAT_MESSAGE_ALLOCATE_BUFFER,
+				// Important! will fail otherwise, since we're not 
+				// (and CANNOT) pass insertion parameters
+				//| FORMAT_MESSAGE_IGNORE_INSERTS,
+				NULL,    // unused with FORMAT_MESSAGE_FROM_SYSTEM
+				GetLastError(),
+				MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+				(wchar_t*)&errorText,  // output 
+				0, // minimum size for output buffer
+				NULL);   // arguments - see note 
+
+			if (NULL != errorText)
+			{
+				// ... do something with the string `errorText` - log it, display it to the user, etc.
+				printf("error: %ws\r\n", errorText);
+				// release memory allocated by FormatMessage()
+				LocalFree(errorText);
+				errorText = NULL;
+			}
 		}
 	}
 	else {

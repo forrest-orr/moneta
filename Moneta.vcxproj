@@ -159,9 +159,13 @@
     <ClInclude Include="StdAfx.h" />
     <ClInclude Include="Suspicions.hpp" />
     <ClInclude Include="Typedefs.h" />
+    <ClInclude Include="xclrdata\xclrdata.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Moneta.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Midl Include="xclrdata\xclrdata.idl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
