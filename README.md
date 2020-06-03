@@ -70,8 +70,8 @@ Filter options: --filter ["unsigned-modules", "clr-prv-rwx", "metadata-modules",
 	entry point in their PE header will have the "missing PEB entry"
 	suspicion filtered off of them.
   + "clr-prv-rwx"
-    All private memory allocated with an initial permission of
-	PAGE_NOACCESS which contain subregions that are +RWX within a
+    All private executable memory which is referenced by the the CLR
+	DLL corresponding to its underlying process .NET version in a
 	process in which the CLR has been initialized will have their
 	"abnormal executable memory type" suspicion filtered off.
   + "clr-heap"

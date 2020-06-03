@@ -313,42 +313,46 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 				for (int32_t nSuspIndex = 0; !bReWalkMap && SuspItr != SbMapItr->second.end(); ++SuspItr, nSuspIndex++) {
 					switch ((*SuspItr)->GetType()) {
 					case Suspicion::Type::XPRV: {
-						if ((*SuspItr)->GetSubregion()->GetBasic()->Protect == PAGE_EXECUTE_READWRITE) {
-							if (find(Filters.begin(), Filters.end(), Filter_t::ClrPrvRwxHeap) != Filters.end()) {
-								if (((*SuspItr)->GetSubregion()->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP)) {
-									bReWalkMap = true;
-									RefSuspList.erase(SuspItr);
+						if (find(Filters.begin(), Filters.end(), Filter_t::ClrPrvRwxHeap) != Filters.end()) {
+							if (((*SuspItr)->GetSubregion()->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP)) {
+								bReWalkMap = true;
+								RefSuspList.erase(SuspItr);
 
-									if (!RefSuspList.size()) {
-										//
-										// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
-										//
+								if (!RefSuspList.size()) {
+									//
+									// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
+									//
 
-										RefSbMap.erase(SbMapItr);
+									RefSbMap.erase(SbMapItr);
 
-										if (!RefSbMap.size()) {
-											SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
-										}
+									if (!RefSbMap.size()) {
+										SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
+										break;
 									}
 								}
 							}
-							else if (find(Filters.begin(), Filters.end(), Filter_t::ClrPrvRwxRegion) != Filters.end()) {
-								if ((*SuspItr)->GetProcess()->CheckDotNetAffiliation(static_cast<uint8_t*>((*SuspItr)->GetSubregion()->GetBasic()->BaseAddress), (*SuspItr)->GetSubregion()->GetBasic()->RegionSize)) {
-									bReWalkMap = true;
-									RefSuspList.erase(SuspItr);
+						}
+						
+						if (find(Filters.begin(), Filters.end(), Filter_t::ClrPrvRwxRegion) != Filters.end()) {
+							if ((*SuspItr)->GetProcess()->CheckDotNetAffiliation(static_cast<uint8_t*>(const_cast<void *>((*SuspItr)->GetParentObject()->GetStartVa())), (*SuspItr)->GetParentObject()->GetEntitySize())) {
+								bReWalkMap = true;
+								RefSuspList.erase(SuspItr);
 
-									if (!RefSuspList.size()) {
-										//
-										// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
-										//
+								if (!RefSuspList.size()) {
+									//
+									// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
+									//
 
-										RefSbMap.erase(SbMapItr);
+									RefSbMap.erase(SbMapItr);
 
-										if (!RefSbMap.size()) {
-											SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
-										}
+									if (!RefSbMap.size()) {
+										SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
+										//Interface::Log("... .NET affiliation found for suspicion of private +x at 0x%p (erased from suspicions)\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
 									}
 								}
+							}
+							else {
+								//Interface::Log("... no .NET affiliation found for suspicion of private +x at 0x%p\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
 							}
 						}
 
