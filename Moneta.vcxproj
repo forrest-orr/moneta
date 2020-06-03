@@ -129,7 +129,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="DotNetNative.cpp" />
     <ClCompile Include="Privilege.cpp" />
     <ClCompile Include="Regions.cpp" />
     <ClCompile Include="FileIo.cpp" />
@@ -145,7 +144,6 @@
     <ClCompile Include="Thread.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="DotNetNative.h" />
     <ClInclude Include="Memory.hpp" />
     <ClInclude Include="FileIo.hpp" />
     <ClInclude Include="Interface.hpp" />
@@ -159,13 +157,9 @@
     <ClInclude Include="StdAfx.h" />
     <ClInclude Include="Suspicions.hpp" />
     <ClInclude Include="Typedefs.h" />
-    <ClInclude Include="xclrdata\xclrdata.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Moneta.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <Midl Include="xclrdata\xclrdata.idl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

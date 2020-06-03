@@ -497,9 +497,10 @@ bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, ws
 		}
 		else {
 			Interface::Log("%ws~ Memory dump failed.\r\n", Indent.c_str());
-			return false;
 		}
 	}
+
+	return false;
 }
 
 void EnumReferencesMap(map <uint8_t*, vector<uint8_t*>> ReferencesMap) {
