@@ -332,43 +332,23 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 									}
 								}
 							}
-							else {
-								/*
-								char Command[1000] = { 0 };
-								sprintf_s(Command, sizeof(Command), "HuntManagedAddress.exe --mode scan --pid %d --address 0x%p --size %d", (*SuspItr)->GetProcess()->GetPid(), (*SuspItr)->GetParentObject()->GetStartVa(), (*SuspItr)->GetParentObject()->GetEntitySize());
-								Interface::Log(VerbosityLevel::Surface, "... executing command: %s\r\n", Command);
-								system(Command);*/
-								//
-								// Check if the owner process of this suspicion has clr.dll loaded - if it does, scan its .data for references to this region
-								//
-								/*
-								PeVm::Body* PeEntity;
+							else if (find(Filters.begin(), Filters.end(), Filter_t::ClrPrvRwxRegion) != Filters.end()) {
+								if ((*SuspItr)->GetProcess()->CheckDotNetAffiliation(static_cast<uint8_t*>((*SuspItr)->GetSubregion()->GetBasic()->BaseAddress), (*SuspItr)->GetSubregion()->GetBasic()->RegionSize)) {
+									bReWalkMap = true;
+									RefSuspList.erase(SuspItr);
 
-								if ((PeEntity = (*SuspItr)->GetProcess()->GetLoadedModule(L"clr.dll")) != nullptr) {
-									Interface::Log(VerbosityLevel::Surface, "... found private +x region at 0x%p within process with clr.dll loaded.\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
-									PeVm::Section *DataSect = PeEntity->GetSection(".data");
+									if (!RefSuspList.size()) {
+										//
+										// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
+										//
 
-									if (DataSect != nullptr) {
-										Interface::Log(VerbosityLevel::Surface, "... clr.dll .data section located at 0x%p\r\n", DataSect->GetStartVa());
-										uint8_t* Buf = new uint8_t[DataSect->GetEntitySize()];
+										RefSbMap.erase(SbMapItr);
 
-										if (ReadProcessMemory((*SuspItr)->GetProcess()->GetHandle(), DataSect->GetStartVa(), Buf, DataSect->GetEntitySize(), nullptr)) {
-											uint32_t dwChunkSize = 4;
-											uint32_t dwChunkCount = (DataSect->GetEntitySize() / dwChunkSize);
-											Interface::Log(VerbosityLevel::Surface, "... successfully read %d bytes of .data section memory\r\n", DataSect->GetEntitySize());
-
-											for (uint32_t dwX = 0; dwX < DataSect->GetEntitySize(); dwX += dwChunkSize) {
-												if (*(uint32_t*)&Buf[dwX] == reinterpret_cast<uint32_t>((*SuspItr)->GetSubregion()->GetBasic()->BaseAddress)) {
-													Interface::Log(VerbosityLevel::Surface, "... found private executable region address 0x%p at 0x%p (offset 0x%08x) in clr.dll .data section\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress, static_cast<uint8_t *>(const_cast<void*>(DataSect->GetStartVa())) + dwX, dwX);
-												}
-											}
+										if (!RefSbMap.size()) {
+											SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
 										}
-
-										delete[] Buf;
-
-										//system("pause");
 									}
-								}*/
+								}
 							}
 						}
 
@@ -548,18 +528,17 @@ template<typename Address_t> int32_t ScanChunkForAddress(uint8_t *pBuf, uint32_t
 }
 
 
-int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t*>> &ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
+int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t*>> &ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const {
 	int32_t nRefTotal = 0;
 
 	for (map<uint8_t*, Entity*>::const_iterator EntItr = this->Entities.begin(); EntItr != this->Entities.end(); ++EntItr) {
 		vector<Subregion*> Subregions = EntItr->second->GetSubregions();
 
 		for (vector<Subregion*>::const_iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
-			//if ((*SbrItr)->GetBasic()->Type == MEM_MAPPED && (*SbrItr)->GetBasic()->Protect == PAGE_READONLY) continue; // Optimize out readonly mapped files (these can be fonts, .dat, etc. which can produce false positive and waste scanner time)
-			if((*SbrItr)->GetBasic()->Protect == PAGE_READONLY) continue; 
 			uint8_t* pDmpBuf = nullptr;
 			uint32_t dwDmpSize = 0;
 
+			if ((*SbrItr)->GetBasic()->Protect == PAGE_READONLY) continue;
 			if ((*SbrItr)->GetBasic()->State != MEM_COMMIT) continue;
 
 			if (DmpCtx.Create((*SbrItr)->GetBasic(), &pDmpBuf, &dwDmpSize)) {
@@ -594,52 +573,17 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 	return nRefTotal;
 }
 
-/*
-int32_t Process::SearchClrDllDataReferences(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
-	int32_t nRefTotal = 0;
-
-	PeVm::Body* PeEntity = this->GetLoadedModule(L"clr.dll");
-
-	if (PeEntity != nullptr) {
-		//Interface::Log(VerbosityLevel::Surface, "... found private +x region at 0x%p within process with clr.dll loaded.\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
-		PeVm::Section* DataSect = PeEntity->GetSection(".data");
-
-		if (DataSect != nullptr) {
-			//Interface::Log(VerbosityLevel::Surface, "... clr.dll .data section located at 0x%p\r\n", DataSect->GetStartVa());
-			uint8_t* Buf = new uint8_t[DataSect->GetEntitySize()];
-
-			if (ReadProcessMemory(this->GetHandle(), DataSect->GetStartVa(), Buf, DataSect->GetEntitySize(), nullptr)) {
-				int32_t nOffset;
-				//Interface::Log("... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
-
-				if ((nOffset = ScanChunkForAddress<uint64_t>(Buf, DataSect->GetEntitySize(), pReferencedAddress, dwRegionSize)) != -1) {
-					//Interface::Log(VerbosityLevel::Surface, "... found private executable region address 0x%p at 0x%p (offset 0x%08x) in clr.dll .data sectio\r\n",
-					//	pReferencedAddress, (uint8_t *)DataSect->GetStartVa() + nOffset, nOffset);
-					nRefTotal++;
-				}
-			}
-
-			delete[] Buf;
-		}
-	}
-
-	return nRefTotal;
-}
-*/
-int32_t Process::SearchDllDataReferences(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
+int32_t Process::SearchDllDataReferences(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const {
 	int32_t nRefTotal = 0;
 
 	for (map<uint8_t*, Entity*>::const_iterator EntItr = this->Entities.begin(); EntItr != this->Entities.end(); ++EntItr) {
 		if (EntItr->second->GetType() == Entity::Type::PE_FILE) {
 			PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(EntItr->second);
 
-			// https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/debugging-managed-code provides chart of CLR versions of their DLL: only mscorwks.dll and clr.dll are used.
-			if (PeEntity != nullptr && (_wcsicmp(PeEntity->GetPebModule().GetName().c_str(), L"clr.dll") == 0 || _wcsicmp(PeEntity->GetPebModule().GetName().c_str(), L"mscorwks.dll")) == 0) {
-				//Interface::Log(VerbosityLevel::Surface, "... found private +x region at 0x%p within process with clr.dll loaded.\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
+			if (PeEntity != nullptr && (_wcsicmp(PeEntity->GetPebModule().GetName().c_str(), L"clr.dll") == 0 || _wcsicmp(PeEntity->GetPebModule().GetName().c_str(), L"mscorwks.dll") == 0)) { // https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/debugging-managed-code provides chart of CLR versions of their DLL: only mscorwks.dll and clr.dll are used.
 				PeVm::Section* DataSect = PeEntity->GetSection(".data");
 
 				if (DataSect != nullptr) {
-					//Interface::Log(VerbosityLevel::Surface, "... clr.dll .data section located at 0x%p\r\n", DataSect->GetStartVa());
 					uint8_t* Buf = new uint8_t[DataSect->GetEntitySize()];
 
 					if (ReadProcessMemory(this->GetHandle(), DataSect->GetStartVa(), Buf, DataSect->GetEntitySize(), nullptr)) {
@@ -663,61 +607,23 @@ int32_t Process::SearchDllDataReferences(const uint8_t* pReferencedAddress, cons
 	return nRefTotal;
 }
 
-int32_t Process::DotNetModuleRef(map <uint8_t*, vector<uint8_t*>> &ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
-	int32_t nRefTotal = 0;
-
-	for (map <uint8_t*, vector<uint8_t*>>::const_iterator RefItr = ReferencesMap.begin(); RefItr != ReferencesMap.end(); ++RefItr) {
-		if (this->Entities.find(RefItr->first) != this->Entities.end()) {
-			auto EntMapItr = this->Entities.at(RefItr->first);
-			PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(EntMapItr);
-
-			if (PeEntity != nullptr) {
-				PeVm::Section* DataSect = PeEntity->GetSection(".data");
-
-				if (DataSect != nullptr) {
-
-					Interface::Log(VerbosityLevel::Surface, "... private +x at 0x%p was referenced by .data of module: %ws\r\n", RefItr->first, PeEntity->GetPebModule().GetName().c_str());
-				}
-				nRefTotal++;
-			}
-		}
-	}
-
-	return nRefTotal;
-}
-
-int32_t Process::SearchDataRefAllocBases(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
+bool Process::CheckDotNetAffiliation(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const {
 	int32_t nRefTotal = 0;
 	map <uint8_t*, vector<uint8_t*>> PrvXRefMap;
-	//bool bModuleRef = false;
 
 	if (this->SearchReferences(*this->DmpCtx, PrvXRefMap, pReferencedAddress, dwRegionSize) > 0) {
-		//EnumReferencesMap(PrvXRefMap);
-
-		//if ((nRefTotal = DotNetModuleRef(PrvXRefMap, pReferencedAddress, dwRegionSize)) <= 0) {
 		if(!(nRefTotal = SearchDllDataReferences(pReferencedAddress, dwRegionSize))) {
 			for (map <uint8_t*, vector<uint8_t*>>::const_iterator RefItr = PrvXRefMap.begin(); RefItr != PrvXRefMap.end(); ++RefItr) {
 				map <uint8_t*, vector<uint8_t*>> RefMap;
-				//this->SearchReferences(*this->DmpCtx, RefMap, RefItr->first, 0);
+
 				if(SearchDllDataReferences(RefItr->first, 0)){
-				//if (DotNetModuleRef(RefMap, pReferencedAddress, dwRegionSize) > 0) {
-					printf("!! prv +x 0x%p referenced by 0x%p which is referenced by a .NET .data module\r\n", pReferencedAddress, RefItr->first);
 					nRefTotal++;
 				}
 			}
 		}
 	}
-	else {
-		printf("no references at all to 0x%p(+%d)\r\n", pReferencedAddress, dwRegionSize); // There is only 1
-		system("pause");
-	}
 
-	// Build a reference map for each private RWX
-	// In the event it is referenced by the .data section of a PE image, consider it .NET
-	// No references at all? It is truly unknown
-	// In the event it is not referenced by any .data, build a ref map for each region that does reference it and check if any of the referencing regions are references by a .data
-	// Ref regions are not referenced by .data? Truly unknown (or could recursive scan)
-	return nRefTotal;
+	return nRefTotal > 0 ? true : false;
 }
 
 /*  vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx)

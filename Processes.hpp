@@ -62,10 +62,9 @@ namespace Processes {
 		BOOL IsWow64() const { return this->Wow64; }
 		Process(uint32_t);
 		std::vector<Memory::Subregion*> Enumerate(ScannerContext &ScannerCtx);
-		int32_t SearchDataRefAllocBases(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize);
-		int32_t SearchDllDataReferences(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize);
-		int32_t DotNetModuleRef(std::map <uint8_t*, std::vector<uint8_t*>>& ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize);
-		int32_t SearchReferences(MemDump &DmpCtx, std::map <uint8_t*, std::vector<uint8_t*>> &ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize);
+		bool CheckDotNetAffiliation(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
+		int32_t SearchDllDataReferences(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
+		int32_t SearchReferences(MemDump &DmpCtx, std::map <uint8_t*, std::vector<uint8_t*>> &ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
 		~Process();
 	};
 }

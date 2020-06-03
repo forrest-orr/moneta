@@ -68,7 +68,7 @@ void ScanPrvRwx(Processes::Process * ProcessObj) {
 				system(Command);
 
 				//if (ProcessObj->SearchDataRefAllocBases(static_cast<const uint8_t*>(EntItr->second->GetStartVa()), 0) > 0) {
-				if (ProcessObj->SearchDataRefAllocBases(static_cast<const uint8_t*>(EntItr->second->GetStartVa()), EntItr->second->GetEntitySize()) > 0) {
+				if (ProcessObj->CheckDotNetAffiliation(static_cast<const uint8_t*>(EntItr->second->GetStartVa()), EntItr->second->GetEntitySize()) > 0) {
 					Interface::Log(VerbosityLevel::Surface, "... private executable region at 0x%p has references within .data section\r\n", EntItr->second->GetStartVa());
 				}
 				else {
@@ -247,7 +247,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				int32_t nDotNetVersion = QueryDotNetVersion(dwSelectedPid);
 				void* pMscordacwksDllBase = LoadMscordacwksDll(nDotNetVersion, false); // Wow64 for the current process, not the target process since it is this tool itself which must load the DAC DLL
 				//EnumerateClrMemoryRegions(&TargetProc, (HMODULE)pMscordacwksDllBase);
-				ScanPrvRwx(&TargetProc);
+				//ScanPrvRwx(&TargetProc);
 				vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(ScannerCtx);
 
 				if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
