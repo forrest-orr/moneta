@@ -26,7 +26,7 @@ namespace Processes {
 		const void* GetEntryPoint() const { return this->StartAddress; }
 		const void* GetStackAddress() const { return this->StackAddress; }
 		const void* GetTebAddress() const { return this->TebAddress; }
-		void SetEntryPoint(const void*);
+		//void SetEntryPoint(const void*);
 		HANDLE GetHandle() const { return this->Handle; }
 		Thread(uint32_t dwTid, Processes::Process& OwnerProc);
 		~Thread();
@@ -48,6 +48,7 @@ namespace Processes {
 		std::vector<Thread*> Threads;
 		std::vector<void*> Heaps;
 		MemDump* DmpCtx;
+		uint32_t ClrVersion;
 		std::map<uint8_t*, Memory::Entity*> Entities; // A region can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
 	public:
 		HANDLE GetHandle() const { return this->Handle; }
@@ -60,6 +61,7 @@ namespace Processes {
 		Memory::PeVm::Body* GetLoadedModule(std::wstring Name) const;
 		bool DumpBlock(MemDump& ProcDmp, const MEMORY_BASIC_INFORMATION* Mbi, std::wstring Indent);
 		BOOL IsWow64() const { return this->Wow64; }
+		uint32_t GetClrVersion() const { return this->ClrVersion; }
 		Process(uint32_t);
 		std::vector<Memory::Subregion*> Enumerate(ScannerContext &ScannerCtx);
 		bool CheckDotNetAffiliation(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;

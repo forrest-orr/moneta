@@ -734,7 +734,14 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 				Interface::Log(" : ");
 				Interface::Log(ConsoleColor::Turquoise, "%ws", this->IsWow64() ? L"Wow64" : L"x64");
 				Interface::Log(" : ");
-				Interface::Log(ConsoleColor::Turquoise, "%ws\r\n", this->ImageFilePath.c_str());
+				Interface::Log(ConsoleColor::Turquoise, "%ws", this->ImageFilePath.c_str());
+
+				if (this->GetClrVersion()) {
+					Interface::Log(" : ");
+					Interface::Log(ConsoleColor::Turquoise, "CLR v%d", this->GetClrVersion());
+				}
+
+				Interface::Log("\r\n");
 				bShownProc = true;
 			}
 
