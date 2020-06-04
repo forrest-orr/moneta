@@ -103,8 +103,11 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 
 			int32_t nClrVersion = QueryDotNetVersion(this->Pid);
 
-			if (nClrVersion > 0) {
+			if (nClrVersion != -1) {
 				this->ClrVersion = nClrVersion;
+			}
+			else {
+				this->ClrVersion = 0;
 			}
 
 			this->DmpCtx = new MemDump(this->Handle, this->Pid);
