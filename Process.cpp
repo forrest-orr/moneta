@@ -101,8 +101,13 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				}
 			}
 
+			int32_t nClrVersion = QueryDotNetVersion(this->Pid);
+
+			if (nClrVersion > 0) {
+				this->ClrVersion = nClrVersion;
+			}
+
 			this->DmpCtx = new MemDump(this->Handle, this->Pid);
-			this->ClrVersion = QueryDotNetVersion(this->Pid);
 
 			//
 			// CreateToolhelp32Snapshot doesn't work work cross-arhitecture heap enumeration - use the PEB to walk the heaps. Note that it was confirmed private +RWX entries in .NET process (other than executable primary heaps) are not sub-heaps which can be enumerated with Heap32First/Next

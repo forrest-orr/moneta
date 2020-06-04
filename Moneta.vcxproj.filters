@@ -66,6 +66,9 @@
     <ClCompile Include="Process.cpp">
       <Filter>Source Files\Classes\Processes</Filter>
     </ClCompile>
+    <ClCompile Include="DotNetNative.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FileIo.hpp">
@@ -106,6 +109,9 @@
     </ClInclude>
     <ClInclude Include="Scanner.hpp">
       <Filter>Header Files\Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="DotNetNative.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
