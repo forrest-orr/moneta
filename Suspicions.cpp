@@ -44,7 +44,7 @@ wstring Suspicion::GetDescription() const {
 	switch (this->SuspicionType) {
 	case MODIFIED_CODE: return L"Modified code";
 	case UNSIGNED_MODULE: return L"Unsigned module";
-	case MISSING_PEB_MODULE: return L"Missing PEB module";
+	case MISSING_PEB_ENTRY: return L"Missing PEB module";
 	case MISMATCHING_PEB_MODULE: return L"Mismatching PEB module";
 	case MODIFIED_HEADER: return L"Modified PE header";
 	case DISK_PERMISSION_MISMATCH: return L"Inconsistent +x between disk and memory";
@@ -101,7 +101,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 				}
 
 				if (!PeEntity->GetPebModule().Exists()) {
-					AbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, nullptr, MISSING_PEB_MODULE));
+					AbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, nullptr, MISSING_PEB_ENTRY));
 				}
 				else {
 					if (_wcsicmp(PeEntity->GetPebModule().GetPath().c_str(), PeEntity->GetFileBase()->GetPath().c_str()) != 0) { // Since the PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx, there may be a PEB link with a base address matching this image region but with a misleading name/path

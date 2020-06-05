@@ -391,7 +391,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 
 						break;
 					}
-					case Suspicion::Type::MISSING_PEB_MODULE: {
+					case Suspicion::Type::MISSING_PEB_ENTRY: {
 						/* Filter cases for missing PEB modules:
 						   
 						   Signed metadata PEs. These appear in the C:\Windows\System32\WinMetadata folder with the .winmd extension. They've also been noted to appear in WindpwsApps, SystemApps and others.
