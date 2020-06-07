@@ -96,7 +96,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 			PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(&ParentObj);
 
 			if (!PeEntity->IsNonExecutableImage()) {
-				if (!PeEntity->IsSigned()) {
+				if (!PeEntity->GetFileBase()->IsPhantom() && !PeEntity->IsSigned()) {
 					AbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, nullptr, UNSIGNED_MODULE));
 				}
 

@@ -796,7 +796,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 				AlignName(ImgType, AlignedImgType, 21);
 				Interface::Log(ConsoleColor::Gold, "%ws", AlignedImgType);
 
-				if (PeEntity->GetFileBase() != nullptr) {
+				if (!PeEntity->GetFileBase()->IsPhantom()) {
 					Interface::Log("| %ws", PeEntity->GetFileBase()->GetPath().c_str());
 				}
 			}
