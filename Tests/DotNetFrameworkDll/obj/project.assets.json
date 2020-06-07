@@ -180,17 +180,21 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\Developer\\.nuget\\packages\\": {}
+    "C:\\Users\\Developer\\.nuget\\packages\\": {},
+    "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Developer\\Desktop\\Github\\moneta\\Tests\\DotNetFrameworkDll\\DotNetFrameworkDll.csproj",
+      "projectUniqueName": "C:\\Users\\Developer\\Documents\\GitHub\\moneta\\Tests\\DotNetFrameworkDll\\DotNetFrameworkDll.csproj",
       "projectName": "DotNetFrameworkDll",
-      "projectPath": "C:\\Users\\Developer\\Desktop\\Github\\moneta\\Tests\\DotNetFrameworkDll\\DotNetFrameworkDll.csproj",
+      "projectPath": "C:\\Users\\Developer\\Documents\\GitHub\\moneta\\Tests\\DotNetFrameworkDll\\DotNetFrameworkDll.csproj",
       "packagesPath": "C:\\Users\\Developer\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Developer\\Desktop\\Github\\moneta\\Tests\\DotNetFrameworkDll\\obj\\",
+      "outputPath": "C:\\Users\\Developer\\Documents\\GitHub\\moneta\\Tests\\DotNetFrameworkDll\\obj\\",
       "projectStyle": "PackageReference",
+      "fallbackFolders": [
+        "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder"
+      ],
       "configFilePaths": [
         "C:\\Users\\Developer\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
@@ -233,7 +237,7 @@
         ],
         "assetTargetFallback": true,
         "warn": true,
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\3.1.201\\RuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\3.1.300\\RuntimeIdentifierGraph.json"
       }
     }
   }
