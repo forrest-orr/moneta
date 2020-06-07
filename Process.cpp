@@ -769,15 +769,20 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 
 				wcscpy_s(ImgType, 22, L" ");
 
-				if (PeEntity->GetPeFile()->IsDotNet()) {
-					wcscat_s(ImgType, 22, L".NET ");
-				}
+				if (PeEntity->GetPeFile() != nullptr) {
+					if (PeEntity->GetPeFile()->IsDotNet()) {
+						wcscat_s(ImgType, 22, L".NET ");
+					}
 
-				if (PeEntity->GetPeFile()->IsExe()) {
-					wcscat_s(ImgType, 22, L"EXE ");
+					if (PeEntity->GetPeFile()->IsExe()) {
+						wcscat_s(ImgType, 22, L"EXE ");
+					}
+					else if (PeEntity->GetPeFile()->IsDll()) {
+						wcscat_s(ImgType, 22, L"DLL ");
+					}
 				}
-				else if (PeEntity->GetPeFile()->IsDll()) {
-					wcscat_s(ImgType, 22, L"DLL ");
+				else {
+					wcscat_s(ImgType, 22, L"Phantom ");
 				}
 
 				if (PeEntity->IsNonExecutableImage()) {
@@ -790,7 +795,10 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 
 				AlignName(ImgType, AlignedImgType, 21);
 				Interface::Log(ConsoleColor::Gold, "%ws", AlignedImgType);
-				Interface::Log("| %ws", PeEntity->GetFileBase()->GetPath().c_str());
+
+				if (PeEntity->GetFileBase() != nullptr) {
+					Interface::Log("| %ws", PeEntity->GetFileBase()->GetPath().c_str());
+				}
 			}
 			else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
 				Interface::Log("| ");
