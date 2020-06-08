@@ -52,6 +52,7 @@ wstring Suspicion::GetDescription() const {
 	case PHANTOM_IMAGE: return L"Phantom image";
 	case XPRV: return L"Abnormal executable memory type";
 	case NON_IMAGE_THREAD: return L"Thread within non-image memory region";
+	case NON_IMAGE_IMAGEBASE: return L"Non-image primary image base";
 	default: return L"?";
 	}
 }
@@ -170,6 +171,10 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 					SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbrItr, XMAP));
 				}
 
+				if (((*SbrItr)->GetFlags() & MEMORY_SUBREGION_FLAG_BASE_IMAGE)) {
+					SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbrItr, NON_IMAGE_IMAGEBASE));
+				}
+
 				if (SbSuspList.size()) {
 					RefSbMap.insert(make_pair(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), SbSuspList));
 				}
@@ -185,6 +190,10 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 					list<Suspicion *> SbSuspList;
 					if (Subregion::PageExecutable((*SbrItr)->GetBasic()->Protect)) {
 						SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbrItr, XPRV));
+					}
+
+					if (((*SbrItr)->GetFlags() & MEMORY_SUBREGION_FLAG_BASE_IMAGE)) {
+						SbSuspList.push_back(new Suspicion(&ParentProc, &ParentObj, *SbrItr, NON_IMAGE_IMAGEBASE));
 					}
 
 					vector<Processes::Thread*> Threads = ParentProc.GetThreads();
