@@ -42,12 +42,28 @@ void PermissionRecord::UpdateMap(vector<Subregion*> SubregionRecords) {
 		}
 
 		map<uint32_t, uint32_t>& CountMap = PermissionMap->at((*RecordItr)->GetBasic()->Type);
+		uint32_t PagePermissions[] = {
+			PAGE_READONLY,
+			PAGE_READWRITE,
+			PAGE_EXECUTE_READ,
+			PAGE_EXECUTE_READWRITE,
+			PAGE_EXECUTE_WRITECOPY,
+			PAGE_WRITECOPY,
+			PAGE_EXECUTE,
+			PAGE_NOACCESS
+		};
 
-		if (!CountMap.count((*RecordItr)->GetBasic()->Protect)) {
-			CountMap.insert(make_pair((*RecordItr)->GetBasic()->Protect, 0));
+		for (uint32_t dwX = 0; dwX < (sizeof(PagePermissions) / sizeof(uint32_t)); dwX++) {
+			if (!CountMap.count(PagePermissions[dwX])) {
+				CountMap.insert(make_pair(PagePermissions[dwX], 0));
+			}
+
+			if (((*RecordItr)->GetBasic()->Protect & PagePermissions[dwX])) {
+				CountMap[PagePermissions[dwX]]++;
+			}
 		}
 
-		CountMap[(*RecordItr)->GetBasic()->Protect]++;
+		//CountMap[(*RecordItr)->GetBasic()->Protect]++;
 	}
 }
 
@@ -73,6 +89,7 @@ void PermissionRecord::ShowRecords() const {
 			else {
 				Interface::Log("    | ");
 			}
+
 			switch (Itr2->first) {
 			case PAGE_READONLY:
 				Interface::Log("PAGE_READONLY: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);

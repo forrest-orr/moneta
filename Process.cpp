@@ -841,13 +841,17 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 					Interface::Log("  |__ Mapped file base: 0x%p\r\n", PeEntity->GetStartVa());
 					Interface::Log("    | Mapped file size: %d\r\n", PeEntity->GetEntitySize());
 					Interface::Log("    | Mapped file path: %ws\r\n", PeEntity->GetFileBase()->GetPath().c_str());
-					Interface::Log("    | Architecture: %ws\r\n", PeEntity->GetPeFile()->IsPe32() ? L"32-bit" : L"64-bit");
-					Interface::Log("    | Size of image: %d\r\n", PeEntity->GetImageSize());
-					Interface::Log("    | PE type: %ws%ws\r\n", PeEntity->GetPeFile()->IsDotNet() ? L".NET " : L"", PeEntity->GetPeFile()->IsDll() ? L"DLL" : L"EXE");
-					Interface::Log("    | Non-executable: %ws\r\n", PeEntity->IsNonExecutableImage() ? L"yes" : L"no");
-					Interface::Log("    | Partially mapped: %ws\r\n", PeEntity->IsPartiallyMapped() ? L"yes" : L"no");
-					Interface::Log("    | Signed: %ws [%ws]\r\n", PeEntity->IsSigned() ? L"yes" : L"no", TranslateSigningType(PeEntity->GetSisningType()));
-					Interface::Log("    | Signing level: %ws\r\n", TranslateSigningLevel(PeEntity->GetSigningLevel()));
+
+					if (PeEntity->GetPeFile() != nullptr) {
+						Interface::Log("    | Architecture: %ws\r\n", PeEntity->GetPeFile()->IsPe32() ? L"32-bit" : L"64-bit");
+						Interface::Log("    | Size of image: %d\r\n", PeEntity->GetImageSize());
+						Interface::Log("    | PE type: %ws%ws\r\n", PeEntity->GetPeFile()->IsDotNet() ? L".NET " : L"", PeEntity->GetPeFile()->IsDll() ? L"DLL" : L"EXE");
+						Interface::Log("    | Non-executable: %ws\r\n", PeEntity->IsNonExecutableImage() ? L"yes" : L"no");
+						Interface::Log("    | Partially mapped: %ws\r\n", PeEntity->IsPartiallyMapped() ? L"yes" : L"no");
+						Interface::Log("    | Signed: %ws [%ws]\r\n", PeEntity->IsSigned() ? L"yes" : L"no", TranslateSigningType(PeEntity->GetSisningType()));
+						Interface::Log("    | Signing level: %ws\r\n", TranslateSigningLevel(PeEntity->GetSigningLevel()));
+					}
+
 					Interface::Log("    |__ PEB module");
 
 					if (PeEntity->GetPebModule().Exists()) {
