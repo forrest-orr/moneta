@@ -73,175 +73,178 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	if (this->Handle != nullptr) {
 		wchar_t ImageName[MAX_PATH + 1] = { 0 }, DevFilePath[MAX_PATH + 1] = { 0 };
 
-		if (GetModuleBaseNameW(this->Handle, nullptr, ImageName, MAX_PATH + 1) && GetProcessImageFileNameW(this->Handle, DevFilePath, sizeof(DevFilePath))) {
+		if (GetModuleBaseNameW(this->Handle, nullptr, ImageName, MAX_PATH + 1) && GetProcessImageFileNameW(this->Handle, DevFilePath, sizeof(DevFilePath))) { // This API uses the image base from the PEB - if it has been moved to a non-image region this call will fail.
 			wchar_t ImageFilePath[MAX_PATH + 1] = { 0 };
 
 			if (FileBase::TranslateDevicePath(DevFilePath, ImageFilePath)) {
 				this->Name = wstring(ImageName);
 				this->ImageFilePath = wstring(ImageFilePath);
-				Interface::Log(VerbosityLevel::Debug, "... mapping address space of PID %d [%ws]\r\n", this->Pid, this->Name.c_str());
-				static IsWow64Process_t IsWow64Process = reinterpret_cast<IsWow64Process_t>(GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process"));
+			}
+		}
 
-				if (IsWow64Process != nullptr) {
-					BOOL bSelfWow64 = FALSE;
+		if (this->Name.empty()) {
+			this->Name = L"Unknown";
+			this->ImageFilePath = L"?";
+		}
 
-					if (IsWow64Process(GetCurrentProcess(), static_cast<PBOOL>(&bSelfWow64))) {
-						if (IsWow64Process(this->Handle, static_cast<PBOOL>(&this->Wow64))) {
-							if (this->IsWow64()) {
-								Interface::Log(VerbosityLevel::Debug, "... PID %d is Wow64\r\n", this->Pid);
-							}
-							else {
-								if (bSelfWow64) {
-									Interface::Log(VerbosityLevel::Debug, "... cannot scan non-Wow64 process from Wow64 Moneta instance\r\n");
-									throw 3;
-								}
-							}
+		Interface::Log(VerbosityLevel::Debug, "... mapping address space of PID %d [%ws]\r\n", this->Pid, this->Name.c_str());
+		static IsWow64Process_t IsWow64Process = reinterpret_cast<IsWow64Process_t>(GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process"));
+
+		if (IsWow64Process != nullptr) {
+			BOOL bSelfWow64 = FALSE;
+
+			if (IsWow64Process(GetCurrentProcess(), static_cast<PBOOL>(&bSelfWow64))) {
+				if (IsWow64Process(this->Handle, static_cast<PBOOL>(&this->Wow64))) {
+					if (this->IsWow64()) {
+						Interface::Log(VerbosityLevel::Debug, "... PID %d is Wow64\r\n", this->Pid);
+					}
+					else {
+						if (bSelfWow64) {
+							Interface::Log(VerbosityLevel::Debug, "... cannot scan non-Wow64 process from Wow64 Moneta instance\r\n");
+							throw 3;
 						}
 					}
-				}
-			}
-
-			int32_t nClrVersion = QueryDotNetVersion(this->Pid);
-
-			if (nClrVersion != -1) {
-				this->ClrVersion = nClrVersion;
-			}
-			else {
-				this->ClrVersion = 0;
-			}
-
-			this->DmpCtx = new MemDump(this->Handle, this->Pid);
-
-			//
-			// CreateToolhelp32Snapshot doesn't work work cross-arhitecture heap enumeration - use the PEB to walk the heaps. Note that it was confirmed private +RWX entries in .NET process (other than executable primary heaps) are not sub-heaps which can be enumerated with Heap32First/Next
-			//
-
-			static NtQueryInformationProcess_t NtQueryInformationProcess = reinterpret_cast<NtQueryInformationProcess_t>(GetProcAddress(GetModuleHandleW(L"Ntdll.dll"), "NtQueryInformationProcess"));
-			NTSTATUS NtStatus;
-			void* RemotePeb = nullptr;
-			uint32_t dwPebSize = 0;
-			PROCESS_BASIC_INFORMATION Pbi = { 0 };
-
-			if (this->IsWow64()) {
-				NtStatus = NtQueryInformationProcess(this->Handle, ProcessWow64Information, &RemotePeb, sizeof(RemotePeb), nullptr);
-			}
-			else {
-				NtStatus = NtQueryInformationProcess(this->Handle, ProcessBasicInformation, &Pbi, sizeof(Pbi), nullptr);
-
-				if (NT_SUCCESS(NtStatus)) {
-					RemotePeb = Pbi.PebBaseAddress;
-				}
-			}
-
-			if (RemotePeb != nullptr) {
-				Interface::Log(VerbosityLevel::Debug, "... PEB of 0x%p\r\n", RemotePeb);
-
-				if (this->IsWow64()) {
-					PEB32* LocalPeb = new PEB32;
-					dwPebSize = sizeof(PEB32);
-
-					if (ReadProcessMemory(this->Handle, RemotePeb, LocalPeb, dwPebSize, nullptr)) {
-						uint32_t dwNumberOfHeaps = LocalPeb->NumberOfHeaps;
-						uint32_t dwHeapsSize = dwNumberOfHeaps * sizeof(uint32_t);
-						uint32_t* Heaps = new uint32_t[dwNumberOfHeaps];
-
-						this->ImageBase = reinterpret_cast<void*>(LocalPeb->ImageBaseAddress);
-						Interface::Log(VerbosityLevel::Debug, "... successfully read remote PEB to local memory (%d heaps) - image base 0x%p\r\n", dwNumberOfHeaps, this->ImageBase);
-
-						if (ReadProcessMemory(this->Handle, reinterpret_cast<void*>(LocalPeb->ProcessHeaps), Heaps, dwHeapsSize, nullptr)) {
-							Interface::Log(VerbosityLevel::Debug, "... successfully read remote heaps to local memory.\r\n");
-
-							for (uint32_t dwX = 0; dwX < dwNumberOfHeaps; dwX++) {
-								Interface::Log(VerbosityLevel::Debug, "... 0x%08x\r\n", Heaps[dwX]);
-								this->Heaps.push_back(reinterpret_cast<void*>(Heaps[dwX]));
-							}
-						}
-					}
-
-					delete LocalPeb;
-				}
-				else {
-					PEB64* LocalPeb = new PEB64;
-					dwPebSize = sizeof(PEB64);
-
-					if (ReadProcessMemory(this->Handle, RemotePeb, LocalPeb, dwPebSize, nullptr)) {
-						uint32_t dwNumberOfHeaps = LocalPeb->NumberOfHeaps;
-						uint32_t dwHeapsSize = dwNumberOfHeaps * sizeof(void*);
-						void** Heaps = new void* [dwNumberOfHeaps];
-
-						this->ImageBase = reinterpret_cast<void*>(LocalPeb->ImageBaseAddress);
-						Interface::Log(VerbosityLevel::Debug, "... successfully read remote PEB to local memory (%d heaps) - image base 0x%p\r\n", dwNumberOfHeaps, this->ImageBase);
-
-						if (ReadProcessMemory(this->Handle, reinterpret_cast<void*>(LocalPeb->ProcessHeaps), Heaps, dwHeapsSize, nullptr)) {
-							Interface::Log(VerbosityLevel::Debug, "... successfully read remote heaps to local memory.\r\n");
-
-							for (uint32_t dwX = 0; dwX < dwNumberOfHeaps; dwX++) {
-								Interface::Log(VerbosityLevel::Debug, "... 0x%p\r\n", Heaps[dwX]);
-								this->Heaps.push_back(Heaps[dwX]);
-							}
-						}
-					}
-
-					delete LocalPeb;
-				}
-			}
-
-			HANDLE hThreadSnap = INVALID_HANDLE_VALUE;
-			THREADENTRY32 ThreadEntry;
-
-			if ((hThreadSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)) != INVALID_HANDLE_VALUE) {
-				ThreadEntry.dwSize = sizeof(THREADENTRY32);
-
-				if (Thread32First(hThreadSnap, &ThreadEntry)) {
-					do {
-						if (ThreadEntry.th32OwnerProcessID == this->Pid) {
-							try {
-								this->Threads.push_back(new Thread(ThreadEntry.th32ThreadID, *this));
-							}
-							catch (int32_t nError) {
-								Interface::Log(VerbosityLevel::Surface, "... failed to query thread information for TID %d in PID %d: cancelling scan of process.\r\n", ThreadEntry.th32ThreadID, this->Pid);
-								throw 2;
-							}
-						}
-					} while (Thread32Next(hThreadSnap, &ThreadEntry));
-				}
-
-				CloseHandle(hThreadSnap);
-				Interface::Log(VerbosityLevel::Debug, "... associated a total of %d threads with the current process.\r\n", this->Threads.size());
-			}
-
-			SIZE_T cbRegionSize = 0;
-			vector<Subregion*> Subregions;
-			vector<Subregion*>::iterator Region;
-
-			for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += cbRegionSize) {
-				MEMORY_BASIC_INFORMATION* Mbi = new MEMORY_BASIC_INFORMATION;
-
-				if (VirtualQueryEx(this->Handle, pBaseAddr, Mbi, sizeof(MEMORY_BASIC_INFORMATION)) == sizeof(MEMORY_BASIC_INFORMATION)) {
-					cbRegionSize = Mbi->RegionSize;
-
-					if (!Subregions.empty()) { // If the subregion list is empty then there is no region base for comparison
-						if (Mbi->AllocationBase != (*Region)->GetBasic()->AllocationBase) {
-							this->Entities.insert(make_pair(static_cast<uint8_t*>((*Region)->GetBasic()->AllocationBase), Entity::Create(*this, Subregions)));
-							Subregions.clear();
-						}
-					}
-
-					Subregions.push_back(new Subregion(*this, Mbi));
-					Region = Subregions.begin(); // This DOES fix a bug.
-				}
-				else {
-					if (!Subregions.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
-						this->Entities.insert(make_pair(static_cast<uint8_t*>((*Region)->GetBasic()->AllocationBase), Entity::Create(*this, Subregions)));
-					}
-
-					delete Mbi;
-					break;
 				}
 			}
 		}
+
+		int32_t nClrVersion = QueryDotNetVersion(this->Pid);
+
+		if (nClrVersion != -1) {
+			this->ClrVersion = nClrVersion;
+		}
 		else {
-			throw 2;
+			this->ClrVersion = 0;
+		}
+
+		this->DmpCtx = new MemDump(this->Handle, this->Pid);
+
+		//
+		// CreateToolhelp32Snapshot doesn't work work cross-arhitecture heap enumeration - use the PEB to walk the heaps. Note that it was confirmed private +RWX entries in .NET process (other than executable primary heaps) are not sub-heaps which can be enumerated with Heap32First/Next
+		//
+
+		static NtQueryInformationProcess_t NtQueryInformationProcess = reinterpret_cast<NtQueryInformationProcess_t>(GetProcAddress(GetModuleHandleW(L"Ntdll.dll"), "NtQueryInformationProcess"));
+		NTSTATUS NtStatus;
+		void* RemotePeb = nullptr;
+		uint32_t dwPebSize = 0;
+		PROCESS_BASIC_INFORMATION Pbi = { 0 };
+
+		if (this->IsWow64()) {
+			NtStatus = NtQueryInformationProcess(this->Handle, ProcessWow64Information, &RemotePeb, sizeof(RemotePeb), nullptr);
+		}
+		else {
+			NtStatus = NtQueryInformationProcess(this->Handle, ProcessBasicInformation, &Pbi, sizeof(Pbi), nullptr);
+
+			if (NT_SUCCESS(NtStatus)) {
+				RemotePeb = Pbi.PebBaseAddress;
+			}
+		}
+
+		if (RemotePeb != nullptr) {
+			Interface::Log(VerbosityLevel::Debug, "... PEB of 0x%p\r\n", RemotePeb);
+
+			if (this->IsWow64()) {
+				PEB32* LocalPeb = new PEB32;
+				dwPebSize = sizeof(PEB32);
+
+				if (ReadProcessMemory(this->Handle, RemotePeb, LocalPeb, dwPebSize, nullptr)) {
+					uint32_t dwNumberOfHeaps = LocalPeb->NumberOfHeaps;
+					uint32_t dwHeapsSize = dwNumberOfHeaps * sizeof(uint32_t);
+					uint32_t* Heaps = new uint32_t[dwNumberOfHeaps];
+
+					this->ImageBase = reinterpret_cast<void*>(LocalPeb->ImageBaseAddress);
+					Interface::Log(VerbosityLevel::Debug, "... successfully read remote PEB to local memory (%d heaps) - image base 0x%p\r\n", dwNumberOfHeaps, this->ImageBase);
+
+					if (ReadProcessMemory(this->Handle, reinterpret_cast<void*>(LocalPeb->ProcessHeaps), Heaps, dwHeapsSize, nullptr)) {
+						Interface::Log(VerbosityLevel::Debug, "... successfully read remote heaps to local memory.\r\n");
+
+						for (uint32_t dwX = 0; dwX < dwNumberOfHeaps; dwX++) {
+							Interface::Log(VerbosityLevel::Debug, "... 0x%08x\r\n", Heaps[dwX]);
+							this->Heaps.push_back(reinterpret_cast<void*>(Heaps[dwX]));
+						}
+					}
+				}
+
+				delete LocalPeb;
+			}
+			else {
+				PEB64* LocalPeb = new PEB64;
+				dwPebSize = sizeof(PEB64);
+
+				if (ReadProcessMemory(this->Handle, RemotePeb, LocalPeb, dwPebSize, nullptr)) {
+					uint32_t dwNumberOfHeaps = LocalPeb->NumberOfHeaps;
+					uint32_t dwHeapsSize = dwNumberOfHeaps * sizeof(void*);
+					void** Heaps = new void* [dwNumberOfHeaps];
+
+					this->ImageBase = reinterpret_cast<void*>(LocalPeb->ImageBaseAddress);
+					Interface::Log(VerbosityLevel::Debug, "... successfully read remote PEB to local memory (%d heaps) - image base 0x%p\r\n", dwNumberOfHeaps, this->ImageBase);
+
+					if (ReadProcessMemory(this->Handle, reinterpret_cast<void*>(LocalPeb->ProcessHeaps), Heaps, dwHeapsSize, nullptr)) {
+						Interface::Log(VerbosityLevel::Debug, "... successfully read remote heaps to local memory.\r\n");
+
+						for (uint32_t dwX = 0; dwX < dwNumberOfHeaps; dwX++) {
+							Interface::Log(VerbosityLevel::Debug, "... 0x%p\r\n", Heaps[dwX]);
+							this->Heaps.push_back(Heaps[dwX]);
+						}
+					}
+				}
+
+				delete LocalPeb;
+			}
+		}
+
+		HANDLE hThreadSnap = INVALID_HANDLE_VALUE;
+		THREADENTRY32 ThreadEntry;
+
+		if ((hThreadSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)) != INVALID_HANDLE_VALUE) {
+			ThreadEntry.dwSize = sizeof(THREADENTRY32);
+
+			if (Thread32First(hThreadSnap, &ThreadEntry)) {
+				do {
+					if (ThreadEntry.th32OwnerProcessID == this->Pid) {
+						try {
+							this->Threads.push_back(new Thread(ThreadEntry.th32ThreadID, *this));
+						}
+						catch (int32_t nError) {
+							Interface::Log(VerbosityLevel::Surface, "... failed to query thread information for TID %d in PID %d: cancelling scan of process.\r\n", ThreadEntry.th32ThreadID, this->Pid);
+							throw 2;
+						}
+					}
+				} while (Thread32Next(hThreadSnap, &ThreadEntry));
+			}
+
+			CloseHandle(hThreadSnap);
+			Interface::Log(VerbosityLevel::Debug, "... associated a total of %d threads with the current process.\r\n", this->Threads.size());
+		}
+
+		SIZE_T cbRegionSize = 0;
+		vector<Subregion*> Subregions;
+		vector<Subregion*>::iterator Region;
+
+		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += cbRegionSize) {
+			MEMORY_BASIC_INFORMATION* Mbi = new MEMORY_BASIC_INFORMATION;
+
+			if (VirtualQueryEx(this->Handle, pBaseAddr, Mbi, sizeof(MEMORY_BASIC_INFORMATION)) == sizeof(MEMORY_BASIC_INFORMATION)) {
+				cbRegionSize = Mbi->RegionSize;
+
+				if (!Subregions.empty()) { // If the subregion list is empty then there is no region base for comparison
+					if (Mbi->AllocationBase != (*Region)->GetBasic()->AllocationBase) {
+						this->Entities.insert(make_pair(static_cast<uint8_t*>((*Region)->GetBasic()->AllocationBase), Entity::Create(*this, Subregions)));
+						Subregions.clear();
+					}
+				}
+
+				Subregions.push_back(new Subregion(*this, Mbi));
+				Region = Subregions.begin(); // This DOES fix a bug.
+			}
+			else {
+				if (!Subregions.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
+					this->Entities.insert(make_pair(static_cast<uint8_t*>((*Region)->GetBasic()->AllocationBase), Entity::Create(*this, Subregions)));
+				}
+
+				delete Mbi;
+				break;
+			}
 		}
 	}
 	else {
