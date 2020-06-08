@@ -154,6 +154,8 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 								Interface::Log(VerbosityLevel::Debug, "... 0x%08x\r\n", Heaps[dwX]);
 								this->Heaps.push_back(reinterpret_cast<void*>(Heaps[dwX]));
 							}
+
+							this->ImageBase = reinterpret_cast<void *>(LocalPeb->ImageBaseAddress);
 						}
 					}
 
@@ -177,6 +179,8 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 								Interface::Log(VerbosityLevel::Debug, "... 0x%p\r\n", Heaps[dwX]);
 								this->Heaps.push_back(Heaps[dwX]);
 							}
+
+							this->ImageBase = reinterpret_cast<void*>(LocalPeb->ImageBaseAddress);
 						}
 					}
 
@@ -482,6 +486,12 @@ int32_t AppendSubregionAttributes(Subregion *Sbr) {
 	if ((Sbr->GetFlags() & MEMORY_SUBREGION_FLAG_DOTNET)) {
 		Interface::Log(" | ");
 		Interface::Log(ConsoleColor::Yellow, ".NET");
+		nCount++;
+	}
+
+	if ((Sbr->GetFlags() & MEMORY_SUBREGION_FLAG_BASE_IMAGE)) {
+		Interface::Log(" | ");
+		Interface::Log(ConsoleColor::Yellow, "Base image");
 		nCount++;
 	}
 

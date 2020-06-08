@@ -49,10 +49,12 @@ namespace Processes {
 		std::vector<void*> Heaps;
 		MemDump* DmpCtx;
 		uint32_t ClrVersion;
+		void* ImageBase;
 		std::map<uint8_t*, Memory::Entity*> Entities; // A region can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
 	public:
 		HANDLE GetHandle() const { return this->Handle; }
 		uint32_t GetPid() const { return this->Pid; }
+		void* GetImageBase() const { return this->ImageBase; }
 		std::vector<void*> GetHeaps() const { return this->Heaps; }
 		std::vector<Thread*> GetThreads() const { return this->Threads; }
 		std::wstring GetName() const { return this->Name; }

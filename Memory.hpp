@@ -2,6 +2,7 @@
 #define MEMORY_SUBREGION_FLAG_STACK 0x2
 #define MEMORY_SUBREGION_FLAG_TEB 0x4
 #define MEMORY_SUBREGION_FLAG_DOTNET 0x8
+#define MEMORY_SUBREGION_FLAG_BASE_IMAGE 0x10
 
 typedef class Thread;
 typedef class MemDump;
