@@ -145,7 +145,8 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 						uint32_t dwHeapsSize = dwNumberOfHeaps * sizeof(uint32_t);
 						uint32_t* Heaps = new uint32_t[dwNumberOfHeaps];
 
-						Interface::Log(VerbosityLevel::Debug, "... successfully read remote PEB to local memory (%d heaps)\r\n", dwNumberOfHeaps);
+						this->ImageBase = reinterpret_cast<void*>(LocalPeb->ImageBaseAddress);
+						Interface::Log(VerbosityLevel::Debug, "... successfully read remote PEB to local memory (%d heaps) - image base 0x%p\r\n", dwNumberOfHeaps, this->ImageBase);
 
 						if (ReadProcessMemory(this->Handle, reinterpret_cast<void*>(LocalPeb->ProcessHeaps), Heaps, dwHeapsSize, nullptr)) {
 							Interface::Log(VerbosityLevel::Debug, "... successfully read remote heaps to local memory.\r\n");
@@ -154,8 +155,6 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 								Interface::Log(VerbosityLevel::Debug, "... 0x%08x\r\n", Heaps[dwX]);
 								this->Heaps.push_back(reinterpret_cast<void*>(Heaps[dwX]));
 							}
-
-							this->ImageBase = reinterpret_cast<void *>(LocalPeb->ImageBaseAddress);
 						}
 					}
 
@@ -170,7 +169,8 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 						uint32_t dwHeapsSize = dwNumberOfHeaps * sizeof(void*);
 						void** Heaps = new void* [dwNumberOfHeaps];
 
-						Interface::Log(VerbosityLevel::Debug, "... successfully read remote PEB to local memory.\r\n");
+						this->ImageBase = reinterpret_cast<void*>(LocalPeb->ImageBaseAddress);
+						Interface::Log(VerbosityLevel::Debug, "... successfully read remote PEB to local memory (%d heaps) - image base 0x%p\r\n", dwNumberOfHeaps, this->ImageBase);
 
 						if (ReadProcessMemory(this->Handle, reinterpret_cast<void*>(LocalPeb->ProcessHeaps), Heaps, dwHeapsSize, nullptr)) {
 							Interface::Log(VerbosityLevel::Debug, "... successfully read remote heaps to local memory.\r\n");
@@ -179,8 +179,6 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 								Interface::Log(VerbosityLevel::Debug, "... 0x%p\r\n", Heaps[dwX]);
 								this->Heaps.push_back(Heaps[dwX]);
 							}
-
-							this->ImageBase = reinterpret_cast<void*>(LocalPeb->ImageBaseAddress);
 						}
 					}
 
@@ -464,7 +462,7 @@ int32_t AppendOverlapSuspicion(map<uint8_t*, list<Suspicion *>>* Suspicions, uin
 
 int32_t AppendSubregionAttributes(Subregion *Sbr) {
 	int32_t nCount = 0;
-
+	
 	if ((Sbr->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP)) {
 		Interface::Log(" | ");
 		Interface::Log(ConsoleColor::Yellow, "Heap");
@@ -491,7 +489,7 @@ int32_t AppendSubregionAttributes(Subregion *Sbr) {
 
 	if ((Sbr->GetFlags() & MEMORY_SUBREGION_FLAG_BASE_IMAGE)) {
 		Interface::Log(" | ");
-		Interface::Log(ConsoleColor::Yellow, "Base image");
+		Interface::Log(ConsoleColor::Yellow, "Primary image base");
 		nCount++;
 	}
 

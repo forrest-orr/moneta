@@ -56,7 +56,7 @@ Subregion::Subregion(Processes::Process &OwnerProc, const MEMORY_BASIC_INFORMATI
 	}
 
 	if (OwnerProc.GetImageBase() >= this->Basic->BaseAddress && OwnerProc.GetImageBase() < (static_cast<uint8_t*>(this->Basic->BaseAddress) + this->Basic->RegionSize)) {
-		this->Flags != MEMORY_SUBREGION_FLAG_BASE_IMAGE;
+		this->Flags |= MEMORY_SUBREGION_FLAG_BASE_IMAGE;
 	}
 
 	if (find(Heaps.begin(), Heaps.end(), Mbi->BaseAddress) != Heaps.end()) {
