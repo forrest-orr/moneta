@@ -445,7 +445,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMa
 	return 0;
 }
 
-int32_t AppendOverlapSuspicion(map<uint8_t*, list<Suspicion *>>* Suspicions, uint8_t *pSbAddress, bool bEntityTop) {
+int32_t AppendOverlapSuspicion(map<uint8_t*, list<Suspicion *>>* Suspicions, uint8_t *pSbAddress, bool bEntityTop, vector<Suspicion*>* SelectedIocs) {
 	int32_t nCount = 0;
 
 	if (Suspicions != nullptr && Suspicions->count(pSbAddress)) {
@@ -454,8 +454,12 @@ int32_t AppendOverlapSuspicion(map<uint8_t*, list<Suspicion *>>* Suspicions, uin
 		for (list<Suspicion *>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
 			if (bEntityTop == (*SuspItr)->IsFullEntitySuspicion()) {
 				Interface::Log(" | ");
-				Interface::Log(ConsoleColor::Red, "%ws", (*SuspItr)->GetDescription().c_str());
+				Interface::Log(ConsoleColor::Red, "%ws", (*SuspItr)->GetDescription((*SuspItr)->GetType()).c_str());
 				nCount++;
+
+				if (SelectedIocs != nullptr) {
+					SelectedIocs->push_back(*SuspItr);
+				}
 			}
 		}
 	}
@@ -681,27 +685,24 @@ bool Process::CheckDotNetAffiliation(const uint8_t* pReferencedAddress, const ui
 	10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
 */
 
-vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
+vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Suspicion*> *SelectedIocs) {
 	bool bShownProc = false;
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
 	//map <uint8_t*, map<uint8_t*, list<Suspicion *>>> SuspicionsMap; // More efficient to only filter this map once. Currently filtering it for every single entity
 	vector<Subregion*> SelectedSbrs;
+	map <uint8_t*, map<uint8_t*, list<Suspicion*>>>* IocMap = new map <uint8_t*, map<uint8_t*, list<Suspicion*>>>();
 	map <uint8_t*, vector<uint8_t *>> ReferencesMap;
-
-	if (ScannerCtx.GetIocMap() == nullptr) {
-		ScannerCtx.SetIocMap(new map <uint8_t*, map<uint8_t*, list<Suspicion*>>>());
-	}
 
 	//
 	// Build suspicions list for following memory selection and apply filters to it.
 	//
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-		Suspicion::InspectEntity(*this, *Itr->second, ScannerCtx.GetIocMap());
+		Suspicion::InspectEntity(*this, *Itr->second, IocMap);
 	}
 
-	if (ScannerCtx.GetIocMap()->size()) {
-		FilterSuspicions(ScannerCtx.GetIocMap(), ScannerCtx.GetFilters());
+	if (IocMap->size()) {
+		FilterSuspicions(IocMap, ScannerCtx.GetFilters());
 	}
 
 	//
@@ -725,13 +726,13 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 	//
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-		auto SuspMapAbItr = ScannerCtx.GetIocMap()->find(static_cast<unsigned char *>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
+		auto SuspMapAbItr = IocMap->find(static_cast<unsigned char *>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
 		auto RefMapAbItr = ReferencesMap.find(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
 		map<uint8_t*, list<Suspicion *>>* SuspSbrMap = nullptr;
 		vector<uint8_t*>* RefSbrVec = nullptr;
 
-		if (SuspMapAbItr != ScannerCtx.GetIocMap()->end()) {
-			SuspSbrMap = &ScannerCtx.GetIocMap()->at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
+		if (SuspMapAbItr != IocMap->end()) {
+			SuspSbrMap = &IocMap->at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
 		}
 
 		if (RefMapAbItr != ReferencesMap.end()) {
@@ -747,7 +748,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 
 		if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::All ||
 			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Block && ((ScannerCtx.GetAddress() >= Itr->second->GetStartVa()) && (ScannerCtx.GetAddress() < Itr->second->GetEndVa()))) ||
-			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious && SuspMapAbItr != ScannerCtx.GetIocMap()->end()) ||
+			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious && SuspMapAbItr != IocMap->end()) ||
 			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Referenced && RefMapAbItr != ReferencesMap.end())) {
 
 			//
@@ -835,7 +836,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 			//
 
 			//AppendSubregionAttributes(Itr->second->GetSubregions().front());
-			ScannerCtx.SetIocCount(ScannerCtx.GetIocCount() + AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t*>(const_cast<void *>(Itr->second->GetStartVa())), true));
+			AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t*>(const_cast<void *>(Itr->second->GetStartVa())), true, SelectedIocs);
 			Interface::Log("\r\n");
 
 			if (Interface::GetVerbosity() == VerbosityLevel::Detail) {
@@ -912,7 +913,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 						if (OverlapSections.empty()) {
 							Interface::Log("    0x%p:0x%08x | %ws | ?        | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
 							AppendSubregionAttributes(*SbrItr);
-							ScannerCtx.SetIocCount(ScannerCtx.GetIocCount() + AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false));
+							AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
 							Interface::Log("\r\n");
 						}
 						else{
@@ -926,7 +927,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 
 								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName, (*SbrItr)->GetPrivateSize());
 								AppendSubregionAttributes(*SbrItr);
-								ScannerCtx.SetIocCount(ScannerCtx.GetIocCount() + AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false));
+								AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
 								Interface::Log("\r\n");
 
 							}
@@ -935,7 +936,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 					else {
 						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
 						AppendSubregionAttributes(*SbrItr);
-						ScannerCtx.SetIocCount(ScannerCtx.GetIocCount() + AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false));
+						AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
 						Interface::Log("\r\n");
 					}
 
@@ -975,5 +976,6 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 		}
 	}
 
+	delete IocMap;
 	return SelectedSbrs;
 }

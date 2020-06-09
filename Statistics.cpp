@@ -131,34 +131,34 @@ void PermissionRecord::ShowRecords() const {
 void IocRecord::ShowRecords() const {
 	int32_t nX = 0;
 
-	Interface::Log("\r\IOC statistics [%d total]\r\n", this->TotalIoc);
+	if (this->TotalIoc) {
+		Interface::Log("\r\IOC statistics [%d total]\r\n", this->TotalIoc);
 
-	for (map<uint32_t, uint32_t>::const_iterator Itr = this->RecordMap->begin(); Itr != this->RecordMap->end(); ++Itr) {
-		if (!nX) {
-			Interface::Log("|__ ");
+		for (map<uint32_t, uint32_t>::const_iterator Itr = this->RecordMap->begin(); Itr != this->RecordMap->end(); ++Itr, nX++) {
+			if (!nX) {
+				Interface::Log("|__ ");
+			}
+			else {
+				Interface::Log("  | ");
+			}
+
+			Interface::Log("%ws: %d (%f%%)\r\n", Suspicion::GetDescription((Suspicion::Type)Itr->first).c_str(), Itr->second, static_cast<float>(Itr->second) / this->TotalIoc * 100.0);
+		}
+	}
+}
+
+void IocRecord::UpdateMap(vector<Suspicion*>* Records) {
+	for (vector<Suspicion*>::const_iterator ListItr = Records->begin(); ListItr != Records->end(); ++ListItr) {
+		if (!this->RecordMap->count((*ListItr)->GetType())) {
+			this->RecordMap->insert(make_pair((*ListItr)->GetType(), 1));
 		}
 		else {
-			Interface::Log("  | ");
+			(*this->RecordMap)[(*ListItr)->GetType()]++;
 		}
 
-		Interface::Log("%ws: %d (%f%%)\r\n", Suspicion::GetDescription((Suspicion::Type)Itr->first), Itr->second, static_cast<float>(Itr->second) / this->TotalIoc * 100.0);
+		this->TotalIoc++;
 	}
 }
-
-void IocRecord::UpdateMap(map <uint8_t*, map<uint8_t*, list<Suspicion*>>>* Records) {
-	for (map <uint8_t*, map<uint8_t*, list<Suspicion*>>>::const_iterator AbMapItr = Records->begin(); AbMapItr != Records->end(); ++AbMapItr) {
-		for (map<uint8_t*, list<Suspicion*>>::const_iterator SbMapItr = AbMapItr->second.begin(); SbMapItr != AbMapItr->second.end(); SbMapItr++) {
-			for (list<Suspicion*>::const_iterator ListItr = SbMapItr->second.begin(); ListItr != SbMapItr->second.end(); ++ListItr) {
-				if (!this->RecordMap->count((*ListItr)->GetType())) {
-					this->RecordMap->insert(make_pair((*ListItr)->GetType(), 1));
-				}
-				else {
-					(*this->RecordMap)[(*ListItr)->GetType()]++;
-				}
-			}
-		}
-	}
-}
-IocRecord::IocRecord(map <uint8_t*, map<uint8_t*, list<Suspicion*>>>* Records) : RecordMap(new map<uint32_t, uint32_t>()) {
+IocRecord::IocRecord(vector<Suspicion*>* Records) : RecordMap(new map<uint32_t, uint32_t>()) {
 	this->UpdateMap(Records);
 }

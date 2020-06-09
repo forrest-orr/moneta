@@ -230,12 +230,18 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		if (ProcType == SelectedProcess_t::SelfPid || ProcType == SelectedProcess_t::SpecificPid) {
 			try {
 				Process TargetProc(dwSelectedPid);
-				vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(ScannerCtx);
+				vector<Suspicion*> SelectedIocs;
+				vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(ScannerCtx, &SelectedIocs);
 
 				if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
 					PermissionRecord* MemPermRec = new PermissionRecord(SelectedSbrs);
-					IocRecord* IocRecords = new IocRecord(ScannerCtx.GetIocMap());
+					IocRecord* IocRecords = new IocRecord(&SelectedIocs);
 					MemPermRec->ShowRecords();
+					IocRecords->ShowRecords();
+				}
+
+				for (vector<Suspicion*>::const_iterator IocItr = SelectedIocs.begin(); IocItr != SelectedIocs.end(); ++IocItr) {
+					delete* IocItr;
 				}
 			}
 			catch (int32_t nError) {
@@ -246,6 +252,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			PROCESSENTRY32W ProcEntry = { 0 };
 			HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 			PermissionRecord* MemPermRec = nullptr;
+			IocRecord* IocRecords = nullptr;
 
 			if (hSnapshot != nullptr) {
 				ProcEntry.dwSize = sizeof(PROCESSENTRY32W);
@@ -254,7 +261,8 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 					do {
 						try {
 							Process TargetProc(ProcEntry.th32ProcessID);
-							vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(ScannerCtx);
+							vector<Suspicion*> SelectedIocs;
+							vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(ScannerCtx, &SelectedIocs);
 
 							if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
 								if (MemPermRec == nullptr) {
@@ -263,6 +271,17 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 								else {
 									MemPermRec->UpdateMap(SelectedSbrs);
 								}
+
+								if (IocRecords == nullptr) {
+									IocRecords = new IocRecord(&SelectedIocs);
+								}
+								else {
+									IocRecords->UpdateMap(&SelectedIocs);
+								}
+							}
+
+							for (vector<Suspicion*>::const_iterator IocItr = SelectedIocs.begin(); IocItr != SelectedIocs.end(); ++IocItr) {
+								delete* IocItr;
 							}
 						}
 						catch (int32_t nError) {
@@ -282,15 +301,14 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			if (MemPermRec != nullptr) {
 				MemPermRec->ShowRecords();
 			}
+
+			if (IocRecords != nullptr) {
+				IocRecords->ShowRecords();
+			}
 		}
 
 		float fElapsedTime = GetTickCount64() - qwStartTick;
 		Interface::Log("\r\n... scan completed (%f second duration)\r\n", fElapsedTime / 1000.0);
-
-		//if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious) {
-			Interface::Log("... total IOC: %d\r\n", ScannerCtx.GetIocCount());
-		//}
-
 		return 1;
 	}
 }

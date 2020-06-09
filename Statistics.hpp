@@ -19,7 +19,7 @@ protected:
 	std::map<uint32_t, uint32_t>* RecordMap; // Key is IOC type, value is count
 	int32_t TotalIoc;
 public:
-	void UpdateMap(std::map <uint8_t*, std::map<uint8_t*, std::list<Suspicion*>>> *Records);
-	IocRecord(std::map <uint8_t*, std::map<uint8_t*, std::list<Suspicion*>>>* Records);
+	void UpdateMap(std::vector<Suspicion*> *Records);
+	IocRecord(std::vector<Suspicion*>* Records);
 	void ShowRecords() const;
 };

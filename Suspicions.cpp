@@ -66,10 +66,10 @@ void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *I
 			printf("  0x%p [%d list elements]\r\n", SbMapItr->first, SbMapItr->second.size());
 			for (list<Suspicion *>::const_iterator ListItr = SbMapItr->second.begin(); ListItr != SbMapItr->second.end(); ++ListItr) {
 				if (!(*ListItr)->IsFullEntitySuspicion()) {
-					printf("    0x%p : %d : %ws\r\n", (*ListItr)->GetSubregion()->GetBasic()->BaseAddress, (*ListItr)->GetType(), (*ListItr)->GetDescription().c_str());
+					printf("    0x%p : %d : %ws\r\n", (*ListItr)->GetSubregion()->GetBasic()->BaseAddress, (*ListItr)->GetType(), (*ListItr)->GetDescription((*ListItr)->GetType()).c_str());
 				}
 				else {
-					printf("    0x%p : %d : %ws : Full entity\r\n", (*ListItr)->GetParentObject()->GetStartVa(), (*ListItr)->GetType(), (*ListItr)->GetDescription().c_str());
+					printf("    0x%p : %d : %ws : Full entity\r\n", (*ListItr)->GetParentObject()->GetStartVa(), (*ListItr)->GetType(), (*ListItr)->GetDescription((*ListItr)->GetType()).c_str());
 				}
 			}
 		}
