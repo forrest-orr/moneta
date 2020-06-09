@@ -157,6 +157,7 @@
     <ClInclude Include="Resources.h" />
     <ClInclude Include="Scanner.hpp" />
     <ClInclude Include="Signing.h" />
+    <ClInclude Include="Statistics.hpp" />
     <ClInclude Include="StdAfx.h" />
     <ClInclude Include="Suspicions.hpp" />
     <ClInclude Include="Typedefs.h" />

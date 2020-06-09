@@ -116,6 +116,9 @@
     <ClInclude Include="Resources.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Statistics.hpp">
+      <Filter>Header Files\Classes</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Moneta.rc">

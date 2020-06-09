@@ -87,10 +87,10 @@ void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>& S
 										   -> Suspicions list
 */
 
-bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, map<uint8_t*, list<Suspicion *>>> &SuspicionsMap) {
+bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMap) {
 	list<Suspicion *> AbSuspList;
-	SuspicionsMap.insert(make_pair(static_cast<unsigned char*>(const_cast<void*>(ParentObj.GetStartVa())), map<uint8_t*, list<Suspicion *>>()));
-	map<uint8_t*, list<Suspicion *>>& RefSbMap = SuspicionsMap.at(static_cast<unsigned char *>(const_cast<void*>(ParentObj.GetStartVa())));
+	IocMap->insert(make_pair(static_cast<unsigned char*>(const_cast<void*>(ParentObj.GetStartVa())), map<uint8_t*, list<Suspicion *>>()));
+	map<uint8_t*, list<Suspicion *>>& RefSbMap = IocMap->at(static_cast<unsigned char *>(const_cast<void*>(ParentObj.GetStartVa())));
 
 	switch (ParentObj.GetType()) {
 		case Entity::Type::PE_FILE: {
@@ -219,7 +219,7 @@ bool Suspicion::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8
 	}
 
 	if (!RefSbMap.size()) {
-		SuspicionsMap.erase(static_cast<unsigned char*>(const_cast<void*>(ParentObj.GetStartVa())));
+		IocMap->erase(static_cast<unsigned char*>(const_cast<void*>(ParentObj.GetStartVa())));
 	}
 
 	return true;

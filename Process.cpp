@@ -299,7 +299,7 @@ void EnumerateThreads(const wstring Indent, vector<Processes::Thread*> Threads) 
 	}
 }
 
-int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&SuspicionsMap, vector<Filter_t> Filters) {
+int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMap, vector<Filter_t> Filters) {
 	bool bReWalkMap = false;
 
 	do {
@@ -315,13 +315,13 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 					 filterable suspicions remaining
 		
 		*/
-		for (map <uint8_t*, map<uint8_t*, list<Suspicion *>>>::const_iterator AbMapItr = SuspicionsMap.begin(); !bReWalkMap && AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
+		for (map <uint8_t*, map<uint8_t*, list<Suspicion *>>>::const_iterator AbMapItr = IocMap->begin(); !bReWalkMap && AbMapItr != IocMap->end(); ++AbMapItr) {
 			/*
 			Region map -> Key [Allocation base]
 							-> Suspicions map -> Key [Subregion address]
 												   -> Suspicions list
 			*/
-			map < uint8_t*, list<Suspicion *>>& RefSbMap = SuspicionsMap.at(AbMapItr->first);
+			map < uint8_t*, list<Suspicion *>>& RefSbMap = IocMap->at(AbMapItr->first);
 			int32_t nSbIndex = 0;
 
 			for (map<uint8_t*, list<Suspicion *>>::const_iterator SbMapItr = AbMapItr->second.begin(); !bReWalkMap && SbMapItr != AbMapItr->second.end(); ++SbMapItr, nSbIndex++) {
@@ -344,7 +344,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 									RefSbMap.erase(SbMapItr);
 
 									if (!RefSbMap.size()) {
-										SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
+										IocMap->erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
 										break;
 									}
 								}
@@ -364,7 +364,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 									RefSbMap.erase(SbMapItr);
 
 									if (!RefSbMap.size()) {
-										SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
+										IocMap->erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
 										//Interface::Log("... .NET affiliation found for suspicion of private +x at 0x%p (erased from suspicions)\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
 									}
 								}
@@ -389,7 +389,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 								RefSbMap.erase(SbMapItr);
 
 								if (!RefSbMap.size()) {
-									SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
+									IocMap->erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
 								}
 							}
 						}
@@ -426,7 +426,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>&Suspic
 											RefSbMap.erase(SbMapItr);
 
 											if (!RefSbMap.size()) {
-												SuspicionsMap.erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
+												IocMap->erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
 											}
 										}
 									}
@@ -684,20 +684,24 @@ bool Process::CheckDotNetAffiliation(const uint8_t* pReferencedAddress, const ui
 vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 	bool bShownProc = false;
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
-	map <uint8_t*, map<uint8_t*, list<Suspicion *>>> SuspicionsMap; // More efficient to only filter this map once. Currently filtering it for every single entity
+	//map <uint8_t*, map<uint8_t*, list<Suspicion *>>> SuspicionsMap; // More efficient to only filter this map once. Currently filtering it for every single entity
 	vector<Subregion*> SelectedSbrs;
 	map <uint8_t*, vector<uint8_t *>> ReferencesMap;
+
+	if (ScannerCtx.GetIocMap() == nullptr) {
+		ScannerCtx.SetIocMap(new map <uint8_t*, map<uint8_t*, list<Suspicion*>>>());
+	}
 
 	//
 	// Build suspicions list for following memory selection and apply filters to it.
 	//
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-		Suspicion::InspectEntity(*this, *Itr->second, SuspicionsMap);
+		Suspicion::InspectEntity(*this, *Itr->second, ScannerCtx.GetIocMap());
 	}
 
-	if (SuspicionsMap.size()) {
-		FilterSuspicions(SuspicionsMap, ScannerCtx.GetFilters());
+	if (ScannerCtx.GetIocMap()->size()) {
+		FilterSuspicions(ScannerCtx.GetIocMap(), ScannerCtx.GetFilters());
 	}
 
 	//
@@ -721,13 +725,13 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 	//
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-		auto SuspMapAbItr = SuspicionsMap.find(static_cast<unsigned char *>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
+		auto SuspMapAbItr = ScannerCtx.GetIocMap()->find(static_cast<unsigned char *>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
 		auto RefMapAbItr = ReferencesMap.find(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
 		map<uint8_t*, list<Suspicion *>>* SuspSbrMap = nullptr;
 		vector<uint8_t*>* RefSbrVec = nullptr;
 
-		if (SuspMapAbItr != SuspicionsMap.end()) {
-			SuspSbrMap = &SuspicionsMap.at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
+		if (SuspMapAbItr != ScannerCtx.GetIocMap()->end()) {
+			SuspSbrMap = &ScannerCtx.GetIocMap()->at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
 		}
 
 		if (RefMapAbItr != ReferencesMap.end()) {
@@ -743,7 +747,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 
 		if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::All ||
 			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Block && ((ScannerCtx.GetAddress() >= Itr->second->GetStartVa()) && (ScannerCtx.GetAddress() < Itr->second->GetEndVa()))) ||
-			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious && SuspMapAbItr != SuspicionsMap.end()) ||
+			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious && SuspMapAbItr != ScannerCtx.GetIocMap()->end()) ||
 			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Referenced && RefMapAbItr != ReferencesMap.end())) {
 
 			//

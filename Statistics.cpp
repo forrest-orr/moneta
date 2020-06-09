@@ -31,6 +31,8 @@ ________________________________________________________________________________
 #include "StdAfx.h"
 #include "Memory.hpp"
 #include "Interface.hpp"
+#include "Suspicions.hpp"
+#include "Statistics.hpp"
 
 using namespace std;
 using namespace Memory;
@@ -123,4 +125,8 @@ void PermissionRecord::ShowRecords() const {
 			Interface::Log("\r\n");
 		}
 	}
+}
+
+IocRecord::IocRecord(map <uint8_t*, map<uint8_t*, list<Suspicion*>>>* Records) {
+	//
 }

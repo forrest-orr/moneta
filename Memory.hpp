@@ -40,15 +40,6 @@ namespace Memory {
 		static bool PageExecutable(uint32_t dwProtect);
 	};
 
-	class PermissionRecord {
-	protected:
-		std::map<uint32_t, std::map<uint32_t, uint32_t>>* PermissionMap; // Primary key is the memory type, secondary map key is the permission attribute (and its pair value is the count).
-	public:
-		void UpdateMap(std::vector<Subregion*> SubregionRecords);
-		PermissionRecord(std::vector<Subregion*> SubregionRecords);
-		void ShowRecords() const;
-	};
-
 	class Entity {
 	protected:
 		std::vector<Subregion*> Subregions;

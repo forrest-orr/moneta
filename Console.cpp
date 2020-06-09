@@ -38,6 +38,7 @@ ________________________________________________________________________________
 #include "Scanner.hpp"
 #include "Privileges.h"
 #include "Resources.h"
+#include "Statistics.hpp"
 
 using namespace std;
 using namespace Memory;
@@ -233,6 +234,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 
 				if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
 					PermissionRecord* MemPermRec = new PermissionRecord(SelectedSbrs);
+					IocRecord* IocRecords = new IocRecord(ScannerCtx.GetIocMap());
 					MemPermRec->ShowRecords();
 				}
 			}

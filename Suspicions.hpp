@@ -17,7 +17,7 @@ protected:
 public:
 	Suspicion::Type GetType() const { return this->SuspicionType; }
 	std::wstring GetDescription() const;
-	static bool InspectEntity(Processes::Process& ParentProc, Memory::Entity& ParentObj, std::map <uint8_t*, std::map<uint8_t*, std::list<Suspicion *>>>& SuspicionsMap);
+	static bool InspectEntity(Processes::Process& ParentProc, Memory::Entity& ParentObj, std::map <uint8_t*, std::map<uint8_t*, std::list<Suspicion *>>> * IocMap);
 	static void EnumerateMap(std::map <uint8_t*, std::map<uint8_t*, std::list<Suspicion *>>>& SuspicionsMap);
 	bool IsFullEntitySuspicion() const { return (this->Sbr == nullptr ? true : false); }
 	Suspicion(Processes::Process* ParentProc, Memory::Entity* Parent, Memory::Subregion* Block, Suspicion::Type Type);
