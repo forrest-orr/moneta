@@ -53,23 +53,106 @@ enum class SelectedProcess_t {
 int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	vector<wstring> Args(&pArgv[0], &pArgv[0 + nArgc]);
 	Interface::Initialize(Args);
-	//for (uint32_t dwX = 0; dwX < 100; dwX++)Interface::Log((ConsoleColor)dwX, "%d ", dwX);
-	//Interface::Log("\r\n");
-	//system("pause");
-	Interface::Log(
-		"   _____                        __          \r\n"
-		"  /     \\   ____   ____   _____/  |______   \r\n"
-		" /  \\ /  \\ /  _ \\ /    \\_/ __ \\   __\\__  \\  \r\n"
-		"/    Y    (  <_> )   |  \\  ___/|  |  / __ \\_\r\n"
-		"\\____|__  /\\____/|___|  /\\___  >__| (____  /\r\n"
-		"        \\/            \\/     \\/          \\/ \r\n"
-		"\r\n"
-		"Moneta v1.0 | Forrest Orr | 2020\r\n\r\n"
-	);
+	SelectedProcess_t ProcType = SelectedProcess_t::InvalidPid;
+	MemorySelection_t MemorySelectionType = MemorySelection_t::Invalid;
+	uint32_t dwSelectedPid = 0, dwRegionSize = 0;
+	uint8_t* pAddress = nullptr;
+	vector<Filter_t> Filters;
+	bool bSuppressBanner = false;
+	uint64_t qwOptFlags = 0;
+
+	for (vector<wstring>::const_iterator i = Args.begin(); i != Args.end(); ++i) {
+		wstring Arg = *i;
+		transform(Arg.begin(), Arg.end(), Arg.begin(), ::tolower);
+
+		if (Arg == L"-p") {
+			if (*(i + 1) == L"self") {
+				ProcType = SelectedProcess_t::SelfPid;
+				dwSelectedPid = GetCurrentProcessId();
+			}
+			else if (*(i + 1) == L"*") {
+				ProcType = SelectedProcess_t::AllPids;
+			}
+			else {
+				ProcType = SelectedProcess_t::SpecificPid;
+				dwSelectedPid = _wtoi((*(i + 1)).c_str());
+			}
+		}
+		else if (Arg == L"-m") {
+			if (*(i + 1) == L"region") {
+				MemorySelectionType = MemorySelection_t::Block;
+			}
+			else if (*(i + 1) == L"*") {
+				MemorySelectionType = MemorySelection_t::All;
+			}
+			else if (*(i + 1) == L"ioc") {
+				MemorySelectionType = MemorySelection_t::Suspicious;
+			}
+			else if (*(i + 1) == L"referenced") {
+				MemorySelectionType = MemorySelection_t::Referenced;
+			}
+		}
+		else if (Arg == L"--address") {
+			pAddress = reinterpret_cast<uint8_t*>(wcstoull((*(i + 1)).c_str(), NULL, 0));
+		}
+		else if (Arg == L"-d") {
+			qwOptFlags |= PROCESS_ENUM_FLAG_MEMDUMP;
+		}
+		else if (Arg == L"--region-size") {
+			dwRegionSize = _wtoi((*(i + 1)).c_str());
+		}
+		else if (Arg == L"--option") {
+			for (vector<wstring>::const_iterator OptZtr = i; OptZtr != Args.end(); ++OptZtr) {
+				wstring OptArg = *OptZtr;
+				transform(OptArg.begin(), OptArg.end(), OptArg.begin(), ::tolower);
+
+				if (OptArg == L"from-base") {
+					qwOptFlags |= PROCESS_ENUM_FLAG_FROM_BASE;
+				}
+				else if (OptArg == L"statistics") {
+					qwOptFlags |= PROCESS_ENUM_FLAG_STATISTICS;
+				}
+				else if (OptArg == L"suppress-banner") {
+					bSuppressBanner = true;
+				}
+			}
+		}
+		else if (Arg == L"--filter") {
+			for (vector<wstring>::const_iterator FilterItr = i; FilterItr != Args.end(); ++FilterItr) {
+				wstring FilterArg = *FilterItr;
+				transform(FilterArg.begin(), FilterArg.end(), FilterArg.begin(), ::tolower);
+
+				if (FilterArg == L"unsigned-modules") {
+					Filters.push_back(Filter_t::UnsignedModules);
+				}
+				else if (FilterArg == L"metadata-modules") {
+					Filters.push_back(Filter_t::MetadataModules);
+				}
+				else if (FilterArg == L"clr-prvx") {
+					Filters.push_back(Filter_t::ClrPrvRwxRegion);
+				}
+				else if (FilterArg == L"clr-heap") {
+					Filters.push_back(Filter_t::ClrPrvRwxHeap);
+				}
+			}
+		}
+	}
+
+	if (!bSuppressBanner) {
+		Interface::Log(
+			"   _____                        __          \r\n"
+			"  /     \\   ____   ____   _____/  |______   \r\n"
+			" /  \\ /  \\ /  _ \\ /    \\_/ __ \\   __\\__  \\  \r\n"
+			"/    Y    (  <_> )   |  \\  ___/|  |  / __ \\_\r\n"
+			"\\____|__  /\\____/|___|  /\\___  >__| (____  /\r\n"
+			"        \\/            \\/     \\/          \\/ \r\n"
+			"\r\n"
+			"Moneta v1.0 | Forrest Orr | 2020\r\n\r\n"
+		);
+	}
 
 	SYSTEM_INFO SystemInfo = { 0 };
 	static IsWow64Process_t IsWow64Process = reinterpret_cast<IsWow64Process_t>(GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process"));
-	uint64_t qwOptFlags = 0;
 	
 	if (IsWow64Process != nullptr) {
 		BOOL bSelfWow64 = FALSE;
@@ -102,86 +185,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		}
 	}
 	else {
-		SelectedProcess_t ProcType = SelectedProcess_t::InvalidPid;
-		MemorySelection_t MemorySelectionType = MemorySelection_t::Invalid;
-		uint32_t dwSelectedPid = 0, dwRegionSize = 0;
-		uint8_t* pAddress = nullptr;
-		vector<Filter_t> Filters;
-
-		for (vector<wstring>::const_iterator i = Args.begin(); i != Args.end(); ++i) {
-			wstring Arg = *i;
-			transform(Arg.begin(), Arg.end(), Arg.begin(), ::tolower);
-
-			if (Arg == L"-p") {
-				if (*(i + 1) == L"self") {
-					ProcType = SelectedProcess_t::SelfPid;
-					dwSelectedPid = GetCurrentProcessId();
-				}
-				else if (*(i + 1) == L"*") {
-					ProcType = SelectedProcess_t::AllPids;
-				}
-				else {
-					ProcType = SelectedProcess_t::SpecificPid;
-					dwSelectedPid = _wtoi((*(i + 1)).c_str());
-				}
-			}
-			else if (Arg == L"-m") {
-				if (*(i + 1) == L"region") {
-					MemorySelectionType = MemorySelection_t::Block;
-				}
-				else if (*(i + 1) == L"*") {
-					MemorySelectionType = MemorySelection_t::All;
-				}
-				else if (*(i + 1) == L"suspicious") {
-					MemorySelectionType = MemorySelection_t::Suspicious;
-				}
-				else if (*(i + 1) == L"referenced") {
-					MemorySelectionType = MemorySelection_t::Referenced;
-				}
-			}
-			else if (Arg == L"--address") {
-				pAddress = reinterpret_cast<uint8_t *>(wcstoull((*(i + 1)).c_str(), NULL, 0));
-			}
-			else if (Arg == L"-d") {
-				qwOptFlags |= PROCESS_ENUM_FLAG_MEMDUMP;
-			}
-			else if (Arg == L"--region-size") {
-				dwRegionSize = _wtoi((*(i + 1)).c_str());
-			}
-			else if (Arg == L"--option") {
-				for (vector<wstring>::const_iterator OptZtr = i; OptZtr != Args.end(); ++OptZtr) {
-					wstring OptArg = *OptZtr;
-					transform(OptArg.begin(), OptArg.end(), OptArg.begin(), ::tolower);
-
-					if (OptArg == L"from-base") {
-						qwOptFlags |= PROCESS_ENUM_FLAG_FROM_BASE;
-					}
-					else if (OptArg == L"statistics") {
-						qwOptFlags |= PROCESS_ENUM_FLAG_STATISTICS;
-					}
-				}
-			}
-			else if (Arg == L"--filter") {
-				for (vector<wstring>::const_iterator FilterItr = i; FilterItr != Args.end(); ++FilterItr) {
-					wstring FilterArg = *FilterItr;
-					transform(FilterArg.begin(), FilterArg.end(), FilterArg.begin(), ::tolower);
-
-					if (FilterArg == L"unsigned-modules") {
-						Filters.push_back(Filter_t::UnsignedModules);
-					}
-					else if (FilterArg == L"metadata-modules") {
-						Filters.push_back(Filter_t::MetadataModules);
-					}
-					else if (FilterArg == L"clr-prvx") {
-						Filters.push_back(Filter_t::ClrPrvRwxRegion);
-					}
-					else if (FilterArg == L"clr-heap") {
-						Filters.push_back(Filter_t::ClrPrvRwxHeap);
-					}
-				}
-			}
-		}
-		
 		//
 		// Validate user input
 		//
@@ -281,6 +284,11 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 
 		float fElapsedTime = GetTickCount64() - qwStartTick;
 		Interface::Log("\r\n... scan completed (%f second duration)\r\n", fElapsedTime / 1000.0);
+
+		if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious) {
+			Interface::Log("... total IOC: %d\r\n", ScannerCtx.GetIocCount());
+		}
+
 		return 1;
 	}
 }

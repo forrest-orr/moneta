@@ -700,6 +700,8 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 		FilterSuspicions(SuspicionsMap, ScannerCtx.GetFilters());
 	}
 
+	ScannerCtx.SetIocCount(SuspicionsMap.size());
+
 	//
 	// Build map of references to user-specified address if applicable for scanner context
 	//

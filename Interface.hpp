@@ -22,6 +22,7 @@ public:
 	static bool Log(ConsoleColor Color, const char* LogFormat, ...);
 	static HANDLE GetOutputHandle() { return Interface::Handle; }
 	static VerbosityLevel GetVerbosity() { return Interface::VerbosityLvl; }
+	static void EnumColors();
 private:
 	static std::wstring LogFilePath;
 	static HANDLE Handle;

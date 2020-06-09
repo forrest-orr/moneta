@@ -122,3 +122,9 @@ bool Interface::Log(ConsoleColor Color, const char* LogFormat, ...) {
 
 	return bWriteSuccess;
 }
+
+void Interface::EnumColors() {
+	for (uint32_t dwX = 0; dwX < 100; dwX++) Interface::Log((ConsoleColor)dwX, "%d ", dwX);
+    Interface::Log("\r\n");
+    system("pause");
+}
