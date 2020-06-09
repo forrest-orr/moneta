@@ -40,8 +40,8 @@ using namespace std;
 using namespace Memory;
 using namespace Processes;
 
-wstring Suspicion::GetDescription() const {
-	switch (this->SuspicionType) {
+wstring Suspicion::GetDescription(Suspicion::Type Type) {
+	switch (Type) {
 	case MODIFIED_CODE: return L"Modified code";
 	case UNSIGNED_MODULE: return L"Unsigned module";
 	case MISSING_PEB_ENTRY: return L"Missing PEB module";
@@ -59,8 +59,8 @@ wstring Suspicion::GetDescription() const {
 
 Suspicion::Suspicion(Process* ParentProc, Entity* ParentObj, Subregion* Block, Suspicion::Type Type) : ParentProcess(ParentProc), ParentObject(ParentObj), Sbr(Block), SuspicionType(Type) {}
 
-void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, list<Suspicion *>>>& SuspicionsMap) {
-	for (map <uint8_t*, map<uint8_t*, list<Suspicion *>>>::const_iterator AbMapItr = SuspicionsMap.begin(); AbMapItr != SuspicionsMap.end(); ++AbMapItr) {
+void Suspicion::EnumerateMap(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMap) {
+	for (map <uint8_t*, map<uint8_t*, list<Suspicion *>>>::const_iterator AbMapItr = IocMap->begin(); AbMapItr != IocMap->end(); ++AbMapItr) {
 		printf("0x%p [%d sblocks]\r\n", AbMapItr->first, AbMapItr->second.size());
 		for (map<uint8_t*, list<Suspicion *>>::const_iterator SbMapItr = AbMapItr->second.begin(); SbMapItr != AbMapItr->second.end(); SbMapItr++) {
 			printf("  0x%p [%d list elements]\r\n", SbMapItr->first, SbMapItr->second.size());
