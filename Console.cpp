@@ -285,9 +285,9 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		float fElapsedTime = GetTickCount64() - qwStartTick;
 		Interface::Log("\r\n... scan completed (%f second duration)\r\n", fElapsedTime / 1000.0);
 
-		if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious) {
+		//if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious) {
 			Interface::Log("... total IOC: %d\r\n", ScannerCtx.GetIocCount());
-		}
+		//}
 
 		return 1;
 	}

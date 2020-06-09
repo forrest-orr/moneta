@@ -700,8 +700,6 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 		FilterSuspicions(SuspicionsMap, ScannerCtx.GetFilters());
 	}
 
-	ScannerCtx.SetIocCount(SuspicionsMap.size());
-
 	//
 	// Build map of references to user-specified address if applicable for scanner context
 	//
@@ -833,7 +831,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 			//
 
 			//AppendSubregionAttributes(Itr->second->GetSubregions().front());
-			AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t*>(const_cast<void *>(Itr->second->GetStartVa())), true);
+			ScannerCtx.SetIocCount(ScannerCtx.GetIocCount() + AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t*>(const_cast<void *>(Itr->second->GetStartVa())), true));
 			Interface::Log("\r\n");
 
 			if (Interface::GetVerbosity() == VerbosityLevel::Detail) {
@@ -910,7 +908,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 						if (OverlapSections.empty()) {
 							Interface::Log("    0x%p:0x%08x | %ws | ?        | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
 							AppendSubregionAttributes(*SbrItr);
-							AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
+							ScannerCtx.SetIocCount(ScannerCtx.GetIocCount() + AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false));
 							Interface::Log("\r\n");
 						}
 						else{
@@ -924,7 +922,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 
 								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName, (*SbrItr)->GetPrivateSize());
 								AppendSubregionAttributes(*SbrItr);
-								AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
+								ScannerCtx.SetIocCount(ScannerCtx.GetIocCount() + AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false));
 								Interface::Log("\r\n");
 
 							}
@@ -933,7 +931,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx) {
 					else {
 						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
 						AppendSubregionAttributes(*SbrItr);
-						AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false);
+						ScannerCtx.SetIocCount(ScannerCtx.GetIocCount() + AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false));
 						Interface::Log("\r\n");
 					}
 
