@@ -154,6 +154,7 @@
     <ClInclude Include="PeFile.hpp" />
     <ClInclude Include="Privileges.h" />
     <ClInclude Include="Processes.hpp" />
+    <ClInclude Include="Resources.h" />
     <ClInclude Include="Scanner.hpp" />
     <ClInclude Include="Signing.h" />
     <ClInclude Include="StdAfx.h" />
@@ -162,6 +163,9 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Moneta.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Usage.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

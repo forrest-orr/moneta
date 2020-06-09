@@ -37,6 +37,7 @@ ________________________________________________________________________________
 #include "MemDump.hpp"
 #include "Scanner.hpp"
 #include "Privileges.h"
+#include "Resources.h"
 
 using namespace std;
 using namespace Memory;
@@ -84,7 +85,21 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	}
 
 	if (nArgc < 5) {
-		Interface::Log("... usage: %ws see README.md\r\n", pArgv[0]);
+		HMODULE	hSelfModule = GetModuleHandleA(nullptr);
+		HRSRC hResourceInfo;
+		HGLOBAL hResourceData;
+		char* pRsrcData = nullptr;
+		uint32_t dwRsrcSize;
+
+		if ((hResourceInfo = FindResourceA(hSelfModule, IDR_USAGE_TEXT_NAME, RT_RCDATA))) {
+			if ((hResourceData = LoadResource(hSelfModule, hResourceInfo))) {
+				dwRsrcSize = SizeofResource(hSelfModule, hResourceInfo);
+				pRsrcData = (char*)LockResource(hResourceData);
+				uint8_t* RsrcBuf = new uint8_t[dwRsrcSize + 1](); // Otherwise the resource text may bleed in to the rest of the .rsrc section
+				memcpy(RsrcBuf, pRsrcData, dwRsrcSize);
+				Interface::Log("%s\r\n", pRsrcData);
+			}
+		}
 	}
 	else {
 		SelectedProcess_t ProcType = SelectedProcess_t::InvalidPid;
@@ -111,7 +126,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				}
 			}
 			else if (Arg == L"-m") {
-				if (*(i + 1) == L"block") {
+				if (*(i + 1) == L"region") {
 					MemorySelectionType = MemorySelection_t::Block;
 				}
 				else if (*(i + 1) == L"*") {
@@ -157,7 +172,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 					else if (FilterArg == L"metadata-modules") {
 						Filters.push_back(Filter_t::MetadataModules);
 					}
-					else if (FilterArg == L"clr-prv-rwx") {
+					else if (FilterArg == L"clr-prvx") {
 						Filters.push_back(Filter_t::ClrPrvRwxRegion);
 					}
 					else if (FilterArg == L"clr-heap") {
