@@ -131,6 +131,9 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				else if (FilterArg == L"clr-heap") {
 					Filters.push_back(Filter_t::ClrPrvRwxHeap);
 				}
+				else if (FilterArg == L"wow64-init") {
+					Filters.push_back(Filter_t::Wow64Init);
+				}
 			}
 		}
 	}

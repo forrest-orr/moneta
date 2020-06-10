@@ -10,7 +10,8 @@ enum class Filter_t {
 	UnsignedModules = 0,
 	MetadataModules,
 	ClrPrvRwxRegion,
-	ClrPrvRwxHeap
+	ClrPrvRwxHeap,
+	Wow64Init
 };
 
 class ScannerContext {
