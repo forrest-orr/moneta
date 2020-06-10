@@ -408,7 +408,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMa
 						*/
 
 						if (find(Filters.begin(), Filters.end(), Filter_t::MetadataModules) != Filters.end()) {
-							const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*SuspItr)->GetParentObject());
+							const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*SuspItr)->GetParentObject()); // By definition this IOC will always have a PE parent object type so there is no need to check its type prior to dynamic casting
 
 							if (PeEntity->IsSigned()) {
 								static const wchar_t* WinmdExt = L".winmd";
@@ -439,14 +439,44 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMa
 					case Suspicion::Type::DISK_PERMISSION_MISMATCH: {
 						if (find(Filters.begin(), Filters.end(), Filter_t::Wow64Init) != Filters.end()) {
 							static const wchar_t* Wow64CpuDll = L"wow64cpu.dll";
-							static const wchar_t* W64SvcSection = L"W64SVC";
-							const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*SuspItr)->GetParentObject());
+							const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*SuspItr)->GetParentObject()); // By definition this IOC will always have a PE parent object type so there is no need to check its type prior to dynamic casting
 
 							if (PeEntity->IsSigned()) {
 								if (wcslen(PeEntity->GetFileBase()->GetPath().c_str()) > wcslen(Wow64CpuDll) && _wcsicmp(PeEntity->GetFileBase()->GetPath().c_str() + wcslen(PeEntity->GetFileBase()->GetPath().c_str()) - wcslen(Wow64CpuDll), Wow64CpuDll) == 0) {
 									PeVm::Section* W64SvcSection = PeEntity->GetSection("W64SVC");
 									if ((*SuspItr)->GetSubregion()->GetBasic()->BaseAddress == W64SvcSection->GetStartVa()) { // There's an edge case where the section preceeding W64SVC is also +x, resulting in the subregion for this IOC starting prior to this section address
 										Interface::Log(VerbosityLevel::Debug, "... found disk permission mismatch suspicion on signed %ws overlapping with W64SVC section at 0x%p\r\n", PeEntity->GetFileBase()->GetPath().c_str(), W64SvcSection->GetStartVa());
+										bReWalkMap = true;
+										RefSuspList.erase(SuspItr);
+
+										if (!RefSuspList.size()) {
+											//
+											// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
+											//
+
+											RefSbMap.erase(SbMapItr);
+
+											if (!RefSbMap.size()) {
+												IocMap->erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
+											}
+										}
+									}
+								}
+							}
+						}
+
+						break;
+					}
+					case Suspicion::Type::MODIFIED_CODE: {
+						if (find(Filters.begin(), Filters.end(), Filter_t::Wow64Init) != Filters.end()) {
+							static const wchar_t* User32Dll = L"user32.dll";
+							const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*SuspItr)->GetParentObject()); // By definition this IOC will always have a PE parent object type so there is no need to check its type prior to dynamic casting
+
+							if ((*SuspItr)->GetProcess()->IsWow64() && PeEntity->IsSigned()) {
+								if (wcslen(PeEntity->GetFileBase()->GetPath().c_str()) > wcslen(User32Dll) && _wcsicmp(PeEntity->GetFileBase()->GetPath().c_str() + wcslen(PeEntity->GetFileBase()->GetPath().c_str()) - wcslen(User32Dll), User32Dll) == 0) {
+									PeVm::Section* W64SvcSection = PeEntity->GetSection(".text");
+									if ((*SuspItr)->GetSubregion()->GetBasic()->BaseAddress == W64SvcSection->GetStartVa()) {
+										Interface::Log(VerbosityLevel::Debug, "... found modified code IOC overlapping with signed %ws .text section at 0x%p\r\n", PeEntity->GetFileBase()->GetPath().c_str(), W64SvcSection->GetStartVa());
 										bReWalkMap = true;
 										RefSuspList.erase(SuspItr);
 
