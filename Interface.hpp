@@ -1,5 +1,6 @@
 enum class VerbosityLevel {
-	Surface = 0,
+	Silent,
+	Surface,
 	Detail,
 	Debug
 };
@@ -18,10 +19,11 @@ public:
 	static void Initialize(VerbosityLevel Vlvl = VerbosityLevel::Surface);
 	static void Initialize(std::vector<std::wstring> &Args);
 	static bool Log(VerbosityLevel MsgVlvl, const char *LogFormat, ...);
-	static bool Log(const char *LogFormat, ...);
-	static bool Log(ConsoleColor Color, const char* LogFormat, ...);
+	//static bool Log(const char *LogFormat, ...);
+	static bool Log(VerbosityLevel MsgVlvl, ConsoleColor Color, const char* LogFormat, ...);
 	static HANDLE GetOutputHandle() { return Interface::Handle; }
 	static VerbosityLevel GetVerbosity() { return Interface::VerbosityLvl; }
+	static void SetVerbosity(VerbosityLevel Vlvl) { Interface::VerbosityLvl = Vlvl; }
 	static void EnumColors();
 private:
 	static std::wstring LogFilePath;

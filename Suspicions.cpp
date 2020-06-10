@@ -48,9 +48,9 @@ wstring Suspicion::GetDescription(Suspicion::Type Type) {
 	case MISMATCHING_PEB_MODULE: return L"Mismatching PEB module";
 	case MODIFIED_HEADER: return L"Modified PE header";
 	case DISK_PERMISSION_MISMATCH: return L"Inconsistent +x between disk and memory";
-	case XMAP: return L"Abnormal executable memory type";
+	case XMAP: return L"Abnormal mapped executable memory";
 	case PHANTOM_IMAGE: return L"Phantom image";
-	case XPRV: return L"Abnormal executable memory type";
+	case XPRV: return L"Abnormal private executable memory";
 	case NON_IMAGE_THREAD: return L"Thread within non-image memory region";
 	case NON_IMAGE_IMAGEBASE: return L"Non-image primary image base";
 	default: return L"?";

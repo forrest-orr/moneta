@@ -47,6 +47,9 @@ void Interface::Initialize(vector<wstring> &Args) {
 			else if (*(i + 1) == L"debug") {
 				VLvl = VerbosityLevel::Debug;
 			}
+			else if (*(i + 1) == L"silent") {
+				VLvl = VerbosityLevel::Silent;
+			}
 		}
 		else if (*i == L"--log-file") {
 			LogFilePath = *(i + 1);
@@ -73,9 +76,9 @@ bool Interface::Log(VerbosityLevel MsgVlvl, const char *LogFormat, ...) {
 		return WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), reinterpret_cast<PDWORD>(&dwBytesWritten), NULL);
 	}
 
-	return FALSE;
+	return false;
 }
-
+/*
 bool Interface::Log(const char *LogFormat, ...) {
 	char LogBuffer[4000] = { 0 };
 	char *pVarList;
@@ -90,41 +93,43 @@ bool Interface::Log(const char *LogFormat, ...) {
 	va_end(pVarList);
 
 	return WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), reinterpret_cast<PDWORD>(&dwBytesWritten), NULL);
-}
+}*/
 
-bool Interface::Log(ConsoleColor Color, const char* LogFormat, ...) {
+bool Interface::Log(VerbosityLevel MsgVlvl, ConsoleColor Color, const char* LogFormat, ...) {
 	char LogBuffer[4000] = { 0 };
 	char* pVarList;
 	uint32_t dwBytesWritten = 0;
 	CONSOLE_SCREEN_BUFFER_INFO ConsoleInfo;
 	WORD wOldAttrib;
-	bool bWriteSuccess;
-	
-	if (Interface::IsStdout) {
-		GetConsoleScreenBufferInfo(Interface::Handle, &ConsoleInfo);
-		wOldAttrib = ConsoleInfo.wAttributes;
-		SetConsoleTextAttribute(Interface::Handle, (WORD)Color);
-	}
+	bool bWriteSuccess = false;
 
-	va_start(pVarList, LogFormat);
+	if (MsgVlvl <= Interface::VerbosityLvl) {
+		if (Interface::IsStdout) {
+			GetConsoleScreenBufferInfo(Interface::Handle, &ConsoleInfo);
+			wOldAttrib = ConsoleInfo.wAttributes;
+			SetConsoleTextAttribute(Interface::Handle, (WORD)Color);
+		}
 
-	if (_vsnprintf_s(LogBuffer, sizeof(LogBuffer), _TRUNCATE, LogFormat, pVarList) == -1) {
-		LogBuffer[sizeof(LogBuffer) - 1] = '\0';
-	}
+		va_start(pVarList, LogFormat);
 
-	va_end(pVarList);
+		if (_vsnprintf_s(LogBuffer, sizeof(LogBuffer), _TRUNCATE, LogFormat, pVarList) == -1) {
+			LogBuffer[sizeof(LogBuffer) - 1] = '\0';
+		}
 
-	bWriteSuccess = WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), reinterpret_cast<PDWORD>(&dwBytesWritten), NULL);
+		va_end(pVarList);
 
-	if (Interface::IsStdout) {
-		SetConsoleTextAttribute(Interface::Handle, wOldAttrib);
+		bWriteSuccess = WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), reinterpret_cast<PDWORD>(&dwBytesWritten), NULL);
+
+		if (Interface::IsStdout) {
+			SetConsoleTextAttribute(Interface::Handle, wOldAttrib);
+		}
 	}
 
 	return bWriteSuccess;
 }
 
 void Interface::EnumColors() {
-	for (uint32_t dwX = 0; dwX < 100; dwX++) Interface::Log((ConsoleColor)dwX, "%d ", dwX);
-    Interface::Log("\r\n");
+	for (uint32_t dwX = 0; dwX < 100; dwX++) Interface::Log(VerbosityLevel::Surface, (ConsoleColor)dwX, "%d ", dwX);
+    Interface::Log(VerbosityLevel::Surface, "\r\n");
     system("pause");
 }

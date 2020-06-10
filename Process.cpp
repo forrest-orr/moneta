@@ -295,7 +295,7 @@ void AlignName(const wchar_t* pOriginalName, wchar_t* pAlignedName, int32_t nAli
 
 void EnumerateThreads(const wstring Indent, vector<Processes::Thread*> Threads) {
 	for (vector<Processes::Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
-		Interface::Log("%wsThread 0x%p [TID 0x%08x]\r\n", Indent.c_str(), (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
+		Interface::Log(VerbosityLevel::Surface, "%wsThread 0x%p [TID 0x%08x]\r\n", Indent.c_str(), (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
 	}
 }
 
@@ -365,12 +365,12 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMa
 
 									if (!RefSbMap.size()) {
 										IocMap->erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
-										//Interface::Log("... .NET affiliation found for suspicion of private +x at 0x%p (erased from suspicions)\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
+										//Interface::Log(VerbosityLevel::Surface, "... .NET affiliation found for suspicion of private +x at 0x%p (erased from suspicions)\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
 									}
 								}
 							}
 							else {
-								//Interface::Log("... no .NET affiliation found for suspicion of private +x at 0x%p\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
+								//Interface::Log(VerbosityLevel::Surface, "... no .NET affiliation found for suspicion of private +x at 0x%p\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
 							}
 						}
 
@@ -453,8 +453,8 @@ int32_t AppendOverlapSuspicion(map<uint8_t*, list<Suspicion *>>* Suspicions, uin
 
 		for (list<Suspicion *>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
 			if (bEntityTop == (*SuspItr)->IsFullEntitySuspicion()) {
-				Interface::Log(" | ");
-				Interface::Log(ConsoleColor::Red, "%ws", (*SuspItr)->GetDescription((*SuspItr)->GetType()).c_str());
+				Interface::Log(VerbosityLevel::Surface, " | ");
+				Interface::Log(VerbosityLevel::Surface, ConsoleColor::Red, "%ws", (*SuspItr)->GetDescription((*SuspItr)->GetType()).c_str());
 				nCount++;
 
 				if (SelectedIocs != nullptr) {
@@ -471,32 +471,32 @@ int32_t AppendSubregionAttributes(Subregion *Sbr) {
 	int32_t nCount = 0;
 	
 	if ((Sbr->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP)) {
-		Interface::Log(" | ");
-		Interface::Log(ConsoleColor::Yellow, "Heap");
+		Interface::Log(VerbosityLevel::Surface, " | ");
+		Interface::Log(VerbosityLevel::Surface, ConsoleColor::Yellow, "Heap");
 		nCount++;
 	}
 
 	if ((Sbr->GetFlags() & MEMORY_SUBREGION_FLAG_TEB)) {
-		Interface::Log(" | ");
-		Interface::Log(ConsoleColor::Yellow, "TEB");
+		Interface::Log(VerbosityLevel::Surface, " | ");
+		Interface::Log(VerbosityLevel::Surface, ConsoleColor::Yellow, "TEB");
 		nCount++;
 	}
 
 	if ((Sbr->GetFlags() & MEMORY_SUBREGION_FLAG_STACK)) {
-		Interface::Log(" | ");
-		Interface::Log(ConsoleColor::Yellow, "Stack");
+		Interface::Log(VerbosityLevel::Surface, " | ");
+		Interface::Log(VerbosityLevel::Surface, ConsoleColor::Yellow, "Stack");
 		nCount++;
 	}
 
 	if ((Sbr->GetFlags() & MEMORY_SUBREGION_FLAG_DOTNET)) {
-		Interface::Log(" | ");
-		Interface::Log(ConsoleColor::Yellow, ".NET");
+		Interface::Log(VerbosityLevel::Surface, " | ");
+		Interface::Log(VerbosityLevel::Surface, ConsoleColor::Yellow, ".NET");
 		nCount++;
 	}
 
 	if ((Sbr->GetFlags() & MEMORY_SUBREGION_FLAG_BASE_IMAGE)) {
-		Interface::Log(" | ");
-		Interface::Log(ConsoleColor::Yellow, "Primary image base");
+		Interface::Log(VerbosityLevel::Surface, " | ");
+		Interface::Log(VerbosityLevel::Surface, ConsoleColor::Yellow, "Primary image base");
 		nCount++;
 	}
 
@@ -524,11 +524,11 @@ bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, ws
 
 	if (Mbi->State == MEM_COMMIT) {
 		if (DmpCtx.Create(Mbi, DmpFilePath, MAX_PATH + 1)) {
-			Interface::Log("%ws~ Memory dumped to %ws\r\n", Indent.c_str(), DmpFilePath);
+			Interface::Log(VerbosityLevel::Surface, "%ws~ Memory dumped to %ws\r\n", Indent.c_str(), DmpFilePath);
 			return true;
 		}
 		else {
-			Interface::Log("%ws~ Memory dump failed.\r\n", Indent.c_str());
+			Interface::Log(VerbosityLevel::Surface, "%ws~ Memory dump failed.\r\n", Indent.c_str());
 		}
 	}
 
@@ -576,7 +576,7 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 
 			if (DmpCtx.Create((*SbrItr)->GetBasic(), &pDmpBuf, &dwDmpSize)) {
 				int32_t nOffset;
-				//Interface::Log("... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
+				//Interface::Log(VerbosityLevel::Surface, "... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
 
 				if((nOffset = ScanChunkForAddress<uint64_t>(pDmpBuf, dwDmpSize, pReferencedAddress, dwRegionSize)) != -1) {
 					//
@@ -621,7 +621,7 @@ int32_t Process::SearchDllDataReferences(const uint8_t* pReferencedAddress, cons
 
 					if (ReadProcessMemory(this->GetHandle(), DataSect->GetStartVa(), Buf, DataSect->GetEntitySize(), nullptr)) {
 						int32_t nOffset;
-						//Interface::Log("... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
+						//Interface::Log(VerbosityLevel::Surface, "... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
 
 						if ((nOffset = ScanChunkForAddress<uint64_t>(Buf, DataSect->GetEntitySize(), pReferencedAddress, dwRegionSize)) != -1) {
 							//Interface::Log(VerbosityLevel::Surface, "... found private executable region address 0x%p at 0x%p (offset 0x%08x) in %ws .data section\r\n",
@@ -756,32 +756,32 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Suspici
 			//
 
 			if (!bShownProc) {
-				Interface::Log("\r\n");
-				Interface::Log(ConsoleColor::Turquoise, "%ws", this->Name.c_str());
-				Interface::Log(" : ");
-				Interface::Log(ConsoleColor::Turquoise, "%d", this->GetPid());
-				Interface::Log(" : ");
-				Interface::Log(ConsoleColor::Turquoise, "%ws", this->IsWow64() ? L"Wow64" : L"x64");
-				Interface::Log(" : ");
-				Interface::Log(ConsoleColor::Turquoise, "%ws", this->ImageFilePath.c_str());
+				Interface::Log(VerbosityLevel::Surface, "\r\n");
+				Interface::Log(VerbosityLevel::Surface, ConsoleColor::Turquoise, "%ws", this->Name.c_str());
+				Interface::Log(VerbosityLevel::Surface, " : ");
+				Interface::Log(VerbosityLevel::Surface, ConsoleColor::Turquoise, "%d", this->GetPid());
+				Interface::Log(VerbosityLevel::Surface, " : ");
+				Interface::Log(VerbosityLevel::Surface, ConsoleColor::Turquoise, "%ws", this->IsWow64() ? L"Wow64" : L"x64");
+				Interface::Log(VerbosityLevel::Surface, " : ");
+				Interface::Log(VerbosityLevel::Surface, ConsoleColor::Turquoise, "%ws", this->ImageFilePath.c_str());
 
 				if (this->GetClrVersion()) {
-					Interface::Log(" : ");
-					Interface::Log(ConsoleColor::Turquoise, "CLR v%d", this->GetClrVersion());
+					Interface::Log(VerbosityLevel::Surface, " : ");
+					Interface::Log(VerbosityLevel::Surface, ConsoleColor::Turquoise, "CLR v%d", this->GetClrVersion());
 				}
 
-				Interface::Log("\r\n");
+				Interface::Log(VerbosityLevel::Surface, "\r\n");
 				bShownProc = true;
 			}
 
 			if (Itr->second->GetSubregions().front()->GetBasic()->State != MEM_FREE) {
-				Interface::Log("  0x%p:0x%08x   ", Itr->second->GetStartVa(), Itr->second->GetEntitySize());
+				Interface::Log(VerbosityLevel::Surface, "  0x%p:0x%08x   ", Itr->second->GetStartVa(), Itr->second->GetEntitySize());
 			}
 
 			if (Itr->second->GetType() == Entity::Type::PE_FILE) {
 				PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 				wchar_t ImgType[22], AlignedImgType[22]; // Length of 20, + 1 for prefix, +1 for null
-				Interface::Log("|");
+				Interface::Log(VerbosityLevel::Surface, "|");
 
 				wcscpy_s(ImgType, 22, L" ");
 
@@ -810,21 +810,21 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Suspici
 
 
 				AlignName(ImgType, AlignedImgType, 21);
-				Interface::Log(ConsoleColor::Gold, "%ws", AlignedImgType);
+				Interface::Log(VerbosityLevel::Surface, ConsoleColor::Gold, "%ws", AlignedImgType);
 
 				if (!PeEntity->GetFileBase()->IsPhantom()) {
-					Interface::Log("| %ws", PeEntity->GetFileBase()->GetPath().c_str());
+					Interface::Log(VerbosityLevel::Surface, "| %ws", PeEntity->GetFileBase()->GetPath().c_str());
 				}
 			}
 			else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
-				Interface::Log("| ");
-				Interface::Log(ConsoleColor::Gold, "Mapped");
-				Interface::Log("   | %ws", dynamic_cast<MappedFile*>(Itr->second)->GetFileBase()->GetPath().c_str());
+				Interface::Log(VerbosityLevel::Surface, "| ");
+				Interface::Log(VerbosityLevel::Surface, ConsoleColor::Gold, "Mapped");
+				Interface::Log(VerbosityLevel::Surface, "   | %ws", dynamic_cast<MappedFile*>(Itr->second)->GetFileBase()->GetPath().c_str());
 			}
 			else {
 				if (Itr->second->GetSubregions().front()->GetBasic()->Type == MEM_PRIVATE) {
-					Interface::Log("| ");
-					Interface::Log(ConsoleColor::Gold, "Private");
+					Interface::Log(VerbosityLevel::Surface, "| ");
+					Interface::Log(VerbosityLevel::Surface, ConsoleColor::Gold, "Private");
 				}
 				else {
 					continue;
@@ -837,44 +837,44 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Suspici
 
 			//AppendSubregionAttributes(Itr->second->GetSubregions().front());
 			AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t*>(const_cast<void *>(Itr->second->GetStartVa())), true, SelectedIocs);
-			Interface::Log("\r\n");
+			Interface::Log(VerbosityLevel::Surface, "\r\n");
 
 			if (Interface::GetVerbosity() == VerbosityLevel::Detail) {
 				if (Itr->second->GetType() == Entity::Type::PE_FILE) {
 					PeVm::Body* PeEntity = dynamic_cast<PeVm::Body*>(Itr->second);
 
-					Interface::Log("  |__ Mapped file base: 0x%p\r\n", PeEntity->GetStartVa());
-					Interface::Log("    | Mapped file size: %d\r\n", PeEntity->GetEntitySize());
-					Interface::Log("    | Mapped file path: %ws\r\n", PeEntity->GetFileBase()->GetPath().c_str());
+					Interface::Log(VerbosityLevel::Surface, "  |__ Mapped file base: 0x%p\r\n", PeEntity->GetStartVa());
+					Interface::Log(VerbosityLevel::Surface, "    | Mapped file size: %d\r\n", PeEntity->GetEntitySize());
+					Interface::Log(VerbosityLevel::Surface, "    | Mapped file path: %ws\r\n", PeEntity->GetFileBase()->GetPath().c_str());
 
 					if (PeEntity->GetPeFile() != nullptr) {
-						Interface::Log("    | Architecture: %ws\r\n", PeEntity->GetPeFile()->IsPe32() ? L"32-bit" : L"64-bit");
-						Interface::Log("    | Size of image: %d\r\n", PeEntity->GetImageSize());
-						Interface::Log("    | PE type: %ws%ws\r\n", PeEntity->GetPeFile()->IsDotNet() ? L".NET " : L"", PeEntity->GetPeFile()->IsDll() ? L"DLL" : L"EXE");
-						Interface::Log("    | Non-executable: %ws\r\n", PeEntity->IsNonExecutableImage() ? L"yes" : L"no");
-						Interface::Log("    | Partially mapped: %ws\r\n", PeEntity->IsPartiallyMapped() ? L"yes" : L"no");
-						Interface::Log("    | Signed: %ws [%ws]\r\n", PeEntity->IsSigned() ? L"yes" : L"no", TranslateSigningType(PeEntity->GetSisningType()));
-						Interface::Log("    | Signing level: %ws\r\n", TranslateSigningLevel(PeEntity->GetSigningLevel()));
+						Interface::Log(VerbosityLevel::Surface, "    | Architecture: %ws\r\n", PeEntity->GetPeFile()->IsPe32() ? L"32-bit" : L"64-bit");
+						Interface::Log(VerbosityLevel::Surface, "    | Size of image: %d\r\n", PeEntity->GetImageSize());
+						Interface::Log(VerbosityLevel::Surface, "    | PE type: %ws%ws\r\n", PeEntity->GetPeFile()->IsDotNet() ? L".NET " : L"", PeEntity->GetPeFile()->IsDll() ? L"DLL" : L"EXE");
+						Interface::Log(VerbosityLevel::Surface, "    | Non-executable: %ws\r\n", PeEntity->IsNonExecutableImage() ? L"yes" : L"no");
+						Interface::Log(VerbosityLevel::Surface, "    | Partially mapped: %ws\r\n", PeEntity->IsPartiallyMapped() ? L"yes" : L"no");
+						Interface::Log(VerbosityLevel::Surface, "    | Signed: %ws [%ws]\r\n", PeEntity->IsSigned() ? L"yes" : L"no", TranslateSigningType(PeEntity->GetSisningType()));
+						Interface::Log(VerbosityLevel::Surface, "    | Signing level: %ws\r\n", TranslateSigningLevel(PeEntity->GetSigningLevel()));
 					}
 
-					Interface::Log("    |__ PEB module");
+					Interface::Log(VerbosityLevel::Surface, "    |__ PEB module");
 
 					if (PeEntity->GetPebModule().Exists()) {
-						Interface::Log("\r\n");
-						Interface::Log("      | Name: %ws\r\n", PeEntity->GetPebModule().GetName().c_str());
-						Interface::Log("      | Image base: 0x%p\r\n", PeEntity->GetPebModule().GetBase());
-						Interface::Log("      | Image size: %d\r\n", PeEntity->GetPebModule().GetSize());
-						Interface::Log("      | Entry point: 0x%p\r\n", PeEntity->GetPebModule().GetEntryPoint());
-						Interface::Log("      | Image file path: %ws\r\n", PeEntity->GetPebModule().GetPath().c_str());
+						Interface::Log(VerbosityLevel::Surface, "\r\n");
+						Interface::Log(VerbosityLevel::Surface, "      | Name: %ws\r\n", PeEntity->GetPebModule().GetName().c_str());
+						Interface::Log(VerbosityLevel::Surface, "      | Image base: 0x%p\r\n", PeEntity->GetPebModule().GetBase());
+						Interface::Log(VerbosityLevel::Surface, "      | Image size: %d\r\n", PeEntity->GetPebModule().GetSize());
+						Interface::Log(VerbosityLevel::Surface, "      | Entry point: 0x%p\r\n", PeEntity->GetPebModule().GetEntryPoint());
+						Interface::Log(VerbosityLevel::Surface, "      | Image file path: %ws\r\n", PeEntity->GetPebModule().GetPath().c_str());
 					}
 					else {
-						Interface::Log(" (missing)\r\n");
+						Interface::Log(VerbosityLevel::Surface, " (missing)\r\n");
 					}
 				}
 				else if (Itr->second->GetType() == Entity::Type::MAPPED_FILE) {
-					Interface::Log("  |__ Mapped file base: 0x%p\r\n", Itr->second->GetStartVa());
-					Interface::Log("    | Mapped file size: %d\r\n", Itr->second->GetEntitySize());
-					Interface::Log("    | Mapped file path: %ws\r\n", dynamic_cast<MappedFile*>(Itr->second)->GetFileBase()->GetPath().c_str());
+					Interface::Log(VerbosityLevel::Surface, "  |__ Mapped file base: 0x%p\r\n", Itr->second->GetStartVa());
+					Interface::Log(VerbosityLevel::Surface, "    | Mapped file size: %d\r\n", Itr->second->GetEntitySize());
+					Interface::Log(VerbosityLevel::Surface, "    | Mapped file path: %ws\r\n", dynamic_cast<MappedFile*>(Itr->second)->GetFileBase()->GetPath().c_str());
 				}
 				/*
 				if (Itr->second->GetRegionInfo() != nullptr) {
@@ -911,10 +911,10 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Suspici
 						vector<PeVm::Section*> OverlapSections = dynamic_cast<PeVm::Body*>(Itr->second)->FindOverlapSect(*(*SbrItr));
 
 						if (OverlapSections.empty()) {
-							Interface::Log("    0x%p:0x%08x | %ws | ?        | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
+							Interface::Log(VerbosityLevel::Surface, "    0x%p:0x%08x | %ws | ?        | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
 							AppendSubregionAttributes(*SbrItr);
 							AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
-							Interface::Log("\r\n");
+							Interface::Log(VerbosityLevel::Surface, "\r\n");
 						}
 						else{
 							for (vector<PeVm::Section*>::const_iterator SectItr = OverlapSections.begin(); SectItr != OverlapSections.end(); ++SectItr) {
@@ -925,30 +925,30 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Suspici
 								wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
 								AlignName(static_cast<const wchar_t*>(UnicodeSectName.c_str()), AlignedSectName, 8);
 
-								Interface::Log("    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName, (*SbrItr)->GetPrivateSize());
+								Interface::Log(VerbosityLevel::Surface, "    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName, (*SbrItr)->GetPrivateSize());
 								AppendSubregionAttributes(*SbrItr);
 								AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
-								Interface::Log("\r\n");
+								Interface::Log(VerbosityLevel::Surface, "\r\n");
 
 							}
 						}
 					}
 					else {
-						Interface::Log("    0x%p:0x%08x | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
+						Interface::Log(VerbosityLevel::Surface, "    0x%p:0x%08x | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
 						AppendSubregionAttributes(*SbrItr);
 						AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
-						Interface::Log("\r\n");
+						Interface::Log(VerbosityLevel::Surface, "\r\n");
 					}
 
 					if (Interface::GetVerbosity() == VerbosityLevel::Detail) {
-						Interface::Log("    |__ Base address: 0x%p\r\n", (*SbrItr)->GetBasic()->BaseAddress);
-						Interface::Log("      | Size: %d\r\n", (*SbrItr)->GetBasic()->RegionSize);
-						Interface::Log("      | Permissions: %ws\r\n", Subregion::ProtectSymbol((*SbrItr)->GetBasic()->Protect));
-						Interface::Log("      | Type: %ws\r\n", Subregion::TypeSymbol((*SbrItr)->GetBasic()->Type));
-						Interface::Log("      | State: %ws\r\n", Subregion::StateSymbol((*SbrItr)->GetBasic()->State));
-						Interface::Log("      | Allocation base: 0x%p\r\n", (*SbrItr)->GetBasic()->AllocationBase);
-						Interface::Log("      | Allocation permissions: %ws\r\n", Subregion::ProtectSymbol((*SbrItr)->GetBasic()->AllocationProtect));
-						Interface::Log("      | Private size: %d [%d pages]\r\n", (*SbrItr)->GetPrivateSize(), (*SbrItr)->GetPrivateSize() / 0x1000);
+						Interface::Log(VerbosityLevel::Surface, "    |__ Base address: 0x%p\r\n", (*SbrItr)->GetBasic()->BaseAddress);
+						Interface::Log(VerbosityLevel::Surface, "      | Size: %d\r\n", (*SbrItr)->GetBasic()->RegionSize);
+						Interface::Log(VerbosityLevel::Surface, "      | Permissions: %ws\r\n", Subregion::ProtectSymbol((*SbrItr)->GetBasic()->Protect));
+						Interface::Log(VerbosityLevel::Surface, "      | Type: %ws\r\n", Subregion::TypeSymbol((*SbrItr)->GetBasic()->Type));
+						Interface::Log(VerbosityLevel::Surface, "      | State: %ws\r\n", Subregion::StateSymbol((*SbrItr)->GetBasic()->State));
+						Interface::Log(VerbosityLevel::Surface, "      | Allocation base: 0x%p\r\n", (*SbrItr)->GetBasic()->AllocationBase);
+						Interface::Log(VerbosityLevel::Surface, "      | Allocation permissions: %ws\r\n", Subregion::ProtectSymbol((*SbrItr)->GetBasic()->AllocationProtect));
+						Interface::Log(VerbosityLevel::Surface, "      | Private size: %d [%d pages]\r\n", (*SbrItr)->GetPrivateSize(), (*SbrItr)->GetPrivateSize() / 0x1000);
 					}
 
 					EnumerateThreads(L"      ", (*SbrItr)->GetThreads());
@@ -966,10 +966,10 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Suspici
 			if ((ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_MEMDUMP)) {
 				if ((ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE)) {
 					if (Itr->second->Dump(*DmpCtx)) {
-						Interface::Log("      ~ Generated full region dump at 0x%p\r\n", Itr->second->GetStartVa());
+						Interface::Log(VerbosityLevel::Surface, "      ~ Generated full region dump at 0x%p\r\n", Itr->second->GetStartVa());
 					}
 					else {
-						Interface::Log("      ~ Failed to generate full region dump at 0x%p\r\n", Itr->second->GetStartVa());
+						Interface::Log(VerbosityLevel::Surface, "      ~ Failed to generate full region dump at 0x%p\r\n", Itr->second->GetStartVa());
 					}
 				}
 			}

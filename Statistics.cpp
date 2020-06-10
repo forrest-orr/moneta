@@ -75,7 +75,7 @@ PermissionRecord::PermissionRecord(vector<Subregion*> SubregionRecords) : Permis
 }
 
 void PermissionRecord::ShowRecords() const {
-	Interface::Log("\r\nMemory statistics\r\n");
+	Interface::Log(VerbosityLevel::Surface, "\r\nMemory statistics\r\n");
 	for (map<uint32_t, map<uint32_t, uint32_t>>::const_iterator Itr = PermissionMap->begin(); Itr != PermissionMap->end(); ++Itr) {
 		int32_t nTotalRegions = 0, nX = 0;
 
@@ -83,47 +83,47 @@ void PermissionRecord::ShowRecords() const {
 			nTotalRegions += Itr2->second;
 		}
 
-		Interface::Log("  %ws [%d total]\r\n", Subregion::TypeSymbol(Itr->first), nTotalRegions); // Total regions for the current memory type only
+		Interface::Log(VerbosityLevel::Surface, "  %ws [%d total]\r\n", Subregion::TypeSymbol(Itr->first), nTotalRegions); // Total regions for the current memory type only
 
 		for (map<uint32_t, uint32_t>::const_iterator Itr2 = Itr->second.begin(); Itr2 != Itr->second.end(); ++Itr2, nX++) {
 			if (!nX) {
-				Interface::Log("  |__ ");
+				Interface::Log(VerbosityLevel::Surface, "  |__ ");
 			}
 			else {
-				Interface::Log("    | ");
+				Interface::Log(VerbosityLevel::Surface, "    | ");
 			}
 
 			switch (Itr2->first) {
 			case PAGE_READONLY:
-				Interface::Log("PAGE_READONLY: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
+				Interface::Log(VerbosityLevel::Surface, "PAGE_READONLY: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			case PAGE_READWRITE:
-				Interface::Log("PAGE_READWRITE: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
+				Interface::Log(VerbosityLevel::Surface, "PAGE_READWRITE: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			case PAGE_EXECUTE_READ:
-				Interface::Log("PAGE_EXECUTE_READ: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
+				Interface::Log(VerbosityLevel::Surface, "PAGE_EXECUTE_READ: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			case PAGE_EXECUTE_READWRITE:
-				Interface::Log("PAGE_EXECUTE_READWRITE: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
+				Interface::Log(VerbosityLevel::Surface, "PAGE_EXECUTE_READWRITE: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			case PAGE_EXECUTE_WRITECOPY:
-				Interface::Log("PAGE_EXECUTE_WRITECOPY: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
+				Interface::Log(VerbosityLevel::Surface, "PAGE_EXECUTE_WRITECOPY: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			case PAGE_WRITECOPY:
-				Interface::Log("PAGE_WRITECOPY: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
+				Interface::Log(VerbosityLevel::Surface, "PAGE_WRITECOPY: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			case PAGE_EXECUTE:
-				Interface::Log("PAGE_EXECUTE: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
+				Interface::Log(VerbosityLevel::Surface, "PAGE_EXECUTE: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			case PAGE_NOACCESS:
-				Interface::Log("PAGE_NOACCESS: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
+				Interface::Log(VerbosityLevel::Surface, "PAGE_NOACCESS: %d (%f%%)", Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			default:
-				Interface::Log("0x%08x: %d (%f%%)", Itr2->first, Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
+				Interface::Log(VerbosityLevel::Surface, "0x%08x: %d (%f%%)", Itr2->first, Itr2->second, static_cast<float>(Itr2->second) / nTotalRegions * 100.0);
 				break;
 			}
 
-			Interface::Log("\r\n");
+			Interface::Log(VerbosityLevel::Surface, "\r\n");
 		}
 	}
 }
@@ -132,17 +132,17 @@ void IocRecord::ShowRecords() const {
 	int32_t nX = 0;
 
 	if (this->TotalIoc) {
-		Interface::Log("\r\IOC statistics [%d total]\r\n", this->TotalIoc);
+		Interface::Log(VerbosityLevel::Surface, "\r\IOC statistics [%d total]\r\n", this->TotalIoc);
 
 		for (map<uint32_t, uint32_t>::const_iterator Itr = this->RecordMap->begin(); Itr != this->RecordMap->end(); ++Itr, nX++) {
 			if (!nX) {
-				Interface::Log("|__ ");
+				Interface::Log(VerbosityLevel::Surface, "|__ ");
 			}
 			else {
-				Interface::Log("  | ");
+				Interface::Log(VerbosityLevel::Surface, "  | ");
 			}
 
-			Interface::Log("%ws: %d (%f%%)\r\n", Suspicion::GetDescription((Suspicion::Type)Itr->first).c_str(), Itr->second, static_cast<float>(Itr->second) / this->TotalIoc * 100.0);
+			Interface::Log(VerbosityLevel::Surface, "%ws: %d (%f%%)\r\n", Suspicion::GetDescription((Suspicion::Type)Itr->first).c_str(), Itr->second, static_cast<float>(Itr->second) / this->TotalIoc * 100.0);
 		}
 	}
 }
