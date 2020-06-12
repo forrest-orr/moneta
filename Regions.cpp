@@ -209,28 +209,28 @@ Entity* Entity::Create(Processes::Process& OwnerProc, std::vector<Subregion*> Su
 
 	if (Subregions.front()->GetBasic()->Type == MEM_MAPPED || Subregions.front()->GetBasic()->Type == MEM_IMAGE) {
 		wchar_t DevFilePath[MAX_PATH + 1] = { 0 };
-		wchar_t MaFilePath[MAX_PATH + 1] = { 0 };
+		wchar_t MapFilePath[MAX_PATH + 1] = { 0 };
 
 		if (GetMappedFileNameW(OwnerProc.GetHandle(), static_cast<HMODULE>(Subregions.front()->GetBasic()->BaseAddress), DevFilePath, MAX_PATH)) {
-			if (!FileBase::TranslateDevicePath(DevFilePath, MaFilePath)) {
+			if (!FileBase::TranslateDevicePath(DevFilePath, MapFilePath)) {
 				Interface::Log(VerbosityLevel::Debug, "! Failed to translate device path: %ws\r\n", DevFilePath);
-				wcscpy_s(MaFilePath, MAX_PATH + 1, L"?");
+				wcscpy_s(MapFilePath, MAX_PATH + 1, L"?");
 			}
 		}
 		else {
 			if (Subregions.front()->GetBasic()->Type == MEM_MAPPED) {
-				wcscpy_s(MaFilePath, MAX_PATH + 1, L"Page File");
+				wcscpy_s(MapFilePath, MAX_PATH + 1, L"Page File");
 			}
 			else {
-				wcscpy_s(MaFilePath, MAX_PATH + 1, L"?");
+				wcscpy_s(MapFilePath, MAX_PATH + 1, L"?");
 			}
 		}
 
 		if (Subregions.front()->GetBasic()->Type == MEM_MAPPED) {
-			NewEntity = new MappedFile(OwnerProc.GetHandle(), Subregions, MaFilePath);
+			NewEntity = new MappedFile(OwnerProc.GetHandle(), Subregions, MapFilePath);
 		}
 		else if (Subregions.front()->GetBasic()->Type == MEM_IMAGE) {
-			NewEntity = new PeVm::Body(OwnerProc, Subregions, MaFilePath);
+			NewEntity = new PeVm::Body(OwnerProc, Subregions, MapFilePath);
 		}
 	}
 	else {
