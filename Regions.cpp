@@ -153,14 +153,14 @@ Signing_t PeVm::Body::GetSisningType() const {
 
 PeVm::Body::PebModule::PebModule(HANDLE hProcess, const uint8_t* pModBase) {
 	if (hProcess != nullptr) {
-		if (GetModuleInformation(hProcess, (HMODULE)pModBase, &this->Info, sizeof(this->Info))) {
+		if (GetModuleInformation(hProcess, reinterpret_cast<HMODULE>(const_cast<uint8_t *>(pModBase)), &this->Info, sizeof(this->Info))) {
 			wchar_t ModuleName[MAX_PATH + 1] = { 0 }, ModulePath[MAX_PATH + 1] = { 0 };
 
-			if (GetModuleBaseNameW(hProcess, (HMODULE)pModBase, ModuleName, MAX_PATH + 1)) {
+			if (GetModuleBaseNameW(hProcess, reinterpret_cast<HMODULE>(const_cast<uint8_t*>(pModBase)), ModuleName, MAX_PATH + 1)) {
 				this->Name = ModuleName;
 			}
 
-			if (GetModuleFileNameExW(hProcess, (HMODULE)pModBase, ModulePath, MAX_PATH + 1)) {
+			if (GetModuleFileNameExW(hProcess, reinterpret_cast<HMODULE>(const_cast<uint8_t*>(pModBase)), ModulePath, MAX_PATH + 1)) {
 				this->Path = ModulePath;
 			}
 

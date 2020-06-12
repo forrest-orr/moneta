@@ -127,7 +127,7 @@ const wchar_t* Subregion::TypeSymbol(uint32_t dwType) {
 uint32_t Subregion::QueryPrivateSize() const {
 	uint32_t dwPrivateSize = 0;
 
-	if (this->Basic->State == MEM_COMMIT && this->Basic->Protect != PAGE_NOACCESS) {
+	if (this->Basic->State == MEM_COMMIT && this->Basic->Protect != PAGE_NOACCESS && this->Basic->Type == MEM_IMAGE) { // Optimize performance by skipping working set scan for non-image memory, as this data is not valuable for private and mapped types.
 		PSAPI_WORKING_SET_EX_INFORMATION WorkingSets = { 0 };
 		uint32_t dwWorkingSetsSize = sizeof(PSAPI_WORKING_SET_EX_INFORMATION);
 
