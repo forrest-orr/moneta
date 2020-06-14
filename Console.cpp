@@ -118,7 +118,11 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				wstring FilterArg = *FilterItr;
 				transform(FilterArg.begin(), FilterArg.end(), FilterArg.begin(), ::tolower);
 
-				if (FilterArg == L"unsigned-modules") {
+				if (FilterArg == L"*") {
+					qwFilterFlags = -1;
+					break;
+				}
+				else if (FilterArg == L"unsigned-modules") {
 					qwFilterFlags |= FILTER_FLAG_UNSIGNED_MODULES;
 				}
 				else if (FilterArg == L"metadata-modules") {
