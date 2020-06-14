@@ -299,7 +299,7 @@ void EnumerateThreads(const wstring Indent, vector<Processes::Thread*> Threads) 
 	}
 }
 
-int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMap, vector<Filter_t> Filters) {
+int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMap, uint64_t qwFilterFlags) {
 	bool bReWalkMap = false;
 
 	do {
@@ -331,7 +331,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMa
 				for (int32_t nSuspIndex = 0; !bReWalkMap && SuspItr != SbMapItr->second.end(); ++SuspItr, nSuspIndex++) {
 					switch ((*SuspItr)->GetType()) {
 					case Suspicion::Type::XPRV: {
-						if (find(Filters.begin(), Filters.end(), Filter_t::ClrPrvRwxHeap) != Filters.end()) {
+						if ((qwFilterFlags & FILTER_FLAG_CLR_HEAP)) {
 							if (((*SuspItr)->GetSubregion()->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP)) {
 								bReWalkMap = true;
 								RefSuspList.erase(SuspItr);
@@ -351,7 +351,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMa
 							}
 						}
 						
-						if (find(Filters.begin(), Filters.end(), Filter_t::ClrPrvRwxRegion) != Filters.end()) {
+						if((qwFilterFlags & FILTER_FLAG_CLR_PRVX)) {
 							if ((*SuspItr)->GetProcess()->CheckDotNetAffiliation(static_cast<uint8_t*>(const_cast<void *>((*SuspItr)->GetParentObject()->GetStartVa())), (*SuspItr)->GetParentObject()->GetEntitySize())) {
 								bReWalkMap = true;
 								RefSuspList.erase(SuspItr);
@@ -377,7 +377,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMa
 						break;
 					}
 					case Suspicion::Type::UNSIGNED_MODULE: {
-						if (find(Filters.begin(), Filters.end(), Filter_t::UnsignedModules) != Filters.end()) {
+						if((qwFilterFlags & FILTER_FLAG_UNSIGNED_MODULES)) {
 							bReWalkMap = true;
 							RefSuspList.erase(SuspItr);
 
@@ -407,7 +407,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMa
 						   0x000000000F3E0000:0x0009e000 | R        | .rsrc    | 0x00000000
 						*/
 
-						if (find(Filters.begin(), Filters.end(), Filter_t::MetadataModules) != Filters.end()) {
+						if ((qwFilterFlags & FILTER_FLAG_METADATA_MODULES)) {
 							const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*SuspItr)->GetParentObject()); // By definition this IOC will always have a PE parent object type so there is no need to check its type prior to dynamic casting
 
 							if (PeEntity->IsSigned()) {
@@ -437,7 +437,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMa
 						break;
 					}
 					case Suspicion::Type::DISK_PERMISSION_MISMATCH: {
-						if (find(Filters.begin(), Filters.end(), Filter_t::Wow64Init) != Filters.end()) {
+						if ((qwFilterFlags & FILTER_FLAG_WOW64_INIT)) {
 							static const wchar_t* Wow64CpuDll = L"wow64cpu.dll";
 							const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*SuspItr)->GetParentObject()); // By definition this IOC will always have a PE parent object type so there is no need to check its type prior to dynamic casting
 
@@ -468,7 +468,7 @@ int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMa
 						break;
 					}
 					case Suspicion::Type::MODIFIED_CODE: {
-						if (find(Filters.begin(), Filters.end(), Filter_t::Wow64Init) != Filters.end()) {
+						if ((qwFilterFlags & FILTER_FLAG_WOW64_INIT)) {
 							static const wchar_t* User32Dll = L"user32.dll";
 							const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*SuspItr)->GetParentObject()); // By definition this IOC will always have a PE parent object type so there is no need to check its type prior to dynamic casting
 

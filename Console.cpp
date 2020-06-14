@@ -58,9 +58,8 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	MemorySelection_t MemorySelectionType = MemorySelection_t::Invalid;
 	uint32_t dwSelectedPid = 0, dwRegionSize = 0;
 	uint8_t* pAddress = nullptr;
-	vector<Filter_t> Filters;
 	bool bSuppressBanner = false;
-	uint64_t qwOptFlags = 0;
+	uint64_t qwOptFlags = 0, qwFilterFlags = 0;
 
 	for (vector<wstring>::const_iterator i = Args.begin(); i != Args.end(); ++i) {
 		wstring Arg = *i;
@@ -120,19 +119,19 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				transform(FilterArg.begin(), FilterArg.end(), FilterArg.begin(), ::tolower);
 
 				if (FilterArg == L"unsigned-modules") {
-					Filters.push_back(Filter_t::UnsignedModules);
+					qwFilterFlags |= FILTER_FLAG_UNSIGNED_MODULES;
 				}
 				else if (FilterArg == L"metadata-modules") {
-					Filters.push_back(Filter_t::MetadataModules);
+					qwFilterFlags |= FILTER_FLAG_METADATA_MODULES;
 				}
 				else if (FilterArg == L"clr-prvx") {
-					Filters.push_back(Filter_t::ClrPrvRwxRegion);
+					qwFilterFlags |= FILTER_FLAG_CLR_PRVX;
 				}
 				else if (FilterArg == L"clr-heap") {
-					Filters.push_back(Filter_t::ClrPrvRwxHeap);
+					qwFilterFlags |= FILTER_FLAG_CLR_HEAP;
 				}
 				else if (FilterArg == L"wow64-init") {
-					Filters.push_back(Filter_t::Wow64Init);
+					qwFilterFlags |= FILTER_FLAG_WOW64_INIT;
 				}
 			}
 		}
@@ -228,7 +227,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		// Analyze processes and generate memory maps/suspicions
 		//
 
-		ScannerContext ScannerCtx(qwOptFlags, MemorySelectionType, pAddress, dwRegionSize, Filters);
+		ScannerContext ScannerCtx(qwOptFlags, MemorySelectionType, pAddress, dwRegionSize, qwFilterFlags);
 		uint64_t qwStartTick = GetTickCount64();
 
 		if (ProcType == SelectedProcess_t::SelfPid || ProcType == SelectedProcess_t::SpecificPid) {
