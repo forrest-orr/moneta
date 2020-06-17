@@ -3,7 +3,7 @@
 #define PROCESS_ENUM_FLAG_STATISTICS 0x4
 
 typedef enum class VerbosityLevel;
-typedef class Suspicion;
+typedef class Ioc;
 namespace Memory {
 	typedef class Subregion;
 	typedef class Entity;
@@ -65,7 +65,7 @@ namespace Processes {
 		BOOL IsWow64() const { return this->Wow64; }
 		uint32_t GetClrVersion() const { return this->ClrVersion; }
 		Process(uint32_t);
-		std::vector<Memory::Subregion*> Enumerate(ScannerContext &ScannerCtx, std::vector<Suspicion*>* SelectedIocs);
+		std::vector<Memory::Subregion*> Enumerate(ScannerContext &ScannerCtx, std::vector<Ioc*>* SelectedIocs);
 		bool CheckDotNetAffiliation(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
 		int32_t SearchDllDataReferences(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
 		int32_t SearchReferences(MemDump &DmpCtx, std::map <uint8_t*, std::vector<uint8_t*>> &ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;

@@ -31,7 +31,7 @@ ________________________________________________________________________________
 #include "StdAfx.h"
 #include "Memory.hpp"
 #include "Interface.hpp"
-#include "Suspicions.hpp"
+#include "Ioc.hpp"
 #include "Statistics.hpp"
 
 using namespace std;
@@ -142,13 +142,13 @@ void IocRecord::ShowRecords() const {
 				Interface::Log(VerbosityLevel::Surface, "  | ");
 			}
 
-			Interface::Log(VerbosityLevel::Surface, "%ws: %d (%f%%)\r\n", Suspicion::GetDescription((Suspicion::Type)Itr->first).c_str(), Itr->second, static_cast<float>(Itr->second) / this->TotalIoc * 100.0);
+			Interface::Log(VerbosityLevel::Surface, "%ws: %d (%f%%)\r\n", Ioc::GetDescription((Ioc::Type)Itr->first).c_str(), Itr->second, static_cast<float>(Itr->second) / this->TotalIoc * 100.0);
 		}
 	}
 }
 
-void IocRecord::UpdateMap(vector<Suspicion*>* Records) {
-	for (vector<Suspicion*>::const_iterator ListItr = Records->begin(); ListItr != Records->end(); ++ListItr) {
+void IocRecord::UpdateMap(vector<Ioc*>* Records) {
+	for (vector<Ioc*>::const_iterator ListItr = Records->begin(); ListItr != Records->end(); ++ListItr) {
 		if (!this->RecordMap->count((*ListItr)->GetType())) {
 			this->RecordMap->insert(make_pair((*ListItr)->GetType(), 1));
 		}
@@ -159,6 +159,6 @@ void IocRecord::UpdateMap(vector<Suspicion*>* Records) {
 		this->TotalIoc++;
 	}
 }
-IocRecord::IocRecord(vector<Suspicion*>* Records) : RecordMap(new map<uint32_t, uint32_t>()) {
+IocRecord::IocRecord(vector<Ioc*>* Records) : RecordMap(new map<uint32_t, uint32_t>()) {
 	this->UpdateMap(Records);
 }

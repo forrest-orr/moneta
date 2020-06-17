@@ -1,9 +1,3 @@
-#define FILTER_FLAG_UNSIGNED_MODULES 0x1
-#define FILTER_FLAG_METADATA_MODULES 0x2
-#define FILTER_FLAG_CLR_PRVX 0x4
-#define FILTER_FLAG_CLR_HEAP 0x8
-#define FILTER_FLAG_WOW64_INIT 0x10
-
 enum class MemorySelection_t {
 	Invalid,
 	Block,

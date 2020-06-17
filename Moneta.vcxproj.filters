@@ -51,9 +51,6 @@
     <ClCompile Include="MemDump.cpp">
       <Filter>Source Files\Classes</Filter>
     </ClCompile>
-    <ClCompile Include="Suspicions.cpp">
-      <Filter>Source Files\Classes</Filter>
-    </ClCompile>
     <ClCompile Include="PeFile.cpp">
       <Filter>Source Files\Classes</Filter>
     </ClCompile>
@@ -69,6 +66,9 @@
     <ClCompile Include="DotNetNative.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Ioc.cpp">
+      <Filter>Source Files\Classes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FileIo.hpp">
@@ -79,9 +79,6 @@
     </ClInclude>
     <ClInclude Include="StdAfx.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Suspicions.hpp">
-      <Filter>Header Files\Classes</Filter>
     </ClInclude>
     <ClInclude Include="Memory.hpp">
       <Filter>Header Files\Classes</Filter>
@@ -117,6 +114,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Statistics.hpp">
+      <Filter>Header Files\Classes</Filter>
+    </ClInclude>
+    <ClInclude Include="Ioc.hpp">
       <Filter>Header Files\Classes</Filter>
     </ClInclude>
   </ItemGroup>

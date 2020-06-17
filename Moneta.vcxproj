@@ -141,7 +141,7 @@
     <ClCompile Include="Process.cpp" />
     <ClCompile Include="Signing.cpp" />
     <ClCompile Include="Subregions.cpp" />
-    <ClCompile Include="Suspicions.cpp" />
+    <ClCompile Include="Ioc.cpp" />
     <ClCompile Include="Thread.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -159,7 +159,7 @@
     <ClInclude Include="Signing.h" />
     <ClInclude Include="Statistics.hpp" />
     <ClInclude Include="StdAfx.h" />
-    <ClInclude Include="Suspicions.hpp" />
+    <ClInclude Include="Ioc.hpp" />
     <ClInclude Include="Typedefs.h" />
   </ItemGroup>
   <ItemGroup>

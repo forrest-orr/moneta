@@ -1,4 +1,4 @@
-typedef class Suspicion;
+typedef class Ioc;
 
 namespace Memory {
 	typedef class Subregion;
@@ -19,7 +19,7 @@ protected:
 	std::map<uint32_t, uint32_t>* RecordMap; // Key is IOC type, value is count
 	int32_t TotalIoc;
 public:
-	void UpdateMap(std::vector<Suspicion*> *Records);
-	IocRecord(std::vector<Suspicion*>* Records);
+	void UpdateMap(std::vector<Ioc*> *Records);
+	IocRecord(std::vector<Ioc*>* Records);
 	void ShowRecords() const;
 };

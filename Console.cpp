@@ -39,6 +39,7 @@ ________________________________________________________________________________
 #include "Privileges.h"
 #include "Resources.h"
 #include "Statistics.hpp"
+#include "Ioc.hpp"
 
 using namespace std;
 using namespace Memory;
@@ -237,7 +238,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		if (ProcType == SelectedProcess_t::SelfPid || ProcType == SelectedProcess_t::SpecificPid) {
 			try {
 				Process TargetProc(dwSelectedPid);
-				vector<Suspicion*> SelectedIocs;
+				vector<Ioc*> SelectedIocs;
 				vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(ScannerCtx, &SelectedIocs);
 
 				if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
@@ -248,7 +249,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 					IocRecords->ShowRecords();
 				}
 				/*
-				for (vector<Suspicion*>::const_iterator IocItr = SelectedIocs.begin(); IocItr != SelectedIocs.end(); ++IocItr) {
+				for (vector<Ioc*>::const_iterator IocItr = SelectedIocs.begin(); IocItr != SelectedIocs.end(); ++IocItr) {
 					//delete* IocItr;
 				}*/
 			}
@@ -270,7 +271,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 						if (ProcEntry.th32ProcessID != GetCurrentProcessId()) {
 							try {
 								Process TargetProc(ProcEntry.th32ProcessID);
-								vector<Suspicion*> SelectedIocs;
+								vector<Ioc*> SelectedIocs;
 								vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(ScannerCtx, &SelectedIocs);
 
 								if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
@@ -289,7 +290,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 									}
 								}
 
-								for (vector<Suspicion*>::const_iterator IocItr = SelectedIocs.begin(); IocItr != SelectedIocs.end(); ++IocItr) {
+								for (vector<Ioc*>::const_iterator IocItr = SelectedIocs.begin(); IocItr != SelectedIocs.end(); ++IocItr) {
 									//delete* IocItr;
 								}
 							}

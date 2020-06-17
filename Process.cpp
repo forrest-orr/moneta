@@ -35,7 +35,7 @@ ________________________________________________________________________________
 #include "Memory.hpp"
 #include "Interface.hpp"
 #include "MemDump.hpp"
-#include "Suspicions.hpp"
+#include "Ioc.hpp"
 #include "Scanner.hpp"
 #include "Signing.h"
 #include "PEB.h"
@@ -299,222 +299,14 @@ void EnumerateThreads(const wstring Indent, vector<Processes::Thread*> Threads) 
 	}
 }
 
-int32_t FilterSuspicions(map <uint8_t*, map<uint8_t*, list<Suspicion *>>> *IocMap, uint64_t qwFilterFlags) {
-	bool bReWalkMap = false;
-
-	do {
-		if (bReWalkMap) {
-			bReWalkMap = false; // The re-walk boolean is only set when a suspicion was filtered. Reset it each time this happens.
-		}
-
-		/* Concept ~ Walk the map and search through the suspicion list corresponding to each sblock.
-		             When a suspicion is filtered, remove it from the list, and remove the sblock map
-					 entry if it was the only suspicion in its list. If the ablock map only had the
-					 one sblock map entry, then remove the ablock map entry as well. Walk the list
-					 again now that the map has updated, and repeat the process until there are no
-					 filterable suspicions remaining
-		
-		*/
-		for (map <uint8_t*, map<uint8_t*, list<Suspicion *>>>::const_iterator AbMapItr = IocMap->begin(); !bReWalkMap && AbMapItr != IocMap->end(); ++AbMapItr) {
-			/*
-			Region map -> Key [Allocation base]
-							-> Suspicions map -> Key [Subregion address]
-												   -> Suspicions list
-			*/
-			map < uint8_t*, list<Suspicion *>>& RefSbMap = IocMap->at(AbMapItr->first);
-			int32_t nSbIndex = 0;
-
-			for (map<uint8_t*, list<Suspicion *>>::const_iterator SbMapItr = AbMapItr->second.begin(); !bReWalkMap && SbMapItr != AbMapItr->second.end(); ++SbMapItr, nSbIndex++) {
-				list<Suspicion *>& RefSuspList = RefSbMap.at(SbMapItr->first);
-				list<Suspicion *>::const_iterator SuspItr = SbMapItr->second.begin();
-
-				for (int32_t nSuspIndex = 0; !bReWalkMap && SuspItr != SbMapItr->second.end(); ++SuspItr, nSuspIndex++) {
-					switch ((*SuspItr)->GetType()) {
-					case Suspicion::Type::XPRV: {
-						if ((qwFilterFlags & FILTER_FLAG_CLR_HEAP)) {
-							if (((*SuspItr)->GetSubregion()->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP)) {
-								bReWalkMap = true;
-								RefSuspList.erase(SuspItr);
-
-								if (!RefSuspList.size()) {
-									//
-									// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
-									//
-
-									RefSbMap.erase(SbMapItr);
-
-									if (!RefSbMap.size()) {
-										IocMap->erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
-										break;
-									}
-								}
-							}
-						}
-						
-						if((qwFilterFlags & FILTER_FLAG_CLR_PRVX)) {
-							if ((*SuspItr)->GetProcess()->CheckDotNetAffiliation(static_cast<uint8_t*>(const_cast<void *>((*SuspItr)->GetParentObject()->GetStartVa())), (*SuspItr)->GetParentObject()->GetEntitySize())) {
-								bReWalkMap = true;
-								RefSuspList.erase(SuspItr);
-
-								if (!RefSuspList.size()) {
-									//
-									// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
-									//
-
-									RefSbMap.erase(SbMapItr);
-
-									if (!RefSbMap.size()) {
-										IocMap->erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
-										//Interface::Log(VerbosityLevel::Surface, "... .NET affiliation found for suspicion of private +x at 0x%p (erased from suspicions)\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
-									}
-								}
-							}
-							else {
-								//Interface::Log(VerbosityLevel::Surface, "... no .NET affiliation found for suspicion of private +x at 0x%p\r\n", (*SuspItr)->GetSubregion()->GetBasic()->BaseAddress);
-							}
-						}
-
-						break;
-					}
-					case Suspicion::Type::UNSIGNED_MODULE: {
-						if((qwFilterFlags & FILTER_FLAG_UNSIGNED_MODULES)) {
-							bReWalkMap = true;
-							RefSuspList.erase(SuspItr);
-
-							if (!RefSuspList.size()) {
-								//
-								// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
-								//
-
-								RefSbMap.erase(SbMapItr);
-
-								if (!RefSbMap.size()) {
-									IocMap->erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
-								}
-							}
-						}
-
-						break;
-					}
-					case Suspicion::Type::MISSING_PEB_ENTRY: {
-						/* Filter cases for missing PEB modules:
-						   
-						   Signed metadata PEs. These appear in the C:\Windows\System32\WinMetadata folder with the .winmd extension. They've also been noted to appear in WindpwsApps, SystemApps and others.
-
-						   0x000000000F3E0000:0x0009e000 | Executable image | C:\Windows\System32\WinMetadata\Windows.UI.winmd | Missing PEB module
-						   0x000000000F3E0000:0x0009e000 | R        | Header   | 0x00000000
-						   0x000000000F3E0000:0x0009e000 | R        | .text    | 0x00000000
-						   0x000000000F3E0000:0x0009e000 | R        | .rsrc    | 0x00000000
-						*/
-
-						if ((qwFilterFlags & FILTER_FLAG_METADATA_MODULES)) {
-							const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*SuspItr)->GetParentObject()); // By definition this IOC will always have a PE parent object type so there is no need to check its type prior to dynamic casting
-
-							if (PeEntity->IsSigned()) {
-								static const wchar_t* WinmdExt = L".winmd";
-
-								if (_wcsicmp(PeEntity->GetFileBase()->GetPath().c_str() + PeEntity->GetFileBase()->GetPath().length() - wcslen(WinmdExt), WinmdExt) == 0) {
-									if (PeEntity->GetPeFile() != nullptr && PeEntity->GetPeFile()->GetEntryPoint() == 0) {
-										bReWalkMap = true;
-										RefSuspList.erase(SuspItr);
-
-										if (!RefSuspList.size()) {
-											//
-											// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
-											//
-
-											RefSbMap.erase(SbMapItr);
-
-											if (!RefSbMap.size()) {
-												IocMap->erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
-											}
-										}
-									}
-								}
-							}
-						}
-
-						break;
-					}
-					case Suspicion::Type::DISK_PERMISSION_MISMATCH: {
-						if ((qwFilterFlags & FILTER_FLAG_WOW64_INIT)) {
-							static const wchar_t* Wow64CpuDll = L"wow64cpu.dll";
-							const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*SuspItr)->GetParentObject()); // By definition this IOC will always have a PE parent object type so there is no need to check its type prior to dynamic casting
-
-							if (PeEntity->IsSigned()) {
-								if (wcslen(PeEntity->GetFileBase()->GetPath().c_str()) > wcslen(Wow64CpuDll) && _wcsicmp(PeEntity->GetFileBase()->GetPath().c_str() + wcslen(PeEntity->GetFileBase()->GetPath().c_str()) - wcslen(Wow64CpuDll), Wow64CpuDll) == 0) {
-									PeVm::Section* W64SvcSection = PeEntity->GetSection("W64SVC");
-									if ((*SuspItr)->GetSubregion()->GetBasic()->BaseAddress == W64SvcSection->GetStartVa()) { // There's an edge case where the section preceeding W64SVC is also +x, resulting in the subregion for this IOC starting prior to this section address
-										Interface::Log(VerbosityLevel::Debug, "... found disk permission mismatch suspicion on signed %ws overlapping with W64SVC section at 0x%p\r\n", PeEntity->GetFileBase()->GetPath().c_str(), W64SvcSection->GetStartVa());
-										bReWalkMap = true;
-										RefSuspList.erase(SuspItr);
-
-										if (!RefSuspList.size()) {
-											//
-											// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
-											//
-
-											RefSbMap.erase(SbMapItr);
-
-											if (!RefSbMap.size()) {
-												IocMap->erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
-											}
-										}
-									}
-								}
-							}
-						}
-
-						break;
-					}
-					case Suspicion::Type::MODIFIED_CODE: {
-						if ((qwFilterFlags & FILTER_FLAG_WOW64_INIT)) {
-							static const wchar_t* User32Dll = L"user32.dll";
-							const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*SuspItr)->GetParentObject()); // By definition this IOC will always have a PE parent object type so there is no need to check its type prior to dynamic casting
-
-							if ((*SuspItr)->GetProcess()->IsWow64() && PeEntity->IsSigned()) {
-								if (wcslen(PeEntity->GetFileBase()->GetPath().c_str()) > wcslen(User32Dll) && _wcsicmp(PeEntity->GetFileBase()->GetPath().c_str() + wcslen(PeEntity->GetFileBase()->GetPath().c_str()) - wcslen(User32Dll), User32Dll) == 0) {
-									PeVm::Section* W64SvcSection = PeEntity->GetSection(".text");
-									if ((*SuspItr)->GetSubregion()->GetBasic()->BaseAddress == W64SvcSection->GetStartVa()) {
-										Interface::Log(VerbosityLevel::Debug, "... found modified code IOC overlapping with signed %ws .text section at 0x%p\r\n", PeEntity->GetFileBase()->GetPath().c_str(), W64SvcSection->GetStartVa());
-										bReWalkMap = true;
-										RefSuspList.erase(SuspItr);
-
-										if (!RefSuspList.size()) {
-											//
-											// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
-											//
-
-											RefSbMap.erase(SbMapItr);
-
-											if (!RefSbMap.size()) {
-												IocMap->erase(AbMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
-											}
-										}
-									}
-								}
-							}
-						}
-
-						break;
-					}
-					}
-				}
-			}
-		}
-	} while (bReWalkMap);
-
-	return 0;
-}
-
-int32_t AppendOverlapSuspicion(map<uint8_t*, list<Suspicion *>>* Suspicions, uint8_t *pSbAddress, bool bEntityTop, vector<Suspicion*>* SelectedIocs) {
+int32_t AppendOverlapIoc(map<uint8_t*, list<Ioc *>>* Iocs, uint8_t *pSbAddress, bool bEntityTop, vector<Ioc*>* SelectedIocs) {
 	int32_t nCount = 0;
 
-	if (Suspicions != nullptr && Suspicions->count(pSbAddress)) {
-		list<Suspicion *>& SuspicionsList = Suspicions->at(pSbAddress);
+	if (Iocs != nullptr && Iocs->count(pSbAddress)) {
+		list<Ioc *>& IocsList = Iocs->at(pSbAddress);
 
-		for (list<Suspicion *>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
-			if (bEntityTop == (*SuspItr)->IsFullEntitySuspicion()) {
+		for (list<Ioc *>::const_iterator SuspItr = IocsList.begin(); SuspItr != IocsList.end(); ++SuspItr) {
+			if (bEntityTop == (*SuspItr)->IsFullEntityIoc()) {
 				Interface::Log(VerbosityLevel::Surface, " | ");
 				Interface::Log(VerbosityLevel::Surface, ConsoleColor::Red, "%ws", (*SuspItr)->GetDescription((*SuspItr)->GetType()).c_str());
 				nCount++;
@@ -565,14 +357,14 @@ int32_t AppendSubregionAttributes(Subregion *Sbr) {
 	return nCount;
 }
 
-int32_t SubEntitySuspCount(map<uint8_t*, list<Suspicion*>>* Suspicions, uint8_t* pSbAddress) {
+int32_t SubEntitySuspCount(map<uint8_t*, list<Ioc*>>* Iocs, uint8_t* pSbAddress) {
 	int32_t nCount = 0;
 
-	if (Suspicions != nullptr && Suspicions->count(pSbAddress)) {
-		list<Suspicion*>& SuspicionsList = Suspicions->at(pSbAddress);
+	if (Iocs != nullptr && Iocs->count(pSbAddress)) {
+		list<Ioc*>& IocsList = Iocs->at(pSbAddress);
 
-		for (list<Suspicion*>::const_iterator SuspItr = SuspicionsList.begin(); SuspItr != SuspicionsList.end(); ++SuspItr) {
-			if (!(*SuspItr)->IsFullEntitySuspicion()) {
+		for (list<Ioc*>::const_iterator SuspItr = IocsList.begin(); SuspItr != IocsList.end(); ++SuspItr) {
+			if (!(*SuspItr)->IsFullEntityIoc()) {
 				nCount++;
 			}
 		}
@@ -747,12 +539,12 @@ bool Process::CheckDotNetAffiliation(const uint8_t* pReferencedAddress, const ui
 	10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
 */
 
-vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Suspicion*> *SelectedIocs) {
+vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs) {
 	bool bShownProc = false;
 	wstring_convert<codecvt_utf8_utf16<wchar_t>> UnicodeConverter;
-	//map <uint8_t*, map<uint8_t*, list<Suspicion *>>> SuspicionsMap; // More efficient to only filter this map once. Currently filtering it for every single entity
 	vector<Subregion*> SelectedSbrs;
-	map <uint8_t*, map<uint8_t*, list<Suspicion*>>>* IocMap = new map <uint8_t*, map<uint8_t*, list<Suspicion*>>>();
+	//map <uint8_t*, map<uint8_t*, list<Ioc*>>>* IocMap = new map <uint8_t*, map<uint8_t*, list<Ioc*>>>();
+	IocMap Iocs;
 	map <uint8_t*, vector<uint8_t *>> ReferencesMap;
 
 	//
@@ -760,11 +552,11 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Suspici
 	//
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-		Suspicion::InspectEntity(*this, *Itr->second, IocMap);
+		Ioc::InspectEntity(*this, *Itr->second, Iocs.GetMap());
 	}
 
-	if (IocMap->size()) {
-		FilterSuspicions(IocMap, ScannerCtx.GetFilters());
+	if (Iocs.GetMap()->size()) {
+		Iocs.Filter(ScannerCtx.GetFilters());
 	}
 
 	//
@@ -788,29 +580,22 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Suspici
 	//
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-		auto SuspMapAbItr = IocMap->find(static_cast<unsigned char *>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
+		auto SuspMapAbItr = Iocs.GetMap()->find(static_cast<unsigned char *>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
 		auto RefMapAbItr = ReferencesMap.find(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
-		map<uint8_t*, list<Suspicion *>>* SuspSbrMap = nullptr;
+		map<uint8_t*, list<Ioc *>>* SuspSbrMap = nullptr;
 		vector<uint8_t*>* RefSbrVec = nullptr;
 
-		if (SuspMapAbItr != IocMap->end()) {
-			SuspSbrMap = &IocMap->at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
+		if (SuspMapAbItr != Iocs.GetMap()->end()) {
+			SuspSbrMap = &Iocs.GetMap()->at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
 		}
 
 		if (RefMapAbItr != ReferencesMap.end()) {
 			RefSbrVec = &ReferencesMap.at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
 		}
-		/*
-		if (Itr->second->GetSubregions().front()->GetBasic()->Type == MEM_PRIVATE && Itr->second->IsPartiallyExecutable()) {
-			char Command[1000] = { 0 };
-			sprintf_s(Command, sizeof(Command), "HuntManagedAddress.exe --mode scan --pid %d --address 0x%p --size %d", this->GetPid(), Itr->second->GetStartVa(), Itr->second->GetEntitySize());
-			Interface::Log(VerbosityLevel::Surface, "... executing command: %s\r\n", Command);
-			system(Command);
-		}*/
 
 		if (ScannerCtx.GetMemorySelectionType() == MemorySelection_t::All ||
 			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Block && ((ScannerCtx.GetAddress() >= Itr->second->GetStartVa()) && (ScannerCtx.GetAddress() < Itr->second->GetEndVa()))) ||
-			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious && SuspMapAbItr != IocMap->end()) ||
+			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Suspicious && SuspMapAbItr != Iocs.GetMap()->end()) ||
 			(ScannerCtx.GetMemorySelectionType() == MemorySelection_t::Referenced && RefMapAbItr != ReferencesMap.end())) {
 
 			//
@@ -898,7 +683,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Suspici
 			//
 
 			//AppendSubregionAttributes(Itr->second->GetSubregions().front());
-			AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t*>(const_cast<void *>(Itr->second->GetStartVa())), true, SelectedIocs);
+			AppendOverlapIoc(SuspSbrMap, static_cast<uint8_t*>(const_cast<void *>(Itr->second->GetStartVa())), true, SelectedIocs);
 			Interface::Log(VerbosityLevel::Surface, "\r\n");
 
 			if (Interface::GetVerbosity() == VerbosityLevel::Detail) {
@@ -975,7 +760,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Suspici
 						if (OverlapSections.empty()) {
 							Interface::Log(VerbosityLevel::Surface, "    0x%p:0x%08x | %ws | ?        | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
 							AppendSubregionAttributes(*SbrItr);
-							AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
+							AppendOverlapIoc(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
 							Interface::Log(VerbosityLevel::Surface, "\r\n");
 						}
 						else{
@@ -989,7 +774,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Suspici
 
 								Interface::Log(VerbosityLevel::Surface, "    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName, (*SbrItr)->GetPrivateSize());
 								AppendSubregionAttributes(*SbrItr);
-								AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
+								AppendOverlapIoc(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
 								Interface::Log(VerbosityLevel::Surface, "\r\n");
 
 							}
@@ -998,7 +783,7 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Suspici
 					else {
 						Interface::Log(VerbosityLevel::Surface, "    0x%p:0x%08x | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
 						AppendSubregionAttributes(*SbrItr);
-						AppendOverlapSuspicion(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
+						AppendOverlapIoc(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
 						Interface::Log(VerbosityLevel::Surface, "\r\n");
 					}
 
@@ -1038,6 +823,5 @@ vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx, vector<Suspici
 		}
 	}
 
-	delete IocMap;
 	return SelectedSbrs;
 }
