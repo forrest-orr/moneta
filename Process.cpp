@@ -238,7 +238,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				Region = Subregions.begin(); // This DOES fix a bug.
 			}
 			else {
-				if (!Subregions.empty()) { // Edge case: new ablock not yet found but finished enumerating sblocks.
+				if (!Subregions.empty()) { // Edge case: new region not yet found but finished enumerating subregions.
 					this->Entities.insert(make_pair(static_cast<uint8_t*>((*Region)->GetBasic()->AllocationBase), Entity::Create(*this, Subregions)));
 				}
 
@@ -391,9 +391,9 @@ bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, ws
 
 void EnumReferencesMap(map <uint8_t*, vector<uint8_t*>> ReferencesMap) {
 	for (map <uint8_t*, vector<uint8_t*>>::const_iterator AbMapItr = ReferencesMap.begin(); AbMapItr != ReferencesMap.end(); ++AbMapItr) {
-		printf("0x%p [%d sblocks]\r\n", AbMapItr->first, AbMapItr->second.size());
+		Interface::Log(Interface::VerbosityLevel::Surface, "0x%p [%d subregions]\r\n", AbMapItr->first, AbMapItr->second.size());
 		for (vector<uint8_t*>::const_iterator RefAddrItr = AbMapItr->second.begin(); RefAddrItr != AbMapItr->second.end(); RefAddrItr++) {
-			printf("  0x%p\r\n", (*RefAddrItr));
+			Interface::Log(Interface::VerbosityLevel::Surface, "  0x%p\r\n", (*RefAddrItr));
 		}
 	}
 }
@@ -437,7 +437,7 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 					// In the event that an entry does not already exist in the reference map for this entity, create one with an empty vector. Otherwise, point the vector reference at the existing vector
 					//
 
-					auto AbMapItr = ReferencesMap.find(static_cast<unsigned char*>(const_cast<void*>(EntItr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sub-region vector.
+					auto AbMapItr = ReferencesMap.find(static_cast<unsigned char*>(const_cast<void*>(EntItr->second->GetStartVa()))); // An iterator into the main region map which points to the entry for the sub-region vector.
 					vector<uint8_t*>* SbrMap = nullptr;
 
 					if (AbMapItr == ReferencesMap.end()) {
@@ -518,24 +518,24 @@ bool Process::CheckDotNetAffiliation(const uint8_t* pReferencedAddress, const ui
 	2. Filter suspicions
 	3. Loop entities for enumeration if:
 	   mselect == process
-	   mselect == sblock and this eneity contains the sblock
+	   mselect == subregion and this eneity contains the subregion
 	   mselect == suspicious and there is 1 or more suspicions
 	   mselect == referenced and this entity contains 1 or more
 	4. Show the process if it has not been shown before
 	5. Display entity info (exe image, private, mapped + total size) ALWAYS (criteria already applied going into loop) along with suspicions (if any)
-	5. For PEs, loop sblocks/sections. Enum if:
+	5. For PEs, loop subregions/sections. Enum if:
 		mselect == process
-		mselect == sblock && sblock == current, or the  "from base" option is set
-		or mselect == suspicious and the current sblock has a suspicion or the  "from base" option is set
-		mselect == referenced and this sblock contains one or more reference or the "from base" option is set
-	6. Dump the current sblock based on the same criteria as above but ONLY if the "from base" option is not set.
+		mselect == subregion && subregion == current, or the  "from base" option is set
+		or mselect == suspicious and the current subregion has a suspicion or the  "from base" option is set
+		mselect == referenced and this subregion contains one or more reference or the "from base" option is set
+	6. Dump the current subregion based on the same criteria as above but ONLY if the "from base" option is not set.
 	7. Dump the entire PE entity if it met the initial enum criteria and "from base" option is set
-	8. For private/mapped loop sblocks and enum if:
+	8. For private/mapped loop subregions and enum if:
 		mselect == process
-		mselect == sblock && sblock == current, or the  "from base" option is set
-		mselect == suspicious and the current sblock has a suspicion or the  "from base" option is set
-		mselect == referenced and this sblock contains one or more reference
-	9. Dump the current sblock based on the same criteria as above but ONLY if the "from base" option is not set.
+		mselect == subregion && subregion == current, or the  "from base" option is set
+		mselect == suspicious and the current subregion has a suspicion or the  "from base" option is set
+		mselect == referenced and this subregion contains one or more reference
+	9. Dump the current subregion based on the same criteria as above but ONLY if the "from base" option is not set.
 	10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
 */
 
@@ -575,12 +575,12 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 	}
 
 	//
-	// Display information on each selected sblock and/or entity within the process address space
+	// Display information on each selected subregion and/or entity within the process address space
 	//
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
-		auto SuspMapAbItr = Iocs.GetMap()->find(static_cast<unsigned char *>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
-		auto RefMapAbItr = ReferencesMap.find(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main ablock map which points to the entry for the sb map.
+		auto SuspMapAbItr = Iocs.GetMap()->find(static_cast<unsigned char *>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main region map which points to the entry for the sb map.
+		auto RefMapAbItr = ReferencesMap.find(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main region map which points to the entry for the sb map.
 		map<uint8_t*, list<Ioc *>>* SuspSbrMap = nullptr;
 		vector<uint8_t*>* RefSbrVec = nullptr;
 
@@ -730,7 +730,7 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 			}
 
 			//
-			// Display the section/sblock information associated with this entity provided it meets the selection criteria
+			// Display the section/subregion information associated with this entity provided it meets the selection criteria
 			//
 
 			vector<Subregion*> Subregions = Itr->second->GetSubregions();
@@ -744,14 +744,14 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 																		   SubEntitySuspCount(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress)) > 0)) || 
 					(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Referenced && (ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE) ||
 																		  (RefSbrVec != nullptr &&
-																		  find(RefSbrVec->begin(), RefSbrVec->end(), static_cast<uint8_t*>((*SbrItr)->GetBasic()->BaseAddress)) != RefSbrVec->end()))) { // mselect == referenced and this sblock contains one or more reference or the "from base" option is set
+																		  find(RefSbrVec->begin(), RefSbrVec->end(), static_cast<uint8_t*>((*SbrItr)->GetBasic()->BaseAddress)) != RefSbrVec->end()))) { // mselect == referenced and this subregion contains one or more reference or the "from base" option is set
 					wchar_t AlignedAttribDesc[9] = { 0 };
 
 					AlignName(Subregion::AttribDesc((*SbrItr)->GetBasic()), AlignedAttribDesc, 8);
 
 					if (Itr->second->GetType() == Entity::Type::PE_FILE && !dynamic_cast<PeVm::Body*>(Itr->second)->GetFileBase()->IsPhantom()) {
 						//
-						// Generate a list of all sections overlapping with this sblock and display them all. A typical example is a +r sblock at the end of the PE which encompasses all consecutive readonly sections ie. .rdata, .rsrc, .reloc
+						// Generate a list of all sections overlapping with this subregion and display them all. A typical example is a +r subregion at the end of the PE which encompasses all consecutive readonly sections ie. .rdata, .rsrc, .reloc
 						//
 
 						vector<PeVm::Section*> OverlapSections = dynamic_cast<PeVm::Body*>(Itr->second)->FindOverlapSect(*(*SbrItr));

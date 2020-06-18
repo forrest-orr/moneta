@@ -34,6 +34,9 @@ public:
 };
 
 class IocMap {
+	// Region map -> Key [Allocation base]
+	//  			 -> Iocs map -> Key [Subregion address]
+	//								-> Iocs list
 protected:
 	std::map <uint8_t*, std::map<uint8_t*, std::list<Ioc*>>>* Map;
 public:

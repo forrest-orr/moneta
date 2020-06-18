@@ -41,40 +41,19 @@ using namespace std;
 using namespace Memory;
 using namespace Processes;
 
-wstring Ioc::GetDescription(Ioc::Type Type) {
-	switch (Type) {
-	case MODIFIED_CODE: return L"Modified code";
-	case UNSIGNED_MODULE: return L"Unsigned module";
-	case MISSING_PEB_ENTRY: return L"Missing PEB module";
-	case MISMATCHING_PEB_MODULE: return L"Mismatching PEB module";
-	case MODIFIED_HEADER: return L"Modified PE header";
-	case DISK_PERMISSION_MISMATCH: return L"Inconsistent +x between disk and memory";
-	case XMAP: return L"Abnormal mapped executable memory";
-	case PHANTOM_IMAGE: return L"Phantom image";
-	case XPRV: return L"Abnormal private executable memory";
-	case NON_IMAGE_THREAD: return L"Thread within non-image memory region";
-	case NON_IMAGE_IMAGEBASE: return L"Non-image primary image base";
-	default: return L"?";
-	}
-}
-
 Ioc::Ioc(Process* ParentProc, Entity* ParentObj, Subregion* Block, Ioc::Type Type) : ParentProcess(ParentProc), ParentObject(ParentObj), Sbr(Block), IocType(Type) {}
 
-/* Inspect entity: generates a list of suspicions for either a region or subregion
-   + It is important to ensure that all new suspicions are added to the list of the existing map entry even if they share the same base address. This allows the ablock map entry to also hold sblock suspicions such as modified hdr.
-   ~ Create an entry in the primary map with the allocation base as a key and save a reference to the secondary map.
-   ~ Create a suspicion list for the ablock and every sblock, ensuring that sblocks with suspicions which share the ablock address (for example modified headers) are adding their suspicions to the same list so there are not 2 map entries for the ablock address.
-   ~ In the event that no new lists were added to the secondary map, erase the primary map entry. Otherwise, preserve both the primary and secondary map entries.
-
-	Region map -> Key [Allocation base]
-					-> Iocs map -> Key [Subregion address]
-										   -> Iocs list
-*/
-
 bool Ioc::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, map<uint8_t*, list<Ioc *>>> *IocMap) {
+	assert(IocMap != nullptr);
+
 	list<Ioc *> AbSuspList;
 	IocMap->insert(make_pair(static_cast<unsigned char*>(const_cast<void*>(ParentObj.GetStartVa())), map<uint8_t*, list<Ioc *>>()));
 	map<uint8_t*, list<Ioc *>>& RefSubregionMap = IocMap->at(static_cast<unsigned char *>(const_cast<void*>(ParentObj.GetStartVa())));
+
+	// It is important to ensure that all new IOC are added to the list of the existing map entry even if they share the same base address. This allows the region map entry to also hold subregion IOC such as modified hdr.
+	// Create an entry in the primary map with the allocation base as a key and save a reference to the secondary map.
+	// Create an IOC list for the region and every subregion, ensuring that subregions with suspicions which share the region address (for example modified headers) are adding their IOC to the same list so there are not 2 map entries for the region address.
+	// In the event that no new lists were added to the secondary map, erase the primary map entry. Otherwise, preserve both the primary and secondary map entries.
 
 	switch (ParentObj.GetType()) {
 		case Entity::Type::PE_FILE: {
@@ -126,7 +105,7 @@ bool Ioc::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, m
 								TargetSuspList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, MODIFIED_CODE));
 							}
 
-							if (SbSuspList.size()) { // Do not insert the list to the map if it overlaps with the ablock.
+							if (SbSuspList.size()) { // Do not insert the list to the map if it overlaps with the region.
 								RefSubregionMap.insert(make_pair(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), SbSuspList));
 							}
 						}
@@ -209,18 +188,35 @@ bool Ioc::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, m
 	return true;
 }
 
+wstring Ioc::GetDescription(Ioc::Type Type) {
+	switch (Type) {
+	case MODIFIED_CODE: return L"Modified code";
+	case UNSIGNED_MODULE: return L"Unsigned module";
+	case MISSING_PEB_ENTRY: return L"Missing PEB module";
+	case MISMATCHING_PEB_MODULE: return L"Mismatching PEB module";
+	case MODIFIED_HEADER: return L"Modified PE header";
+	case DISK_PERMISSION_MISMATCH: return L"Inconsistent +x between disk and memory";
+	case XMAP: return L"Abnormal mapped executable memory";
+	case PHANTOM_IMAGE: return L"Phantom image";
+	case XPRV: return L"Abnormal private executable memory";
+	case NON_IMAGE_THREAD: return L"Thread within non-image memory region";
+	case NON_IMAGE_IMAGEBASE: return L"Non-image primary image base";
+	default: return L"?";
+	}
+}
+
 void IocMap::EraseIoc(list<Ioc*> *RefIocList, list<Ioc*>::const_iterator IocListItr, map <uint8_t*, list<Ioc*>>* RefSubregionMap, map<uint8_t*, list<Ioc*>>::const_iterator SubregionMapItr, map <uint8_t*, map<uint8_t*, list<Ioc*>>>::const_iterator RegionMapItr) {
+	assert(RefIocList != nullptr);
+	assert(RefSubregionMap != nullptr);
 	RefIocList->erase(IocListItr);
 
 	if (!RefIocList->size()) {
-		//
-		// Erase the suspicion list from the sblock map and then erase the sblock map from the ablock map. Finalize by removing the ablock map from the suspicion map itself.
-		//
+		// Erase the suspicion list from the subregion map and then erase the subregion map from the region map. Finalize by removing the region map from the suspicion map itself.
 
 		RefSubregionMap->erase(SubregionMapItr);
 
 		if (!RefSubregionMap->size()) {
-			this->Map->erase(RegionMapItr); // Will this cause a bug if multiple suspicions are erased in one call to this function?
+			this->Map->erase(RegionMapItr);
 		}
 	}
 }
@@ -238,23 +234,18 @@ int32_t IocMap::Filter(uint64_t qwFilterFlags) {
 
 	do {
 		if (bReWalkMap) {
-			bReWalkMap = false; // The re-walk boolean is only set when a suspicion was filtered. Reset it each time this happens.
+			bReWalkMap = false; // The re-walk boolean is  honly set when a suspicion was filtered. Reset it each time this happens.
 		}
 
-		/* Concept ~ Walk the map and search through the suspicion list corresponding to each sblock.
-					 When a suspicion is filtered, remove it from the list, and remove the sblock map
-					 entry if it was the only suspicion in its list. If the ablock map only had the
-					 one sblock map entry, then remove the ablock map entry as well. Walk the list
-					 again now that the map has updated, and repeat the process until there are no
-					 filterable suspicions remaining
+		// Walk each region, subregion and corresponding IOC list
+		// When an IOC is filtered remove it from the IOC list - an empty IOC list will remove the subregion entry and an empty subregion map will remove the region map entry.
+		// Re-walk the updated map until there are no new filtered IOC
 
-		*/
 		for (map <uint8_t*, map<uint8_t*, list<Ioc*>>>::const_iterator RegionMapItr = this->Map->begin(); !bReWalkMap && RegionMapItr != this->Map->end(); ++RegionMapItr) {
-			/*
-			Region map -> Key [Allocation base]
-							-> Iocs map -> Key [Subregion address]
-												   -> Iocs list
-			*/
+			// Region map -> Key [Allocation base]
+			//				-> Iocs map -> Key [Subregion address]
+			//									   -> Iocs list
+
 			map<uint8_t*, list<Ioc*>>& RefSubregionMap = this->Map->at(RegionMapItr->first);
 
 			for (map<uint8_t*, list<Ioc*>>::const_iterator SubregionMapItr = RegionMapItr->second.begin(); !bReWalkMap && SubregionMapItr != RegionMapItr->second.end(); ++SubregionMapItr) {
@@ -292,16 +283,6 @@ int32_t IocMap::Filter(uint64_t qwFilterFlags) {
 						break;
 					}
 					case Ioc::Type::MISSING_PEB_ENTRY: {
-						/* Filter cases for missing PEB modules:
-
-						   Signed metadata PEs. These appear in the C:\Windows\System32\WinMetadata folder with the .winmd extension. They've also been noted to appear in WindpwsApps, SystemApps and others.
-
-						   0x000000000F3E0000:0x0009e000 | Executable image | C:\Windows\System32\WinMetadata\Windows.UI.winmd | Missing PEB module
-						   0x000000000F3E0000:0x0009e000 | R        | Header   | 0x00000000
-						   0x000000000F3E0000:0x0009e000 | R        | .text    | 0x00000000
-						   0x000000000F3E0000:0x0009e000 | R        | .rsrc    | 0x00000000
-						*/
-
 						if ((qwFilterFlags & FILTER_FLAG_METADATA_MODULES)) {
 							const PeVm::Body* PeEntity = dynamic_cast<const PeVm::Body*>((*IocListItr)->GetParentObject()); // By definition this IOC will always have a PE parent object type so there is no need to check its type prior to dynamic casting
 
@@ -368,15 +349,15 @@ int32_t IocMap::Filter(uint64_t qwFilterFlags) {
 
 void IocMap::Enumerate() {
 	for (map <uint8_t*, map<uint8_t*, list<Ioc*>>>::const_iterator RegionMapItr = this->Map->begin(); RegionMapItr != this->Map->end(); ++RegionMapItr) {
-		printf("0x%p [%d sblocks]\r\n", RegionMapItr->first, RegionMapItr->second.size());
+		Interface::Log(Interface::VerbosityLevel::Surface, "0x%p [%d subregions]\r\n", RegionMapItr->first, RegionMapItr->second.size());
 		for (map<uint8_t*, list<Ioc*>>::const_iterator SubregionMapItr = RegionMapItr->second.begin(); SubregionMapItr != RegionMapItr->second.end(); SubregionMapItr++) {
-			printf("  0x%p [%d list elements]\r\n", SubregionMapItr->first, SubregionMapItr->second.size());
+			Interface::Log(Interface::VerbosityLevel::Surface, "  0x%p [%d list elements]\r\n", SubregionMapItr->first, SubregionMapItr->second.size());
 			for (list<Ioc*>::const_iterator ListItr = SubregionMapItr->second.begin(); ListItr != SubregionMapItr->second.end(); ++ListItr) {
 				if (!(*ListItr)->IsFullEntityIoc()) {
-					printf("    0x%p : %d : %ws\r\n", (*ListItr)->GetSubregion()->GetBasic()->BaseAddress, (*ListItr)->GetType(), (*ListItr)->GetDescription((*ListItr)->GetType()).c_str());
+					Interface::Log(Interface::VerbosityLevel::Surface, "    0x%p : %d : %ws\r\n", (*ListItr)->GetSubregion()->GetBasic()->BaseAddress, (*ListItr)->GetType(), (*ListItr)->GetDescription((*ListItr)->GetType()).c_str());
 				}
 				else {
-					printf("    0x%p : %d : %ws : Full entity\r\n", (*ListItr)->GetParentObject()->GetStartVa(), (*ListItr)->GetType(), (*ListItr)->GetDescription((*ListItr)->GetType()).c_str());
+					Interface::Log(Interface::VerbosityLevel::Surface, "    0x%p : %d : %ws : Full entity\r\n", (*ListItr)->GetParentObject()->GetStartVa(), (*ListItr)->GetType(), (*ListItr)->GetDescription((*ListItr)->GetType()).c_str());
 				}
 			}
 		}

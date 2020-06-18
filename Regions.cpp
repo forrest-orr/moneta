@@ -62,7 +62,7 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 
 		if ((this->FilePe = PeFile::Load(FilePath)) != nullptr) {
 			//
-			// Identify which sblocks within this parent entity overlap with each section header. Create an entity child object for each section and copy associated sblocks into it.
+			// Identify which subregions within this parent entity overlap with each section header. Create an entity child object for each section and copy associated subregions into it.
 			//
 
 			for (int32_t nX = -1; nX < this->FilePe->GetFileHdr()->NumberOfSections; nX++) {
@@ -82,7 +82,7 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 				uint8_t* pSectEndVa = this->PeData + ArtificialPeHdr.VirtualAddress + dwSectionSize;
 
 				//
-				// Calculate the sblocks overlapping between this PE entity and the current section.
+				// Calculate the subregions overlapping between this PE entity and the current section.
 				//
 
 				vector<Subregion*> OverlapSubregion;
@@ -92,8 +92,8 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 					uint8_t* pSubregionEndVa = static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress) + (*SbrItr)->GetBasic()->RegionSize;
 
 					if ((pSubregionStartVa >= pSectStartVa && pSubregionStartVa < pSectEndVa) || (pSubregionEndVa > pSectStartVa&& pSubregionEndVa <= pSectEndVa) || (pSubregionStartVa < pSectStartVa && pSubregionEndVa > pSectEndVa)) {
-						Interface::Log(Interface::VerbosityLevel::Debug, "... section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa, pSectEndVa, pSubregionStartVa, pSubregionEndVa);
-						MEMORY_BASIC_INFORMATION* Mbi = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
+						Interface::Log(Interface::VerbosityLevel::Debug, "... section %s [0x%p:0x%p] corresponds to subregion [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa, pSectEndVa, pSubregionStartVa, pSubregionEndVa);
+						MEMORY_BASIC_INFORMATION* Mbi = new MEMORY_BASIC_INFORMATION; // When duplicating subregions, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
 						memcpy(Mbi, (*SbrItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
 						OverlapSubregion.push_back(new Subregion(OwnerProc, Mbi));
 					}
@@ -176,7 +176,7 @@ PeVm::Component::Component(HANDLE hProcess, std::vector<Subregion*> Subregions, 
 
 PeVm::Section::Section(HANDLE hProcess, vector<Subregion*> Subregions, IMAGE_SECTION_HEADER* SectHdr, uint8_t* pPeBuf) : Region(hProcess, Subregions), PeVm::Component(hProcess, Subregions, pPeBuf) {
 	memcpy(&this->Hdr, SectHdr, sizeof(IMAGE_SECTION_HEADER));
-	this->EntitySize = this->Hdr.SizeOfRawData < this->Hdr.Misc.VirtualSize ? this->Hdr.Misc.VirtualSize : this->Hdr.SizeOfRawData; // Overwrite default size determined by sblocks. Verified correct order.
+	this->EntitySize = this->Hdr.SizeOfRawData < this->Hdr.Misc.VirtualSize ? this->Hdr.Misc.VirtualSize : this->Hdr.SizeOfRawData; // Overwrite default size determined by subregions. Verified correct order.
 }
 
 MappedFile::MappedFile(HANDLE hProcess, vector<Subregion*> Subregions, const wchar_t* FilePath, bool bMemStore) : Region(hProcess, Subregions), MapFileBase(new FileBase(FilePath, bMemStore, false)) {}
@@ -195,7 +195,7 @@ Region::Region(HANDLE hProcess, vector<Subregion*> Subregions) { // Removed as a
 		if (!NT_SUCCESS(NtStatus)) {
 			delete this->RegionInfo;
 			this->RegionInfo = nullptr;
-			printf("- Failed to query region information at 0x%p (0x%08x)\r\n", Subregions.front()->GetBasic()->AllocationBase, NtStatus);
+			Interface::Log(Interface::VerbosityLevel::Surface, "- Failed to query region information at 0x%p (0x%08x)\r\n", Subregions.front()->GetBasic()->AllocationBase, NtStatus);
 			system("pause");
 		}
 	}
