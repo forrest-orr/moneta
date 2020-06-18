@@ -119,9 +119,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 
 		this->DmpCtx = new MemDump(this->Handle, this->Pid);
 
-		//
 		// CreateToolhelp32Snapshot doesn't work work cross-arhitecture heap enumeration - use the PEB to walk the heaps. Note that it was confirmed private +RWX entries in .NET process (other than executable primary heaps) are not sub-heaps which can be enumerated with Heap32First/Next
-		//
 
 		static NtQueryInformationProcess_t NtQueryInformationProcess = reinterpret_cast<NtQueryInformationProcess_t>(GetProcAddress(GetModuleHandleW(L"Ntdll.dll"), "NtQueryInformationProcess"));
 		NTSTATUS NtStatus;
@@ -255,7 +253,6 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 
 PeVm::Body* Process::GetLoadedModule(wstring Name) const {
 	wstring SanitizedName = Name;
-
 	transform(SanitizedName.begin(), SanitizedName.end(), SanitizedName.begin(), ::toupper);
 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
@@ -299,11 +296,14 @@ void EnumerateThreads(const wstring Indent, vector<Processes::Thread*> Threads) 
 	}
 }
 
-int32_t AppendOverlapIoc(map<uint8_t*, list<Ioc *>>* Iocs, uint8_t *pSbAddress, bool bEntityTop, vector<Ioc*>* SelectedIocs) {
+int32_t AppendOverlapIoc(map<uint8_t*, list<Ioc *>>* Iocs, uint8_t *pSubregionAddress, bool bEntityTop, vector<Ioc*>* SelectedIocs) {
+	assert(pSubregionAddress != nullptr);
+	assert(SelectedIocs != nullptr);
+
 	int32_t nCount = 0;
 
-	if (Iocs != nullptr && Iocs->count(pSbAddress)) {
-		list<Ioc *>& IocsList = Iocs->at(pSbAddress);
+	if (Iocs != nullptr && Iocs->count(pSubregionAddress)) {
+		list<Ioc *>& IocsList = Iocs->at(pSubregionAddress);
 
 		for (list<Ioc *>::const_iterator SuspItr = IocsList.begin(); SuspItr != IocsList.end(); ++SuspItr) {
 			if (bEntityTop == (*SuspItr)->IsFullEntityIoc()) {
@@ -357,11 +357,12 @@ int32_t AppendSubregionAttributes(Subregion *Sbr) {
 	return nCount;
 }
 
-int32_t SubEntitySuspCount(map<uint8_t*, list<Ioc*>>* Iocs, uint8_t* pSbAddress) {
+int32_t SubEntitySuspCount(map<uint8_t*, list<Ioc*>>* Iocs, uint8_t* pSubregionAddress) {
+	assert(pSubregionAddress != nullptr);
 	int32_t nCount = 0;
 
-	if (Iocs != nullptr && Iocs->count(pSbAddress)) {
-		list<Ioc*>& IocsList = Iocs->at(pSbAddress);
+	if (Iocs != nullptr && Iocs->count(pSubregionAddress)) {
+		list<Ioc*>& IocsList = Iocs->at(pSubregionAddress);
 
 		for (list<Ioc*>::const_iterator SuspItr = IocsList.begin(); SuspItr != IocsList.end(); ++SuspItr) {
 			if (!(*SuspItr)->IsFullEntityIoc()) {
@@ -374,6 +375,7 @@ int32_t SubEntitySuspCount(map<uint8_t*, list<Ioc*>>* Iocs, uint8_t* pSbAddress)
 }
 
 bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, wstring Indent) {
+	assert(Mbi != nullptr);
 	wchar_t DmpFilePath[MAX_PATH + 1] = { 0 };
 
 	if (Mbi->State == MEM_COMMIT) {
@@ -399,6 +401,9 @@ void EnumReferencesMap(map <uint8_t*, vector<uint8_t*>> ReferencesMap) {
 }
 
 template<typename Address_t> int32_t ScanChunkForAddress(uint8_t *pBuf, uint32_t dwSize, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
+	assert(pBuf != nullptr);
+	assert(pReferencedAddress != nullptr);
+
 	for (int32_t nOffset = 0; nOffset < dwSize; nOffset++) {
 		Address_t PotentialAddress = *(Address_t*)&pBuf[nOffset];
 
@@ -455,8 +460,6 @@ int32_t Process::SearchReferences(MemDump &DmpCtx, map <uint8_t*, vector<uint8_t
 		}
 	}
 	
-	//EnumReferencesMap(ReferencesMap);
-
 	return nRefTotal;
 }
 

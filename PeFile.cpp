@@ -36,6 +36,9 @@ ________________________________________________________________________________
 using namespace std;
 
 PeFile::PeFile(const uint8_t* pPeBuf, uint32_t dwPeFileSize) : Data(new uint8_t[dwPeFileSize]), Size(dwPeFileSize) {
+	assert(pPeBuf != nullptr);
+	assert(dwPeFileSize);
+
 	memcpy(this->Data, pPeBuf, dwPeFileSize);
 	this->DosHdr = reinterpret_cast<IMAGE_DOS_HEADER*>(this->Data);
 	this->FileHdr = reinterpret_cast<IMAGE_FILE_HEADER*>((reinterpret_cast<uint8_t *>(this->DosHdr) + this->DosHdr->e_lfanew + sizeof(LONG)));

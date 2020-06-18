@@ -31,6 +31,8 @@ ________________________________________________________________________________
 #include "StdAfx.h"
 
 bool SetPrivilege(HANDLE hToken, const wchar_t *Privilege, bool bEnablePrivilege) {
+	assert(Privilege != nullptr);
+
 	TOKEN_PRIVILEGES TokenPrivs = { 0 };
 	LUID Luid;
 	TOKEN_PRIVILEGES TokenPrivPrev = { 0 };
@@ -55,7 +57,6 @@ bool SetPrivilege(HANDLE hToken, const wchar_t *Privilege, bool bEnablePrivilege
 			}
 
 			AdjustTokenPrivileges(hToken, false, &TokenPrivPrev, dwPrevSize, nullptr, nullptr);
-
 			if (GetLastError() == ERROR_SUCCESS) return true;
 		}
 	}

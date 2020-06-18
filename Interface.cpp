@@ -125,7 +125,6 @@ bool Interface::Log(VerbosityLevel MsgVlvl, ConsoleColor Color, const char* LogF
 		}
 
 		va_end(pVarList);
-
 		bWriteSuccess = WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), reinterpret_cast<PDWORD>(&dwBytesWritten), NULL);
 
 		if (Interface::IsStdout) {

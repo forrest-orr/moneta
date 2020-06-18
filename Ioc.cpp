@@ -208,6 +208,7 @@ wstring Ioc::GetDescription(Ioc::Type Type) {
 void IocMap::EraseIoc(list<Ioc*> *RefIocList, list<Ioc*>::const_iterator IocListItr, map <uint8_t*, list<Ioc*>>* RefSubregionMap, map<uint8_t*, list<Ioc*>>::const_iterator SubregionMapItr, map <uint8_t*, map<uint8_t*, list<Ioc*>>>::const_iterator RegionMapItr) {
 	assert(RefIocList != nullptr);
 	assert(RefSubregionMap != nullptr);
+
 	RefIocList->erase(IocListItr);
 
 	if (!RefIocList->size()) {

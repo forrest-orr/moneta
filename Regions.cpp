@@ -273,8 +273,8 @@ bool Entity::Dump(MemDump& DmpCtx) const {
 
 	for (vector<Subregion*>::iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
 		if ((*SbrItr)->GetBasic()->State == MEM_COMMIT) {
-			wchar_t DumFilePath[MAX_PATH + 1] = { 0 };
-			if (DmpCtx.Create(DumpFolder, (*SbrItr)->GetBasic(), DumFilePath, MAX_PATH + 1)) {
+			wchar_t DumpFilePath[MAX_PATH + 1] = { 0 };
+			if (DmpCtx.Create(DumpFolder, (*SbrItr)->GetBasic(), DumpFilePath, MAX_PATH + 1)) {
 				nDumpCount++;
 			}
 		}
