@@ -61,9 +61,7 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 		this->Signed = CheckSigning(FilePath);
 
 		if ((this->FilePe = PeFile::Load(FilePath)) != nullptr) {
-			//
 			// Identify which subregions within this parent entity overlap with each section header. Create an entity child object for each section and copy associated subregions into it.
-			//
 
 			for (int32_t nX = -1; nX < this->FilePe->GetFileHdr()->NumberOfSections; nX++) {
 				IMAGE_SECTION_HEADER ArtificialPeHdr = { 0 }; // This will initialize other relevant fields such as VirtualAddress to 0 for the PE header edge case.
@@ -81,9 +79,7 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 				uint8_t* pSectStartVa = this->PeData + ArtificialPeHdr.VirtualAddress;
 				uint8_t* pSectEndVa = this->PeData + ArtificialPeHdr.VirtualAddress + dwSectionSize;
 
-				//
 				// Calculate the subregions overlapping between this PE entity and the current section.
-				//
 
 				vector<Subregion*> OverlapSubregion;
 
@@ -185,22 +181,7 @@ MappedFile::~MappedFile() {
 	delete this->MapFileBase;
 }
 
-Region::Region(HANDLE hProcess, vector<Subregion*> Subregions) { // Removed as a temporary performance optimization since the region info is not being used during detailed enumeration
-	/*
-	if (Subregions.front()->GetBasic()->State == MEM_COMMIT) {
-		static NtQueryVirtualMemory_t NtQueryVirtualMemory = (NtQueryVirtualMemory_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryVirtualMemory");
-		this->RegionInfo = new MEMORY_REGION_INFORMATION;
-		NTSTATUS NtStatus = NtQueryVirtualMemory(hProcess, Subregions.front()->GetBasic()->AllocationBase, MemoryRegionInformation, this->RegionInfo, sizeof(MEMORY_REGION_INFORMATION), nullptr);
-
-		if (!NT_SUCCESS(NtStatus)) {
-			delete this->RegionInfo;
-			this->RegionInfo = nullptr;
-			Interface::Log(Interface::VerbosityLevel::Surface, "- Failed to query region information at 0x%p (0x%08x)\r\n", Subregions.front()->GetBasic()->AllocationBase, NtStatus);
-			system("pause");
-		}
-	}
-	*/
-
+Region::Region(HANDLE hProcess, vector<Subregion*> Subregions) {
 	SetSubregions(Subregions);
 }
 
@@ -287,11 +268,6 @@ Entity::~Entity() {
 	for (vector<Subregion*>::const_iterator Itr = this->Subregions.begin(); Itr != this->Subregions.end(); ++Itr) {
 		delete* Itr;
 	}
-	/*
-	if (RegionInfo != nullptr) {
-		delete this->RegionInfo;
-	}
-	*/
 }
 
 void Entity::SetSubregions(vector<Subregion*> Subregions) {

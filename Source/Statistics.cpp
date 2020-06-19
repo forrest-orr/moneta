@@ -65,8 +65,6 @@ void PermissionRecord::UpdateMap(vector<Subregion*> SubregionRecords) {
 				this->TotalRegions++;
 			}
 		}
-
-		//CountMap[(*RecordItr)->GetBasic()->Protect]++;
 	}
 }
 
@@ -129,9 +127,8 @@ void PermissionRecord::ShowRecords() const {
 }
 
 void IocRecord::ShowRecords() const {
-	int32_t nX = 0;
-
 	if (this->TotalIoc) {
+		int32_t nX = 0;
 		Interface::Log(Interface::VerbosityLevel::Surface, "\r\IOC statistics [%d total]\r\n", this->TotalIoc);
 
 		for (map<uint32_t, uint32_t>::const_iterator Itr = this->RecordMap->begin(); Itr != this->RecordMap->end(); ++Itr, nX++) {
@@ -159,6 +156,7 @@ void IocRecord::UpdateMap(vector<Ioc*>* Records) {
 		this->TotalIoc++;
 	}
 }
+
 IocRecord::IocRecord(vector<Ioc*>* Records) : RecordMap(new map<uint32_t, uint32_t>()) {
 	this->UpdateMap(Records);
 }

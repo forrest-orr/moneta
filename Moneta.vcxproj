@@ -71,6 +71,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetName>$(ProjectName)64</TargetName>
+    <SourcePath>$(VC_SourcePath);Source;</SourcePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);Headers;</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <TargetName>$(ProjectName)32</TargetName>
@@ -121,6 +123,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -129,45 +132,45 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="DotNetNative.cpp" />
-    <ClCompile Include="Privilege.cpp" />
-    <ClCompile Include="Regions.cpp" />
-    <ClCompile Include="FileIo.cpp" />
-    <ClCompile Include="Console.cpp" />
-    <ClCompile Include="Statistics.cpp" />
-    <ClCompile Include="Interface.cpp" />
-    <ClCompile Include="MemDump.cpp" />
-    <ClCompile Include="PeFile.cpp" />
-    <ClCompile Include="Process.cpp" />
-    <ClCompile Include="Signing.cpp" />
-    <ClCompile Include="Subregions.cpp" />
-    <ClCompile Include="Ioc.cpp" />
-    <ClCompile Include="Thread.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="DotNetNative.h" />
-    <ClInclude Include="Helpers.h" />
-    <ClInclude Include="Memory.hpp" />
-    <ClInclude Include="FileIo.hpp" />
-    <ClInclude Include="Interface.hpp" />
-    <ClInclude Include="MemDump.hpp" />
-    <ClInclude Include="PEB.h" />
-    <ClInclude Include="PeFile.hpp" />
-    <ClInclude Include="Privileges.h" />
-    <ClInclude Include="Processes.hpp" />
-    <ClInclude Include="Resources.h" />
-    <ClInclude Include="Scanner.hpp" />
-    <ClInclude Include="Signing.h" />
-    <ClInclude Include="Statistics.hpp" />
-    <ClInclude Include="StdAfx.h" />
-    <ClInclude Include="Ioc.hpp" />
-    <ClInclude Include="Typedefs.h" />
-  </ItemGroup>
-  <ItemGroup>
     <ResourceCompile Include="Moneta.rc" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Usage.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Source\Console.cpp" />
+    <ClCompile Include="Source\DotNetNative.cpp" />
+    <ClCompile Include="Source\FileIo.cpp" />
+    <ClCompile Include="Source\Interface.cpp" />
+    <ClCompile Include="Source\Ioc.cpp" />
+    <ClCompile Include="Source\MemDump.cpp" />
+    <ClCompile Include="Source\PeFile.cpp" />
+    <ClCompile Include="Source\Privilege.cpp" />
+    <ClCompile Include="Source\Process.cpp" />
+    <ClCompile Include="Source\Regions.cpp" />
+    <ClCompile Include="Source\Signing.cpp" />
+    <ClCompile Include="Source\Statistics.cpp" />
+    <ClCompile Include="Source\Subregions.cpp" />
+    <ClCompile Include="Source\Thread.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Headers\DotNetNative.h" />
+    <ClInclude Include="Headers\FileIo.hpp" />
+    <ClInclude Include="Headers\Helpers.h" />
+    <ClInclude Include="Headers\Interface.hpp" />
+    <ClInclude Include="Headers\Ioc.hpp" />
+    <ClInclude Include="Headers\MemDump.hpp" />
+    <ClInclude Include="Headers\Memory.hpp" />
+    <ClInclude Include="Headers\PEB.h" />
+    <ClInclude Include="Headers\PeFile.hpp" />
+    <ClInclude Include="Headers\Privileges.h" />
+    <ClInclude Include="Headers\Processes.hpp" />
+    <ClInclude Include="Headers\Resources.h" />
+    <ClInclude Include="Headers\Scanner.hpp" />
+    <ClInclude Include="Headers\Signing.h" />
+    <ClInclude Include="Headers\Statistics.hpp" />
+    <ClInclude Include="Headers\StdAfx.h" />
+    <ClInclude Include="Headers\Typedefs.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

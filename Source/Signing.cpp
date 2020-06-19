@@ -115,8 +115,6 @@ wchar_t* GetWindowsPECatalogIssuer(const wchar_t* FilePath) {
                                                 CertIssuer = reinterpret_cast<wchar_t *>(new uint8_t[((dwCertNameLength + 1) * sizeof(wchar_t))]); // Documentation says the length returned is in characters not bytes.
 
                                                 if (!CertGetNameStringW(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, CERT_NAME_ISSUER_FLAG, nullptr, CertIssuer, dwCertNameLength)) {
-                                                    delete CertIssuer;
-
                                                     CertIssuer = nullptr;
                                                 }
                                             }

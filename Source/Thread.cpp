@@ -67,7 +67,7 @@ Thread::Thread(uint32_t dwTid, Processes::Process &OwnerProc) : Id(dwTid) {
 					uint32_t dwTebSize = sizeof(TEB32);
 
 					if (ReadProcessMemory(OwnerProc.GetHandle(), Tbi.TebBaseAddress, LocalTeb, dwTebSize, nullptr)) {
-						//Interface::Log(Interface::VerbosityLevel::Debug, "... successfully read remote TEB to local memory.\r\n");
+						Interface::Log(Interface::VerbosityLevel::Debug, "... successfully read remote TEB to local memory.\r\n");
 						Interface::Log(Interface::VerbosityLevel::Debug, "... stack base: 0x%08x\r\n", LocalTeb->StackBase);
 						this->StackAddress = reinterpret_cast<void*>(LocalTeb->StackBase);
 					}
@@ -82,7 +82,7 @@ Thread::Thread(uint32_t dwTid, Processes::Process &OwnerProc) : Id(dwTid) {
 					uint32_t dwTebSize = sizeof(TEB64);
 
 					if (ReadProcessMemory(OwnerProc.GetHandle(), Tbi.TebBaseAddress, LocalTeb, dwTebSize, nullptr)) {
-						//Interface::Log(Interface::VerbosityLevel::Debug, "... successfully read remote TEB to local memory.\r\n");
+						Interface::Log(Interface::VerbosityLevel::Debug, "... successfully read remote TEB to local memory.\r\n");
 						Interface::Log(Interface::VerbosityLevel::Debug, "... stack base: 0x%p\r\n", LocalTeb->StackBase);
 						this->StackAddress = LocalTeb->StackBase;
 					}

@@ -65,6 +65,8 @@ Process::~Process() {
 			delete dynamic_cast<Region*>(Itr->second);;
 		}
 	}
+
+	delete this->DmpCtx;
 }
 
 Process::Process(uint32_t dwPid) : Pid(dwPid) {
@@ -380,32 +382,6 @@ bool Process::CheckDotNetAffiliation(const uint8_t* pReferencedAddress, const ui
 
 	return nRefTotal > 0 ? true : false;
 }
-
-/*  vector<Subregion*> Process::Enumerate(ScannerContext& ScannerCtx)
-	1. Loop entities to build suspicions list
-	2. Filter suspicions
-	3. Loop entities for enumeration if:
-	   mselect == process
-	   mselect == subregion and this eneity contains the subregion
-	   mselect == suspicious and there is 1 or more suspicions
-	   mselect == referenced and this entity contains 1 or more
-	4. Show the process if it has not been shown before
-	5. Display entity info (exe image, private, mapped + total size) ALWAYS (criteria already applied going into loop) along with suspicions (if any)
-	5. For PEs, loop subregions/sections. Enum if:
-		mselect == process
-		mselect == subregion && subregion == current, or the  "from base" option is set
-		or mselect == suspicious and the current subregion has a suspicion or the  "from base" option is set
-		mselect == referenced and this subregion contains one or more reference or the "from base" option is set
-	6. Dump the current subregion based on the same criteria as above but ONLY if the "from base" option is not set.
-	7. Dump the entire PE entity if it met the initial enum criteria and "from base" option is set
-	8. For private/mapped loop subregions and enum if:
-		mselect == process
-		mselect == subregion && subregion == current, or the  "from base" option is set
-		mselect == suspicious and the current subregion has a suspicion or the  "from base" option is set
-		mselect == referenced and this subregion contains one or more reference
-	9. Dump the current subregion based on the same criteria as above but ONLY if the "from base" option is not set.
-	10. Dump the entire entity if it met the initial enum criteria and "from base" option is set
-*/
 
 void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, vector<Subregion*> *SelectedSbrs) {
 	bool bShownProc = false;

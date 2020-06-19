@@ -129,17 +129,16 @@ uint32_t Subregion::QueryPrivateSize() const {
 
 	if (this->Basic->State == MEM_COMMIT && this->Basic->Protect != PAGE_NOACCESS && this->Basic->Type == MEM_IMAGE) { // Optimize performance by skipping working set scan for non-image memory, as this data is not valuable for private and mapped types.
 		PSAPI_WORKING_SET_EX_INFORMATION WorkingSets = { 0 };
-		uint32_t dwWorkingSetsSize = sizeof(PSAPI_WORKING_SET_EX_INFORMATION);
 
 		for (uint32_t dwPageOffset = 0; dwPageOffset < this->Basic->RegionSize; dwPageOffset += 0x1000) {
 			WorkingSets.VirtualAddress = (static_cast<uint8_t *>(this->Basic->BaseAddress) + dwPageOffset);
-			if (K32QueryWorkingSetEx(this->ProcessHandle, &WorkingSets, dwWorkingSetsSize)) {
+			if (K32QueryWorkingSetEx(this->ProcessHandle, &WorkingSets, sizeof(PSAPI_WORKING_SET_EX_INFORMATION))) {
 				if (!WorkingSets.VirtualAttributes.Shared) {
 					dwPrivateSize += 0x1000;
 				}
 			}
 			else {
-				Interface::Log(Interface::VerbosityLevel::Surface, "... failed to query working set at 0x%p\r\n", WorkingSets.VirtualAddress);
+				Interface::Log(Interface::VerbosityLevel::Debug, "... failed to query working set at 0x%p\r\n", WorkingSets.VirtualAddress);
 			}
 		}
 	}
