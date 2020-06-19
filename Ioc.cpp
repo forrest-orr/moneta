@@ -277,7 +277,7 @@ int32_t IocMap::Filter(uint64_t qwFilterFlags) {
 								this->EraseIoc(&RefSuspList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
 							}
 							else {
-								Interface::Log(VerbosityLevel::Debug, "... no .NET affiliation found for suspicion of private +x at 0x%p\r\n", (*IocListItr)->GetSubregion()->GetBasic()->BaseAddress);
+								Interface::Log(Interface::VerbosityLevel::Debug, "... no .NET affiliation found for suspicion of private +x at 0x%p\r\n", (*IocListItr)->GetSubregion()->GetBasic()->BaseAddress);
 							}
 						}
 
@@ -328,7 +328,7 @@ int32_t IocMap::Filter(uint64_t qwFilterFlags) {
 								if (wcslen(PeEntity->GetFileBase()->GetPath().c_str()) > wcslen(Wow64CpuDll) && _wcsicmp(PeEntity->GetFileBase()->GetPath().c_str() + wcslen(PeEntity->GetFileBase()->GetPath().c_str()) - wcslen(Wow64CpuDll), Wow64CpuDll) == 0) {
 									PeVm::Section* W64SvcSection = PeEntity->GetSection("W64SVC");
 									if ((*IocListItr)->GetSubregion()->GetBasic()->BaseAddress == W64SvcSection->GetStartVa()) { // There's an edge case where the section preceeding W64SVC is also +x, resulting in the subregion for this IOC starting prior to this section address
-										Interface::Log(VerbosityLevel::Debug, "... found disk permission mismatch suspicion on signed %ws overlapping with W64SVC section at 0x%p\r\n", PeEntity->GetFileBase()->GetPath().c_str(), W64SvcSection->GetStartVa());
+										Interface::Log(Interface::VerbosityLevel::Debug, "... found disk permission mismatch suspicion on signed %ws overlapping with W64SVC section at 0x%p\r\n", PeEntity->GetFileBase()->GetPath().c_str(), W64SvcSection->GetStartVa());
 										bReWalkMap = true;
 										this->EraseIoc(&RefSuspList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
 									}
@@ -347,7 +347,7 @@ int32_t IocMap::Filter(uint64_t qwFilterFlags) {
 								if (wcslen(PeEntity->GetFileBase()->GetPath().c_str()) > wcslen(User32Dll) && _wcsicmp(PeEntity->GetFileBase()->GetPath().c_str() + wcslen(PeEntity->GetFileBase()->GetPath().c_str()) - wcslen(User32Dll), User32Dll) == 0) {
 									PeVm::Section* W64SvcSection = PeEntity->GetSection(".text");
 									if ((*IocListItr)->GetSubregion()->GetBasic()->BaseAddress == W64SvcSection->GetStartVa()) {
-										Interface::Log(VerbosityLevel::Debug, "... found modified code IOC overlapping with signed %ws .text section at 0x%p\r\n", PeEntity->GetFileBase()->GetPath().c_str(), W64SvcSection->GetStartVa());
+										Interface::Log(Interface::VerbosityLevel::Debug, "... found modified code IOC overlapping with signed %ws .text section at 0x%p\r\n", PeEntity->GetFileBase()->GetPath().c_str(), W64SvcSection->GetStartVa());
 										bReWalkMap = true;
 										this->EraseIoc(&RefSuspList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
 									}

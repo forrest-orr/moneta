@@ -139,7 +139,7 @@ uint32_t Subregion::QueryPrivateSize() const {
 				}
 			}
 			else {
-				Interface::Log(VerbosityLevel::Surface, "... failed to query working set at 0x%p\r\n", WorkingSets.VirtualAddress);
+				Interface::Log(Interface::VerbosityLevel::Surface, "... failed to query working set at 0x%p\r\n", WorkingSets.VirtualAddress);
 			}
 		}
 	}

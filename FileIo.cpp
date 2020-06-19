@@ -1,9 +1,40 @@
+/*
+__________________________________________________________________________________________
+| _______  _____  __   _ _______ _______ _______                                         |
+| |  |  | |     | | \  | |______    |    |_____|                                         |
+| |  |  | |_____| |  \_| |______    |    |     |                                         |
+|________________________________________________________________________________________|
+| Moneta ~ Usermode memory scanner & malware hunter                                      |
+|----------------------------------------------------------------------------------------|
+| https://www.forrest-orr.net/post/malicious-memory-artifacts-part-ii-bypassing-scanners |
+|----------------------------------------------------------------------------------------|
+| Author: Forrest Orr - 2020                                                             |
+|----------------------------------------------------------------------------------------|
+| Contact: forrest.orr@protonmail.com                                                    |
+|----------------------------------------------------------------------------------------|
+| Licensed under GNU GPLv3                                                               |
+|________________________________________________________________________________________|
+| ## Features                                                                            |
+|                                                                                        |
+| ~ Query the memory attributes of any accessible process(es).                           |
+| ~ Identify private, mapped and image memory.                                           |
+| ~ Correlate regions of memory to their underlying file on disks.                       |
+| ~ Identify PE headers and sections corresponding to image memory.                      |
+| ~ Identify modified regions of mapped image memory.                                    |
+| ~ Identify abnormal memory attributes indicative of malware.                           |
+| ~ Create memory dumps of user-specified memory ranges                                  |
+| ~ Calculate memory permission/type statistics                                          |
+|________________________________________________________________________________________|
+
+*/
+
 #include "stdafx.h"
 #include "FileIo.hpp"
 
 using namespace std;
 
 FileBase::FileBase(wstring DesiredPath, const uint8_t* DataBuf, uint32_t dwSize) : Path(DesiredPath), FileData(new uint8_t[dwSize]), FileSize(dwSize) {
+	assert(DataBuf != nullptr);
 	memcpy(this->FileData, DataBuf, dwSize);
 }
 
@@ -58,6 +89,9 @@ FileBase::~FileBase() {
 }
 
 bool FileBase::TranslateDevicePath(const wchar_t* DevicePath, wchar_t* TranslatedPath) {
+	assert(DevicePath != nullptr);
+	assert(TranslatedPath != nullptr);
+
 	wchar_t DriveLetters[MAX_PATH + 1] = { 0 };
 	bool bTranslated = false;
 
@@ -85,36 +119,21 @@ bool FileBase::TranslateDevicePath(const wchar_t* DevicePath, wchar_t* Translate
 	return bTranslated;
 }
 
-/* ArchWow64PathExpand
-
-The purpose of this function is to receive an unformatted file path (which may
-contain architecture folders or environment variables) and convert the two
-ambiguous architecture directories to Wow64 if applicable.
-
-1. Expand all environment variables.
-2. Check whether the path begins with either of the ambiguous architecture
-folders: C:\Windows\system32, C:\Program Files
-3. If the path does not begin with an ambiguous arch folder return it as is.
-4. If the path does begin with an ambiguous arch folder then convert it to
-the Wow64 equivalent and return it.
-
-Examples:
-
-%programfiles%\example1\example.exe -> C:\Program Files (x86)\example1\example.exe
-C:\Program Files (x86)\example2\example.exe -> C:\Program Files (x86)\example2\example.exe
-C:\Program Files\example3\example.exe -> C:\Program Files (x86)\example3\example.exe
-C:\Windows\system32\notepad.exe -> C:\Windows\syswow64\notepad.exe
-
-*/
-
-#define MAX_ENV_VAR_SIZE 32767
-
 bool FileBase::ArchWow64PathExpand(const wchar_t* TargetFilePath, wchar_t* OutputPath, size_t ccOutputPathLength) {
+	assert(TargetFilePath != nullptr);
+	assert(OutputPath != nullptr);
+
 	bool bExpandedPath = false;
-	uint64_t qwPathLength;
+	uint64_t qwPathLength, qwMaxEnvVarSize = 32767;
 	wchar_t* ProgFilePath64, * ProgFilePathWow64;
 	wchar_t SystemDirectory[MAX_PATH + 1] = { 0 }, SysWow64Directory[MAX_PATH + 1] = { 0 }, ExpandedTargetPath[MAX_PATH + 1] = { 0 };
 	SYSTEM_INFO SystemInfo = { 0 };
+
+	// %programfiles%\example1\example.exe -> C:\Program Files (x86)\example1\example.exe
+	// C:\Program Files (x86)\example2\example.exe -> C:\Program Files (x86)\example2\example.exe
+	// C:\Program Files\example3\example.exe -> C:\Program Files (x86)\example3\example.exe
+	// C:\Windows\system32\notepad.exe -> C:\Windows\syswow64\notepad.exe
+	// C:\ProgramData\something.exe -> C:\ProgramData\something.exe
 
 	if (ExpandEnvironmentStringsW(TargetFilePath, ExpandedTargetPath, MAX_PATH + 1)) {
 		bExpandedPath = true;
@@ -123,18 +142,16 @@ bool FileBase::ArchWow64PathExpand(const wchar_t* TargetFilePath, wchar_t* Outpu
 		GetNativeSystemInfo(&SystemInfo); // Native version of this call works on both Wow64 and x64 as opposed to just x64 for GetSystemInfo. Works on XP+
 
 		if (SystemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) {
-			//
 			// Resolve the 32 and 64-bit versions of the most problematic paths (Program Files, System32)
-			//
 
 			if ((qwPathLength = GetSystemWow64DirectoryW(SysWow64Directory, MAX_PATH + 1))) {
 				if ((qwPathLength = GetSystemDirectoryW(SystemDirectory, MAX_PATH + 1))) {
-					ProgFilePath64 = reinterpret_cast<wchar_t *>(new uint8_t[MAX_ENV_VAR_SIZE]); // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
+					ProgFilePath64 = reinterpret_cast<wchar_t *>(new uint8_t[qwMaxEnvVarSize]); // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
 
-					if ((qwPathLength = GetEnvironmentVariableW(L"ProgramW6432", ProgFilePath64, MAX_ENV_VAR_SIZE))) {
-						ProgFilePathWow64 = reinterpret_cast<wchar_t *>(new uint8_t[MAX_ENV_VAR_SIZE]); // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
+					if ((qwPathLength = GetEnvironmentVariableW(L"ProgramW6432", ProgFilePath64, qwMaxEnvVarSize))) {
+						ProgFilePathWow64 = reinterpret_cast<wchar_t *>(new uint8_t[qwMaxEnvVarSize]); // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
 
-						if ((qwPathLength = GetEnvironmentVariableW(L"ProgramFiles(x86)", ProgFilePathWow64, MAX_ENV_VAR_SIZE))) {
+						if ((qwPathLength = GetEnvironmentVariableW(L"ProgramFiles(x86)", ProgFilePathWow64, qwMaxEnvVarSize))) {
 							//
 							// Is the target path within one of the two ambiguous architecture directories?
 							//

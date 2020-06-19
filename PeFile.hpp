@@ -39,11 +39,9 @@ public:
 	static PeFile* Load(const std::wstring PeFilePath); // Factory
 };
 
-//
-// This derived class is appropriate for holding methods which are type-specific but can be handled with a simple difference in template, not something so fundamental that it must be placed in an architecture-specific sub class.
-//
-
-template<typename NtHdrType> class PeArch : public PeFile { // Every method within this class must have the same template prototype as the class itself. Types used to initialize the template are inheritted by all methods as well. Note that a template function CANNOT be declared within a class unless its template matches that of its containing class.
+template<typename NtHdrType> class PeArch : public PeFile {
+	// Every method within this class must have the same template prototype as the class itself. Types used to initialize the template are inheritted by all methods as well. Note that a template function CANNOT be declared within a class unless its template matches that of its containing class.
+	// This derived class is appropriate for holding methods which are type-specific but can be handled with a simple difference in template, not something so fundamental that it must be placed in an architecture-specific sub class.
 protected:
 	NtHdrType* NtHdr;
 	PeArch(const uint8_t* pPeBuf, uint32_t dwPeFileSize);

@@ -45,7 +45,7 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 	MEMORY_IMAGE_INFORMATION Mii = { 0 };
 	NTSTATUS NtStatus = NtQueryVirtualMemory(OwnerProc.GetHandle(), this->PeData, MemoryImageInformation, &Mii, sizeof(MEMORY_IMAGE_INFORMATION), nullptr);
 
-	Interface::Log(VerbosityLevel::Debug, "... creating PE entity for %ws within %ws (PID %d)\r\n", FilePath, OwnerProc.GetName().c_str(), OwnerProc.GetPid());
+	Interface::Log(Interface::VerbosityLevel::Debug, "... creating PE entity for %ws within %ws (PID %d)\r\n", FilePath, OwnerProc.GetName().c_str(), OwnerProc.GetPid());
 
 	if (NT_SUCCESS(NtStatus)) {
 		this->NonExecutableImage = Mii.ImageNotExecutable;
@@ -54,7 +54,7 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 		this->SigningLevel = Mii.ImageSigningLevel;
 	}
 	else {
-		Interface::Log(VerbosityLevel::Debug, "... NtQueryVirtualMemory failed for image information (0x%08x)\r\n", NtStatus);
+		Interface::Log(Interface::VerbosityLevel::Debug, "... NtQueryVirtualMemory failed for image information (0x%08x)\r\n", NtStatus);
 	}
 
 	if (!this->GetFileBase()->IsPhantom()) {
@@ -92,7 +92,7 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 					uint8_t* pSubregionEndVa = static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress) + (*SbrItr)->GetBasic()->RegionSize;
 
 					if ((pSubregionStartVa >= pSectStartVa && pSubregionStartVa < pSectEndVa) || (pSubregionEndVa > pSectStartVa&& pSubregionEndVa <= pSectEndVa) || (pSubregionStartVa < pSectStartVa && pSubregionEndVa > pSectEndVa)) {
-						Interface::Log(VerbosityLevel::Debug, "... section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa, pSectEndVa, pSubregionStartVa, pSubregionEndVa);
+						Interface::Log(Interface::VerbosityLevel::Debug, "... section %s [0x%p:0x%p] corresponds to sblock [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa, pSectEndVa, pSubregionStartVa, pSubregionEndVa);
 						MEMORY_BASIC_INFORMATION* Mbi = new MEMORY_BASIC_INFORMATION; // When duplicating sblocks, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
 						memcpy(Mbi, (*SbrItr)->GetBasic(), sizeof(MEMORY_BASIC_INFORMATION));
 						OverlapSubregion.push_back(new Subregion(OwnerProc, Mbi));
@@ -103,7 +103,7 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 			}
 		}
 		else {
-			Interface::Log(VerbosityLevel::Debug, "... failed to load PE file using factory method in PE body constructor\r\n");
+			Interface::Log(Interface::VerbosityLevel::Debug, "... failed to load PE file using factory method in PE body constructor\r\n");
 		}
 	}
 }
@@ -213,7 +213,7 @@ Entity* Entity::Create(Processes::Process& OwnerProc, std::vector<Subregion*> Su
 
 		if (GetMappedFileNameW(OwnerProc.GetHandle(), static_cast<HMODULE>(Subregions.front()->GetBasic()->BaseAddress), DevFilePath, MAX_PATH)) {
 			if (!FileBase::TranslateDevicePath(DevFilePath, MapFilePath)) {
-				Interface::Log(VerbosityLevel::Debug, "! Failed to translate device path: %ws\r\n", DevFilePath);
+				Interface::Log(Interface::VerbosityLevel::Debug, "! Failed to translate device path: %ws\r\n", DevFilePath);
 				wcscpy_s(MapFilePath, MAX_PATH + 1, L"?");
 			}
 		}

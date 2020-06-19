@@ -4,6 +4,7 @@
 
 typedef enum class VerbosityLevel;
 typedef class Ioc;
+
 namespace Memory {
 	typedef class Subregion;
 	typedef class Entity;
@@ -14,9 +15,11 @@ namespace Memory {
 	
 }
 typedef class MemDump;
+
 namespace Processes {
 	typedef class Process;
 }
+
 typedef class ScannerContext;
 
 namespace Processes {
@@ -26,7 +29,6 @@ namespace Processes {
 		const void* GetEntryPoint() const { return this->StartAddress; }
 		const void* GetStackAddress() const { return this->StackAddress; }
 		const void* GetTebAddress() const { return this->TebAddress; }
-		//void SetEntryPoint(const void*);
 		HANDLE GetHandle() const { return this->Handle; }
 		Thread(uint32_t dwTid, Processes::Process& OwnerProc);
 		~Thread();
@@ -52,6 +54,8 @@ namespace Processes {
 		void* ImageBase;
 		std::map<uint8_t*, Memory::Entity*> Entities; // A region can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
 	public:
+		Process(uint32_t);
+		~Process();
 		HANDLE GetHandle() const { return this->Handle; }
 		uint32_t GetPid() const { return this->Pid; }
 		void* GetImageBase() const { return this->ImageBase; }
@@ -64,11 +68,9 @@ namespace Processes {
 		bool DumpBlock(MemDump& ProcDmp, const MEMORY_BASIC_INFORMATION* Mbi, std::wstring Indent);
 		BOOL IsWow64() const { return this->Wow64; }
 		uint32_t GetClrVersion() const { return this->ClrVersion; }
-		Process(uint32_t);
-		std::vector<Memory::Subregion*> Enumerate(ScannerContext &ScannerCtx, std::vector<Ioc*>* SelectedIocs);
+		void Enumerate(ScannerContext& ScannerCtx, std::vector<Ioc*>* SelectedIocs, std::vector<Memory::Subregion*>* SelectedSbrs);
 		bool CheckDotNetAffiliation(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
 		int32_t SearchDllDataReferences(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
-		int32_t SearchReferences(MemDump &DmpCtx, std::map <uint8_t*, std::vector<uint8_t*>> &ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
-		~Process();
+		int32_t SearchReferences(MemDump& DmpCtx, std::map <uint8_t*, std::vector<uint8_t*>>& ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
 	};
 }

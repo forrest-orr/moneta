@@ -1,31 +1,56 @@
+/*
+__________________________________________________________________________________________
+| _______  _____  __   _ _______ _______ _______                                         |
+| |  |  | |     | | \  | |______    |    |_____|                                         |
+| |  |  | |_____| |  \_| |______    |    |     |                                         |
+|________________________________________________________________________________________|
+| Moneta ~ Usermode memory scanner & malware hunter                                      |
+|----------------------------------------------------------------------------------------|
+| https://www.forrest-orr.net/post/malicious-memory-artifacts-part-ii-bypassing-scanners |
+|----------------------------------------------------------------------------------------|
+| Author: Forrest Orr - 2020                                                             |
+|----------------------------------------------------------------------------------------|
+| Contact: forrest.orr@protonmail.com                                                    |
+|----------------------------------------------------------------------------------------|
+| Licensed under GNU GPLv3                                                               |
+|________________________________________________________________________________________|
+| ## Features                                                                            |
+|                                                                                        |
+| ~ Query the memory attributes of any accessible process(es).                           |
+| ~ Identify private, mapped and image memory.                                           |
+| ~ Correlate regions of memory to their underlying file on disks.                       |
+| ~ Identify PE headers and sections corresponding to image memory.                      |
+| ~ Identify modified regions of mapped image memory.                                    |
+| ~ Identify abnormal memory attributes indicative of malware.                           |
+| ~ Create memory dumps of user-specified memory ranges                                  |
+| ~ Calculate memory permission/type statistics                                          |
+|________________________________________________________________________________________|
+
+*/
+
 #include "stdafx.h"
 #include "Interface.hpp"
 
 using namespace std;
 
 wstring Interface::LogFilePath;
-VerbosityLevel Interface::VerbosityLvl;
+Interface::VerbosityLevel Interface::VerbosityLvl;
 HANDLE Interface::Handle;
 bool Interface::IsStdout;
 
 void Interface::Initialize(wstring LogFilePath, VerbosityLevel VLvl) {
-	HANDLE Handle;
-	bool bIsStdout = false;
-
 	if (LogFilePath.empty()) {
-		bIsStdout = true;
-		Handle = GetStdHandle(STD_OUTPUT_HANDLE);
+		Interface::IsStdout = true;
+		Interface::Handle = GetStdHandle(STD_OUTPUT_HANDLE);
 	}
 	else {
-		if ((Handle = CreateFileW(LogFilePath.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, 0, NULL)) == INVALID_HANDLE_VALUE) {
+		if ((Interface::Handle = CreateFileW(LogFilePath.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, 0, NULL)) == INVALID_HANDLE_VALUE) {
 			throw;
 		}
 	}
 
 	Interface::LogFilePath = LogFilePath;
 	Interface::VerbosityLvl = VLvl;
-	Interface::Handle = Handle;
-	Interface::IsStdout = bIsStdout;
 }
 
 void Interface::Initialize(VerbosityLevel Vlvl) {
@@ -34,21 +59,21 @@ void Interface::Initialize(VerbosityLevel Vlvl) {
 
 void Interface::Initialize(vector<wstring> &Args) {
 	wstring LogFilePath;
-	VerbosityLevel VLvl = VerbosityLevel::Surface;
+	VerbosityLevel VLvl = Interface::VerbosityLevel::Surface;
 
 	for (vector<wstring>::const_iterator i = Args.begin(); i != Args.end(); ++i) {
 		if (*i == L"-v") {
 			if (*(i + 1) == L"surface") {
-				VLvl = VerbosityLevel::Surface;
+				VLvl = Interface::VerbosityLevel::Surface;
 			}
 			else if (*(i + 1) == L"detail") {
-				VLvl = VerbosityLevel::Detail;
+				VLvl = Interface::VerbosityLevel::Detail;
 			}
 			else if (*(i + 1) == L"debug") {
-				VLvl = VerbosityLevel::Debug;
+				VLvl = Interface::VerbosityLevel::Debug;
 			}
 			else if (*(i + 1) == L"silent") {
-				VLvl = VerbosityLevel::Silent;
+				VLvl = Interface::VerbosityLevel::Silent;
 			}
 		}
 		else if (*i == L"--log-file") {
@@ -72,28 +97,11 @@ bool Interface::Log(VerbosityLevel MsgVlvl, const char *LogFormat, ...) {
 		}
 
 		va_end(pVarList);
-
 		return WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), reinterpret_cast<PDWORD>(&dwBytesWritten), NULL);
 	}
 
 	return false;
 }
-/*
-bool Interface::Log(const char *LogFormat, ...) {
-	char LogBuffer[4000] = { 0 };
-	char *pVarList;
-	uint32_t dwBytesWritten = 0;
-
-	va_start(pVarList, LogFormat);
-
-	if (_vsnprintf_s(LogBuffer, sizeof(LogBuffer), _TRUNCATE, LogFormat, pVarList) == -1) {
-		LogBuffer[sizeof(LogBuffer) - 1] = '\0';
-	}
-
-	va_end(pVarList);
-
-	return WriteFile(Interface::Handle, LogBuffer, strlen(LogBuffer), reinterpret_cast<PDWORD>(&dwBytesWritten), NULL);
-}*/
 
 bool Interface::Log(VerbosityLevel MsgVlvl, ConsoleColor Color, const char* LogFormat, ...) {
 	char LogBuffer[4000] = { 0 };
@@ -129,7 +137,7 @@ bool Interface::Log(VerbosityLevel MsgVlvl, ConsoleColor Color, const char* LogF
 }
 
 void Interface::EnumColors() {
-	for (uint32_t dwX = 0; dwX < 100; dwX++) Interface::Log(VerbosityLevel::Surface, (ConsoleColor)dwX, "%d ", dwX);
-    Interface::Log(VerbosityLevel::Surface, "\r\n");
+	for (uint32_t dwX = 0; dwX < 100; dwX++) Interface::Log(Interface::VerbosityLevel::Surface, (ConsoleColor)dwX, "%d ", dwX);
+    Interface::Log(Interface::VerbosityLevel::Surface, "\r\n");
     system("pause");
 }

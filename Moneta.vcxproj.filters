@@ -13,87 +13,57 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Source Files\Classes">
-      <UniqueIdentifier>{de84756f-c300-449c-9217-d751f1b1b984}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\Classes">
-      <UniqueIdentifier>{99d0197e-6354-4645-b4c2-edc2420d44ee}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Classes\Memory">
-      <UniqueIdentifier>{12f263ff-349e-4eb0-87ba-8e1042e59bd1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Classes\Processes">
-      <UniqueIdentifier>{c61e686a-46b3-45de-b235-3e17d7bd8260}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="FileIo.cpp">
-      <Filter>Source Files\Classes</Filter>
-    </ClCompile>
     <ClCompile Include="Console.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Interface.cpp">
-      <Filter>Source Files\Classes</Filter>
-    </ClCompile>
-    <ClCompile Include="Signing.cpp">
-      <Filter>Source Files\Classes</Filter>
-    </ClCompile>
-    <ClCompile Include="Regions.cpp">
-      <Filter>Source Files\Classes\Memory</Filter>
-    </ClCompile>
-    <ClCompile Include="Statistics.cpp">
-      <Filter>Source Files\Classes\Memory</Filter>
-    </ClCompile>
-    <ClCompile Include="Subregions.cpp">
-      <Filter>Source Files\Classes\Memory</Filter>
-    </ClCompile>
-    <ClCompile Include="MemDump.cpp">
-      <Filter>Source Files\Classes</Filter>
-    </ClCompile>
-    <ClCompile Include="PeFile.cpp">
-      <Filter>Source Files\Classes</Filter>
-    </ClCompile>
     <ClCompile Include="Privilege.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Thread.cpp">
-      <Filter>Source Files\Classes\Processes</Filter>
-    </ClCompile>
-    <ClCompile Include="Process.cpp">
-      <Filter>Source Files\Classes\Processes</Filter>
     </ClCompile>
     <ClCompile Include="DotNetNative.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Ioc.cpp">
-      <Filter>Source Files\Classes</Filter>
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Signing.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PeFile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FileIo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MemDump.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Regions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Subregions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Statistics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Process.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Thread.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="FileIo.hpp">
-      <Filter>Header Files\Classes</Filter>
-    </ClInclude>
-    <ClInclude Include="Interface.hpp">
-      <Filter>Header Files\Classes</Filter>
-    </ClInclude>
     <ClInclude Include="StdAfx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Memory.hpp">
-      <Filter>Header Files\Classes</Filter>
-    </ClInclude>
-    <ClInclude Include="PeFile.hpp">
-      <Filter>Header Files\Classes</Filter>
-    </ClInclude>
-    <ClInclude Include="MemDump.hpp">
-      <Filter>Header Files\Classes</Filter>
-    </ClInclude>
     <ClInclude Include="Privileges.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Processes.hpp">
-      <Filter>Header Files\Classes</Filter>
     </ClInclude>
     <ClInclude Include="Signing.h">
       <Filter>Header Files</Filter>
@@ -104,20 +74,38 @@
     <ClInclude Include="PEB.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Scanner.hpp">
-      <Filter>Header Files\Classes</Filter>
-    </ClInclude>
     <ClInclude Include="DotNetNative.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Resources.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="FileIo.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Interface.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MemDump.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PeFile.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Processes.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Scanner.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="Statistics.hpp">
-      <Filter>Header Files\Classes</Filter>
+      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Ioc.hpp">
-      <Filter>Header Files\Classes</Filter>
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

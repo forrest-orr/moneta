@@ -56,7 +56,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	vector<wstring> Args(&pArgv[0], &pArgv[0 + nArgc]);
 	Interface::Initialize(Args);
 	SelectedProcess_t ProcType = SelectedProcess_t::InvalidPid;
-	MemorySelection_t MemorySelectionType = MemorySelection_t::Invalid;
+	ScannerContext::MemorySelection_t Mst = ScannerContext::MemorySelection_t::Invalid;
 	uint32_t dwSelectedPid = 0, dwRegionSize = 0;
 	uint8_t* pAddress = nullptr;
 	bool bSuppressBanner = false;
@@ -77,16 +77,16 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		}
 		else if (Arg == L"-m") {
 			if (*(i + 1) == L"region") {
-				MemorySelectionType = MemorySelection_t::Block;
+				Mst = ScannerContext::MemorySelection_t::Block;
 			}
 			else if (*(i + 1) == L"*") {
-				MemorySelectionType = MemorySelection_t::All;
+				Mst = ScannerContext::MemorySelection_t::All;
 			}
 			else if (*(i + 1) == L"ioc") {
-				MemorySelectionType = MemorySelection_t::Suspicious;
+				Mst = ScannerContext::MemorySelection_t::Suspicious;
 			}
 			else if (*(i + 1) == L"referenced") {
-				MemorySelectionType = MemorySelection_t::Referenced;
+				Mst = ScannerContext::MemorySelection_t::Referenced;
 			}
 		}
 		else if (Arg == L"--address") {
@@ -143,7 +143,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 	}
 
 	if (!bSuppressBanner) {
-		Interface::Log(VerbosityLevel::Surface,
+		Interface::Log(Interface::VerbosityLevel::Surface,
 			"   _____                        __          \r\n"
 			"  /     \\   ____   ____   _____/  |______   \r\n"
 			" /  \\ /  \\ /  _ \\ /    \\_/ __ \\   __\\__  \\  \r\n"
@@ -165,7 +165,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			GetNativeSystemInfo(&SystemInfo); // Native version of this call works on both Wow64 and x64 as opposed to just x64 for GetSystemInfo. Works on XP+
 
 			if (SystemInfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 && bSelfWow64) {
-				Interface::Log(VerbosityLevel::Surface, "... Moneta 32-bit should not be used on a 64-bit OS. Use the x64 version of this tool.\r\n");
+				Interface::Log(Interface::VerbosityLevel::Surface, "... Moneta 32-bit should not be used on a 64-bit OS. Use the x64 version of this tool.\r\n");
 				return 0;
 			}
 		}
@@ -184,83 +184,75 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				pRsrcData = (char*)LockResource(hResourceData);
 				uint8_t* RsrcBuf = new uint8_t[dwRsrcSize + 1](); // Otherwise the resource text may bleed in to the rest of the .rsrc section
 				memcpy(RsrcBuf, pRsrcData, dwRsrcSize);
-				Interface::Log(VerbosityLevel::Surface, "%s\r\n", pRsrcData);
+				Interface::Log(Interface::VerbosityLevel::Surface, "%s\r\n", pRsrcData);
 			}
 		}
 	}
 	else {
-		//
 		// Validate user input
-		//
 
 		if (ProcType == SelectedProcess_t::InvalidPid) {
-			Interface::Log(VerbosityLevel::Surface, "... invalid target process type selected\r\n");
+			Interface::Log(Interface::VerbosityLevel::Surface, "... invalid target process type selected\r\n");
 			return 0;
 		}
 
 		if (dwSelectedPid == GetCurrentProcessId()) {
-			Interface::Log(VerbosityLevel::Surface, "... this scanner cannot target itself\r\n");
+			Interface::Log(Interface::VerbosityLevel::Surface, "... this scanner cannot target itself\r\n");
 			return 0;
 		}
 
-		if (MemorySelectionType == MemorySelection_t::Invalid) {
-			Interface::Log(VerbosityLevel::Surface, "... invalid memory selection type\r\n");
+		if (Mst == ScannerContext::MemorySelection_t::Invalid) {
+			Interface::Log(Interface::VerbosityLevel::Surface, "... invalid memory selection type\r\n");
 			return 0;
 		}
 
-		if ((MemorySelectionType == MemorySelection_t::Referenced || MemorySelectionType == MemorySelection_t::Block) && pAddress == nullptr) {
-			Interface::Log(VerbosityLevel::Surface, "... address must be specified for the provided memory selection type.\r\n");
+		if ((Mst == ScannerContext::MemorySelection_t::Referenced || Mst == ScannerContext::MemorySelection_t::Block) && pAddress == nullptr) {
+			Interface::Log(Interface::VerbosityLevel::Surface, "... address must be specified for the provided memory selection type.\r\n");
 			return 0;
 		}
 
-		//
 		// Initialization
-		//
 
 		if (GrantSelfSeDebug()) {
-			Interface::Log(VerbosityLevel::Debug, "... successfully granted SeDebug privilege to self\r\n");
+			Interface::Log(Interface::VerbosityLevel::Debug, "... successfully granted SeDebug privilege to self\r\n");
 		}
 		else {
-			Interface::Log(VerbosityLevel::Surface, "... failed to grant SeDebug privilege to self. Certain processes will be inaccessible.\r\n");
+			Interface::Log(Interface::VerbosityLevel::Surface, "... failed to grant SeDebug privilege to self. Certain processes will be inaccessible.\r\n");
 		}
 
 		if ((qwOptFlags & PROCESS_ENUM_FLAG_MEMDUMP)) {
 			MemDump::Initialize();
 		}
 
-		//
 		// Analyze processes and generate memory maps/suspicions
-		//
 
-		ScannerContext ScannerCtx(qwOptFlags, MemorySelectionType, pAddress, dwRegionSize, qwFilterFlags);
+		ScannerContext ScannerCtx(qwOptFlags, Mst, pAddress, dwRegionSize, qwFilterFlags);
 		uint64_t qwStartTick = GetTickCount64();
 
 		if (ProcType == SelectedProcess_t::SelfPid || ProcType == SelectedProcess_t::SpecificPid) {
 			try {
 				Process TargetProc(dwSelectedPid);
 				vector<Ioc*> SelectedIocs;
-				vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(ScannerCtx, &SelectedIocs);
+				vector<Subregion*> SelectedSbrs;
+
+				TargetProc.Enumerate(ScannerCtx, &SelectedIocs, &SelectedSbrs);
 
 				if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
-					PermissionRecord* MemPermRec = new PermissionRecord(SelectedSbrs);
+					PermissionRecord* PermissionRecords = new PermissionRecord(SelectedSbrs);
 					IocRecord* IocRecords = new IocRecord(&SelectedIocs);
-					Interface::SetVerbosity(VerbosityLevel::Surface); // Override the verbosity level now that the scan is over to ensure statistics and scan time are displayed (if applicable)
-					MemPermRec->ShowRecords();
+					Interface::SetVerbosity(Interface::VerbosityLevel::Surface); // Override the verbosity level now that the scan is over to ensure statistics and scan time are displayed (if applicable)
+					PermissionRecords->ShowRecords();
 					IocRecords->ShowRecords();
 				}
-				/*
-				for (vector<Ioc*>::const_iterator IocItr = SelectedIocs.begin(); IocItr != SelectedIocs.end(); ++IocItr) {
-					//delete* IocItr;
-				}*/
 			}
 			catch (int32_t nError) {
-				Interface::Log(VerbosityLevel::Surface, "... failed to map address space of %d (error %d)\r\n", dwSelectedPid, nError);
+				Interface::Log(Interface::VerbosityLevel::Surface, "... failed to map address space of %d (error %d)\r\n", dwSelectedPid, nError);
 			}
 		}
 		else {
 			PROCESSENTRY32W ProcEntry = { 0 };
 			HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-			PermissionRecord* MemPermRec = nullptr;
+			PermissionRecord* PermissionRecords = nullptr;
 			IocRecord* IocRecords = nullptr;
 
 			if (hSnapshot != nullptr) {
@@ -272,14 +264,16 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 							try {
 								Process TargetProc(ProcEntry.th32ProcessID);
 								vector<Ioc*> SelectedIocs;
-								vector<Subregion*> SelectedSbrs = TargetProc.Enumerate(ScannerCtx, &SelectedIocs);
+								vector<Subregion*> SelectedSbrs;
+
+								TargetProc.Enumerate(ScannerCtx, &SelectedIocs, &SelectedSbrs);
 
 								if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
-									if (MemPermRec == nullptr) {
-										MemPermRec = new PermissionRecord(SelectedSbrs);
+									if (PermissionRecords == nullptr) {
+										PermissionRecords = new PermissionRecord(SelectedSbrs);
 									}
 									else {
-										MemPermRec->UpdateMap(SelectedSbrs);
+										PermissionRecords->UpdateMap(SelectedSbrs);
 									}
 
 									if (IocRecords == nullptr) {
@@ -289,13 +283,9 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 										IocRecords->UpdateMap(&SelectedIocs);
 									}
 								}
-
-								for (vector<Ioc*>::const_iterator IocItr = SelectedIocs.begin(); IocItr != SelectedIocs.end(); ++IocItr) {
-									//delete* IocItr;
-								}
 							}
 							catch (int32_t nError) {
-								Interface::Log(VerbosityLevel::Debug, "... failed to map address space of %d:%ws (error %d)\r\n", ProcEntry.th32ProcessID, ProcEntry.szExeFile, nError);
+								Interface::Log(Interface::VerbosityLevel::Debug, "... failed to map address space of %d:%ws (error %d)\r\n", ProcEntry.th32ProcessID, ProcEntry.szExeFile, nError);
 								continue;
 							}
 						}
@@ -306,13 +296,13 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			}
 			else
 			{
-				Interface::Log(VerbosityLevel::Surface, "... failed to create process list snapshot (error %d)\r\n", GetLastError());
+				Interface::Log(Interface::VerbosityLevel::Surface, "... failed to create process list snapshot (error %d)\r\n", GetLastError());
 			}
 
-			Interface::SetVerbosity(VerbosityLevel::Surface); // Override the verbosity level now that the scan is over to ensure statistics and scan time are displayed (if applicable)
+			Interface::SetVerbosity(Interface::VerbosityLevel::Surface); // Override the verbosity level now that the scan is over to ensure statistics and scan time are displayed (if applicable)
 
-			if (MemPermRec != nullptr) {
-				MemPermRec->ShowRecords();
+			if (PermissionRecords != nullptr) {
+				PermissionRecords->ShowRecords();
 			}
 
 			if (IocRecords != nullptr) {
@@ -321,7 +311,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		}
 
 		float fElapsedTime = GetTickCount64() - qwStartTick;
-		Interface::Log(VerbosityLevel::Surface, "\r\n... scan completed (%f second duration)\r\n", fElapsedTime / 1000.0);
+		Interface::Log(Interface::VerbosityLevel::Surface, "\r\n... scan completed (%f second duration)\r\n", fElapsedTime / 1000.0);
 		return 1;
 	}
 }
