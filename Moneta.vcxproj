@@ -136,12 +136,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ResourceCompile Include="Moneta.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="Usage.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="Source\Console.cpp" />
     <ClCompile Include="Source\DotNetNative.cpp" />
     <ClCompile Include="Source\FileIo.cpp" />
@@ -175,6 +169,15 @@
     <ClInclude Include="Headers\Statistics.hpp" />
     <ClInclude Include="Headers\StdAfx.h" />
     <ClInclude Include="Headers\Typedefs.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Resources\Moneta.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Resources\Moneta.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Resources\Usage.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
