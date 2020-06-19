@@ -140,3 +140,22 @@ void Interface::EnumColors() {
     Interface::Log(Interface::VerbosityLevel::Surface, "\r\n");
     system("pause");
 }
+
+void Interface::AlignStr(const wchar_t* pOriginalStr, wchar_t* pAlignedStr, int32_t nAlignTo) {
+	assert(nAlignTo >= 1);
+	assert(wcslen(pOriginalStr) <= nAlignTo);
+
+	if (wcslen(pOriginalStr)) {
+		wcsncpy_s(pAlignedStr, (nAlignTo + 1), pOriginalStr, nAlignTo);
+		for (int32_t nX = wcslen(pAlignedStr); nX < nAlignTo; nX++) {
+			wcscat_s(pAlignedStr, (nAlignTo + 1), L" ");
+		}
+	}
+	else {
+		wcscpy_s(pAlignedStr, (nAlignTo + 1), L" ");
+
+		for (int32_t nX = 1; nX < nAlignTo; nX++) {
+			wcscat_s(pAlignedStr, (nAlignTo + 1), L" ");
+		}
+	}
+}

@@ -233,7 +233,7 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 				}
 
 				Subregions.push_back(new Subregion(*this, Mbi));
-				Region = Subregions.begin(); // This DOES fix a bug.
+				Region = Subregions.begin();
 			}
 			else {
 				if (!Subregions.empty()) { // Edge case: new region not yet found but finished enumerating subregions.
@@ -248,6 +248,12 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 	else {
 		Interface::Log(Interface::VerbosityLevel::Debug, "... failed to open handle to PID %d\r\n", this->Pid);
 		throw 1;
+	}
+}
+
+void Process::EnumerateThreads(const wstring Indent) {
+	for (vector<Processes::Thread*>::iterator ThItr = this->Threads.begin(); ThItr != Threads.end(); ++ThItr) {
+		Interface::Log(Interface::VerbosityLevel::Surface, "%wsThread 0x%p [TID 0x%08x]\r\n", Indent.c_str(), (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
 	}
 }
 
@@ -271,32 +277,7 @@ PeVm::Body* Process::GetLoadedModule(wstring Name) const {
 	return nullptr;
 }
 
-void AlignName(const wchar_t* pOriginalName, wchar_t* pAlignedName, int32_t nAlignTo) { // Make generic and move to interface?
-	assert(nAlignTo >= 1);
-	assert(wcslen(pOriginalName) <= nAlignTo);
-
-	if (wcslen(pOriginalName)) {
-		wcsncpy_s(pAlignedName, (nAlignTo + 1), pOriginalName, nAlignTo);
-		for (int32_t nX = wcslen(pAlignedName); nX < nAlignTo; nX++) {
-			wcscat_s(pAlignedName, (nAlignTo + 1), L" ");
-		}
-	}
-	else {
-		wcscpy_s(pAlignedName, (nAlignTo + 1), L" ");
-
-		for (int32_t nX = 1; nX < nAlignTo; nX++) {
-			wcscat_s(pAlignedName, (nAlignTo + 1), L" ");
-		}
-	}
-}
-
-void EnumerateThreads(const wstring Indent, vector<Processes::Thread*> Threads) {
-	for (vector<Processes::Thread*>::iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
-		Interface::Log(Interface::VerbosityLevel::Surface, "%wsThread 0x%p [TID 0x%08x]\r\n", Indent.c_str(), (*ThItr)->GetEntryPoint(), (*ThItr)->GetTid());
-	}
-}
-
-int32_t AppendOverlapIoc(map<uint8_t*, list<Ioc *>>* Iocs, uint8_t *pSubregionAddress, bool bEntityTop, vector<Ioc*>* SelectedIocs) {
+int32_t Process::AppendOverlapIoc(map<uint8_t*, list<Ioc *>>* Iocs, uint8_t *pSubregionAddress, bool bEntityTop, vector<Ioc*>* SelectedIocs) {
 	assert(pSubregionAddress != nullptr);
 	assert(SelectedIocs != nullptr);
 
@@ -321,7 +302,7 @@ int32_t AppendOverlapIoc(map<uint8_t*, list<Ioc *>>* Iocs, uint8_t *pSubregionAd
 	return nCount;
 }
 
-int32_t AppendSubregionAttributes(Subregion *Sbr) {
+int32_t Process::AppendSubregionAttributes(Subregion *Sbr) {
 	int32_t nCount = 0;
 	
 	if ((Sbr->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP)) {
@@ -357,7 +338,7 @@ int32_t AppendSubregionAttributes(Subregion *Sbr) {
 	return nCount;
 }
 
-int32_t SubEntitySuspCount(map<uint8_t*, list<Ioc*>>* Iocs, uint8_t* pSubregionAddress) {
+int32_t Process::SubEntityIocCount(map<uint8_t*, list<Ioc*>>* Iocs, uint8_t* pSubregionAddress) {
 	assert(pSubregionAddress != nullptr);
 	int32_t nCount = 0;
 
@@ -390,7 +371,7 @@ bool Process::DumpBlock(MemDump &DmpCtx, const MEMORY_BASIC_INFORMATION *Mbi, ws
 
 	return false;
 }
-
+/*
 void EnumReferencesMap(map <uint8_t*, vector<uint8_t*>> ReferencesMap) {
 	for (map <uint8_t*, vector<uint8_t*>>::const_iterator AbMapItr = ReferencesMap.begin(); AbMapItr != ReferencesMap.end(); ++AbMapItr) {
 		Interface::Log(Interface::VerbosityLevel::Surface, "0x%p [%d subregions]\r\n", AbMapItr->first, AbMapItr->second.size());
@@ -398,7 +379,7 @@ void EnumReferencesMap(map <uint8_t*, vector<uint8_t*>> ReferencesMap) {
 			Interface::Log(Interface::VerbosityLevel::Surface, "  0x%p\r\n", (*RefAddrItr));
 		}
 	}
-}
+}*/
 
 template<typename Address_t> int32_t ScanChunkForAddress(uint8_t *pBuf, uint32_t dwSize, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) {
 	assert(pBuf != nullptr);
@@ -478,13 +459,11 @@ int32_t Process::SearchDllDataReferences(const uint8_t* pReferencedAddress, cons
 
 					if (ReadProcessMemory(this->GetHandle(), DataSect->GetStartVa(), Buf, DataSect->GetEntitySize(), nullptr)) {
 						int32_t nOffset;
-						//Interface::Log(Interface::VerbosityLevel::Surface, "... successfully dumped memory at 0x%p (%d bytes)\r\n", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize);
 
 						if ((nOffset = ScanChunkForAddress<uint64_t>(Buf, DataSect->GetEntitySize(), pReferencedAddress, dwRegionSize)) != -1) {
-							//Interface::Log(Interface::VerbosityLevel::Surface, "... found private executable region address 0x%p at 0x%p (offset 0x%08x) in %ws .data section\r\n",
-							//	pReferencedAddress, (uint8_t *)DataSect->GetStartVa() + nOffset, nOffset, PeEntity->GetPebModule().GetName().c_str());
+							Interface::Log(Interface::VerbosityLevel::Debug, "... found private executable region address 0x%p at 0x%p (offset 0x%08x) in %ws .data section\r\n",
+								pReferencedAddress, (uint8_t *)DataSect->GetStartVa() + nOffset, nOffset, PeEntity->GetPebModule().GetName().c_str());
 							nRefTotal++;
-							//break;
 						}
 					}
 
@@ -658,7 +637,7 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 				}
 
 
-				AlignName(ImgType, AlignedImgType, 21);
+				Interface::AlignStr(ImgType, AlignedImgType, 21);
 				Interface::Log(Interface::VerbosityLevel::Surface, Interface::ConsoleColor::Gold, "%ws", AlignedImgType);
 
 				if (!PeEntity->GetFileBase()->IsPhantom()) {
@@ -725,11 +704,6 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 					Interface::Log(Interface::VerbosityLevel::Surface, "    | Mapped file size: %d\r\n", Itr->second->GetEntitySize());
 					Interface::Log(Interface::VerbosityLevel::Surface, "    | Mapped file path: %ws\r\n", dynamic_cast<MappedFile*>(Itr->second)->GetFileBase()->GetPath().c_str());
 				}
-				/*
-				if (Itr->second->GetRegionInfo() != nullptr) {
-					// Due to flag inconsistency between architectures and different Windows version MEMORY_REGION_INFORMATION has been excluded
-				}
-				*/
 			}
 
 			//
@@ -744,13 +718,13 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 					(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Suspicious && ((ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE) || 
 																		  (SuspSbrMap != nullptr &&
 																		   SuspSbrMap->count(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress))) &&
-																		   SubEntitySuspCount(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress)) > 0)) || 
+																		   SubEntityIocCount(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress)) > 0)) || 
 					(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Referenced && (ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE) ||
 																		  (RefSbrVec != nullptr &&
 																		  find(RefSbrVec->begin(), RefSbrVec->end(), static_cast<uint8_t*>((*SbrItr)->GetBasic()->BaseAddress)) != RefSbrVec->end()))) { // mselect == referenced and this subregion contains one or more reference or the "from base" option is set
 					wchar_t AlignedAttribDesc[9] = { 0 };
 
-					AlignName(Subregion::AttribDesc((*SbrItr)->GetBasic()), AlignedAttribDesc, 8);
+					Interface::AlignStr(Subregion::AttribDesc((*SbrItr)->GetBasic()), AlignedAttribDesc, 8);
 
 					if (Itr->second->GetType() == Entity::Type::PE_FILE && !dynamic_cast<PeVm::Body*>(Itr->second)->GetFileBase()->IsPhantom()) {
 						//
@@ -772,7 +746,7 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 
 								strncpy_s(AnsiSectName, 9, (char*)(*SectItr)->GetHeader()->Name, 8);
 								wstring UnicodeSectName = UnicodeConverter.from_bytes(AnsiSectName);
-								AlignName(static_cast<const wchar_t*>(UnicodeSectName.c_str()), AlignedSectName, 8);
+								Interface::AlignStr(static_cast<const wchar_t*>(UnicodeSectName.c_str()), AlignedSectName, 8);
 
 								Interface::Log(Interface::VerbosityLevel::Surface, "    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName, (*SbrItr)->GetPrivateSize());
 								AppendSubregionAttributes(*SbrItr);
@@ -800,7 +774,7 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 						Interface::Log(Interface::VerbosityLevel::Surface, "      | Private size: %d [%d pages]\r\n", (*SbrItr)->GetPrivateSize(), (*SbrItr)->GetPrivateSize() / 0x1000);
 					}
 
-					EnumerateThreads(L"      ", (*SbrItr)->GetThreads());
+					this->EnumerateThreads(L"      ");
 
 					if ((ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_MEMDUMP)) {
 						if (!(ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE)) {

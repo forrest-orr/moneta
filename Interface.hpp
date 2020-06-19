@@ -23,6 +23,7 @@ public:
 	static VerbosityLevel GetVerbosity() { return Interface::VerbosityLvl; }
 	static void SetVerbosity(VerbosityLevel Vlvl) { Interface::VerbosityLvl = Vlvl; }
 	static void EnumColors();
+	static void AlignStr(const wchar_t* pOriginalStr, wchar_t* pAlignedStr, int32_t nAlignTo);
 private:
 	static std::wstring LogFilePath;
 	static HANDLE Handle;

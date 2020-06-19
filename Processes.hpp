@@ -72,5 +72,9 @@ namespace Processes {
 		bool CheckDotNetAffiliation(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
 		int32_t SearchDllDataReferences(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
 		int32_t SearchReferences(MemDump& DmpCtx, std::map <uint8_t*, std::vector<uint8_t*>>& ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
+		void EnumerateThreads(const std::wstring Indent);
+		int32_t AppendOverlapIoc(std::map<uint8_t*, std::list<Ioc*>>* Iocs, uint8_t* pSubregionAddress, bool bEntityTop, std::vector<Ioc*>* SelectedIocs);
+		int32_t AppendSubregionAttributes(Memory::Subregion* Sbr);
+		int32_t SubEntityIocCount(std::map<uint8_t*, std::list<Ioc*>>* Iocs, uint8_t* pSubregionAddress);
 	};
 }
