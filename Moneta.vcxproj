@@ -146,6 +146,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DotNetNative.h" />
+    <ClInclude Include="Helpers.h" />
     <ClInclude Include="Memory.hpp" />
     <ClInclude Include="FileIo.hpp" />
     <ClInclude Include="Interface.hpp" />

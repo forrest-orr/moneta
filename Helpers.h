@@ -1,0 +1,1 @@
+template<typename Address_t> int32_t ScanChunkForAddress(uint8_t* pBuf, uint32_t dwSize, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize);

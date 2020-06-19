@@ -65,16 +65,17 @@ namespace Processes {
 		std::wstring GetImageFilePath() const { return this->ImageFilePath; }
 		std::map<uint8_t*, Memory::Entity*> GetEntities() const { return this->Entities; }
 		Memory::PeVm::Body* GetLoadedModule(std::wstring Name) const;
-		bool DumpBlock(MemDump& ProcDmp, const MEMORY_BASIC_INFORMATION* Mbi, std::wstring Indent);
+		MemDump* GetDmpCtx() const { return this->DmpCtx; }
+		bool DumpBlock(const MEMORY_BASIC_INFORMATION* Mbi, std::wstring Indent);
 		BOOL IsWow64() const { return this->Wow64; }
 		uint32_t GetClrVersion() const { return this->ClrVersion; }
 		void Enumerate(ScannerContext& ScannerCtx, std::vector<Ioc*>* SelectedIocs, std::vector<Memory::Subregion*>* SelectedSbrs);
 		bool CheckDotNetAffiliation(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
 		int32_t SearchDllDataReferences(const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
-		int32_t SearchReferences(MemDump& DmpCtx, std::map <uint8_t*, std::vector<uint8_t*>>& ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
-		void EnumerateThreads(const std::wstring Indent);
-		int32_t AppendOverlapIoc(std::map<uint8_t*, std::list<Ioc*>>* Iocs, uint8_t* pSubregionAddress, bool bEntityTop, std::vector<Ioc*>* SelectedIocs);
-		int32_t AppendSubregionAttributes(Memory::Subregion* Sbr);
-		int32_t SubEntityIocCount(std::map<uint8_t*, std::list<Ioc*>>* Iocs, uint8_t* pSubregionAddress);
+		int32_t SearchReferences(std::map <uint8_t*, std::vector<uint8_t*>>& ReferencesMap, const uint8_t* pReferencedAddress, const uint32_t dwRegionSize) const;
+		static void EnumerateThreads(const std::wstring Indent, std::vector<Processes::Thread*> Threads);
+		static int32_t AppendOverlapIoc(std::map<uint8_t*, std::list<Ioc*>>* Iocs, uint8_t* pSubregionAddress, bool bEntityTop, std::vector<Ioc*>* SelectedIocs);
+		static int32_t AppendSubregionAttributes(Memory::Subregion* Sbr);
+		static int32_t SubEntityIocCount(std::map<uint8_t*, std::list<Ioc*>>* Iocs, uint8_t* pSubregionAddress);
 	};
 }
