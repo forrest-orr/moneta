@@ -46,7 +46,7 @@ Ioc::Ioc(Process* ParentProc, Entity* ParentObj, Subregion* Block, Ioc::Type Typ
 bool Ioc::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, map<uint8_t*, list<Ioc *>>> *IocMap) {
 	assert(IocMap != nullptr);
 
-	list<Ioc *> AbSuspList;
+	list<Ioc *> RegionIocList;
 	IocMap->insert(make_pair(static_cast<unsigned char*>(const_cast<void*>(ParentObj.GetStartVa())), map<uint8_t*, list<Ioc *>>()));
 	map<uint8_t*, list<Ioc *>>& RefSubregionMap = IocMap->at(static_cast<unsigned char *>(const_cast<void*>(ParentObj.GetStartVa())));
 
@@ -61,11 +61,11 @@ bool Ioc::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, m
 
 			if (!PeEntity->IsNonExecutableImage()) {
 				if (!PeEntity->GetFileBase()->IsPhantom() && !PeEntity->IsSigned()) {
-					AbSuspList.push_back(new Ioc(&ParentProc, &ParentObj, nullptr, UNSIGNED_MODULE));
+					RegionIocList.push_back(new Ioc(&ParentProc, &ParentObj, nullptr, UNSIGNED_MODULE));
 				}
 
 				if (!PeEntity->GetPebModule().Exists()) {
-					AbSuspList.push_back(new Ioc(&ParentProc, &ParentObj, nullptr, MISSING_PEB_ENTRY));
+					RegionIocList.push_back(new Ioc(&ParentProc, &ParentObj, nullptr, MISSING_PEB_ENTRY));
 				}
 				else {
 					if (_wcsicmp(PeEntity->GetPebModule().GetPath().c_str(), PeEntity->GetFileBase()->GetPath().c_str()) != 0) { // Since the PEB module is queried by base address with GetModuleInfo/GetModuleFileNameExW rather than by name with GetModuleHandleEx, there may be a PEB link with a base address matching this image region but with a misleading name/path
@@ -74,12 +74,12 @@ bool Ioc::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, m
 
 							if (FileBase::ArchWow64PathExpand(PeEntity->GetPebModule().GetPath().c_str(), ReFormattedPath, MAX_PATH + 1)) {
 								if (_wcsicmp(ReFormattedPath, PeEntity->GetFileBase()->GetPath().c_str()) != 0) {
-									AbSuspList.push_back(new Ioc(&ParentProc, &ParentObj, nullptr, MISMATCHING_PEB_MODULE));
+									RegionIocList.push_back(new Ioc(&ParentProc, &ParentObj, nullptr, MISMATCHING_PEB_MODULE));
 								}
 							}
 						}
 						else {
-							AbSuspList.push_back(new Ioc(&ParentProc, &ParentObj, nullptr, MISMATCHING_PEB_MODULE));
+							RegionIocList.push_back(new Ioc(&ParentProc, &ParentObj, nullptr, MISMATCHING_PEB_MODULE));
 						}
 					}
 				}
@@ -90,29 +90,29 @@ bool Ioc::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, m
 						vector<Subregion*> Subregions = (*SectItr)->GetSubregions();
 
 						for (vector<Subregion*>::iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
-							list<Ioc *> SbSuspList;
-							list<Ioc *>& TargetSuspList = (*SbrItr)->GetBasic()->BaseAddress == ParentObj.GetStartVa() ? AbSuspList : SbSuspList;
+							list<Ioc *> SbIocList;
+							list<Ioc *>& TargetIocList = (*SbrItr)->GetBasic()->BaseAddress == ParentObj.GetStartVa() ? RegionIocList : SbIocList;
 
 							if (strcmp(reinterpret_cast<const char*>((*SectItr)->GetHeader()->Name), "Header") == 0 && (*SbrItr)->GetPrivateSize()) {
-								TargetSuspList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, MODIFIED_HEADER));
+								TargetIocList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, MODIFIED_HEADER));
 							}
 
 							if (Subregion::PageExecutable((*SbrItr)->GetBasic()->Protect) && !((*SectItr)->GetHeader()->Characteristics & IMAGE_SCN_MEM_EXECUTE)) {
-								TargetSuspList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, DISK_PERMISSION_MISMATCH));
+								TargetIocList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, DISK_PERMISSION_MISMATCH));
 							}
 
 							if (Subregion::PageExecutable((*SbrItr)->GetBasic()->Protect) && (*SbrItr)->GetPrivateSize()) {
-								TargetSuspList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, MODIFIED_CODE));
+								TargetIocList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, MODIFIED_CODE));
 							}
 
-							if (SbSuspList.size()) { // Do not insert the list to the map if it overlaps with the region.
-								RefSubregionMap.insert(make_pair(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), SbSuspList));
+							if (SbIocList.size()) { // Do not insert the list to the map if it overlaps with the region.
+								RefSubregionMap.insert(make_pair(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), SbIocList));
 							}
 						}
 					}
 				}
 				else {
-					AbSuspList.push_back(new Ioc(&ParentProc, &ParentObj, nullptr, PHANTOM_IMAGE));
+					RegionIocList.push_back(new Ioc(&ParentProc, &ParentObj, nullptr, PHANTOM_IMAGE));
 				}
 			}
 
@@ -121,25 +121,25 @@ bool Ioc::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, m
 		case Entity::Type::MAPPED_FILE: {
 			vector<Subregion*> Subregions = ParentObj.GetSubregions(); // This must be done explicitly, otherwise each time GetSubregions is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 			for (vector<Subregion*>::iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
-				list<Ioc *> SbSuspList;
+				list<Ioc *> SbIocList;
 				vector<Processes::Thread*> Threads = ParentProc.GetThreads();
 
 				for (vector<Processes::Thread*>::const_iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
 					if ((*ThItr)->GetEntryPoint() >= (*SbrItr)->GetBasic()->BaseAddress && (*ThItr)->GetEntryPoint() < (static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress) + (*SbrItr)->GetBasic()->RegionSize)) {
-						SbSuspList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, NON_IMAGE_THREAD));
+						SbIocList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, NON_IMAGE_THREAD));
 					}
 				}
 				
 				if (Subregion::PageExecutable((*SbrItr)->GetBasic()->Protect)) {
-					SbSuspList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, XMAP));
+					SbIocList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, XMAP));
 				}
 
 				if (((*SbrItr)->GetFlags() & MEMORY_SUBREGION_FLAG_BASE_IMAGE)) {
-					SbSuspList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, NON_IMAGE_IMAGEBASE));
+					SbIocList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, NON_IMAGE_IMAGEBASE));
 				}
 
-				if (SbSuspList.size()) {
-					RefSubregionMap.insert(make_pair(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), SbSuspList));
+				if (SbIocList.size()) {
+					RefSubregionMap.insert(make_pair(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), SbIocList));
 				}
 			}
 
@@ -150,25 +150,25 @@ bool Ioc::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, m
 
 			if (Subregions.front()->GetBasic()->Type == MEM_PRIVATE) {
 				for (vector<Subregion*>::iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
-					list<Ioc *> SbSuspList;
+					list<Ioc *> SbIocList;
 					if (Subregion::PageExecutable((*SbrItr)->GetBasic()->Protect)) {
-						SbSuspList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, XPRV));
+						SbIocList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, XPRV));
 					}
 
 					if (((*SbrItr)->GetFlags() & MEMORY_SUBREGION_FLAG_BASE_IMAGE)) {
-						SbSuspList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, NON_IMAGE_IMAGEBASE));
+						SbIocList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, NON_IMAGE_IMAGEBASE));
 					}
 
 					vector<Processes::Thread*> Threads = ParentProc.GetThreads();
 
 					for (vector<Processes::Thread*>::const_iterator ThItr = Threads.begin(); ThItr != Threads.end(); ++ThItr) {
 						if ((*ThItr)->GetEntryPoint() >= (*SbrItr)->GetBasic()->BaseAddress && (*ThItr)->GetEntryPoint() < (static_cast<uint8_t*>((*SbrItr)->GetBasic()->BaseAddress) + (*SbrItr)->GetBasic()->RegionSize)) {
-							SbSuspList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, NON_IMAGE_THREAD));
+							SbIocList.push_back(new Ioc(&ParentProc, &ParentObj, *SbrItr, NON_IMAGE_THREAD));
 						}
 					}
 
-					if (SbSuspList.size()) {
-						RefSubregionMap.insert(make_pair(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), SbSuspList));
+					if (SbIocList.size()) {
+						RefSubregionMap.insert(make_pair(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), SbIocList));
 					}
 				}
 			}
@@ -177,8 +177,8 @@ bool Ioc::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, m
 		}
 	}
 
-	if (AbSuspList.size()) {
-		RefSubregionMap.insert(make_pair(static_cast<unsigned char*>(const_cast<void*>(ParentObj.GetStartVa())), AbSuspList));
+	if (RegionIocList.size()) {
+		RefSubregionMap.insert(make_pair(static_cast<unsigned char*>(const_cast<void*>(ParentObj.GetStartVa())), RegionIocList));
 	}
 
 	if (!RefSubregionMap.size()) {
@@ -250,7 +250,7 @@ int32_t IocMap::Filter(uint64_t qwFilterFlags) {
 			map<uint8_t*, list<Ioc*>>& RefSubregionMap = this->Map->at(RegionMapItr->first);
 
 			for (map<uint8_t*, list<Ioc*>>::const_iterator SubregionMapItr = RegionMapItr->second.begin(); !bReWalkMap && SubregionMapItr != RegionMapItr->second.end(); ++SubregionMapItr) {
-				list<Ioc*>& RefSuspList = RefSubregionMap.at(SubregionMapItr->first);
+				list<Ioc*>& RefIocList = RefSubregionMap.at(SubregionMapItr->first);
 				list<Ioc*>::const_iterator IocListItr = SubregionMapItr->second.begin();
 
 				for (; !bReWalkMap && IocListItr != SubregionMapItr->second.end(); ++IocListItr) {
@@ -259,14 +259,14 @@ int32_t IocMap::Filter(uint64_t qwFilterFlags) {
 						if ((qwFilterFlags & FILTER_FLAG_CLR_HEAP)) {
 							if (((*IocListItr)->GetSubregion()->GetFlags() & MEMORY_SUBREGION_FLAG_HEAP)) {
 								bReWalkMap = true;
-								this->EraseIoc(&RefSuspList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
+								this->EraseIoc(&RefIocList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
 							}
 						}
 
 						if ((qwFilterFlags & FILTER_FLAG_CLR_PRVX)) {
 							if ((*IocListItr)->GetProcess()->CheckDotNetAffiliation(static_cast<uint8_t*>(const_cast<void*>((*IocListItr)->GetParentObject()->GetStartVa())), (*IocListItr)->GetParentObject()->GetEntitySize())) {
 								bReWalkMap = true;
-								this->EraseIoc(&RefSuspList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
+								this->EraseIoc(&RefIocList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
 							}
 							else {
 								Interface::Log(Interface::VerbosityLevel::Debug, "... no .NET affiliation found for suspicion of private +x at 0x%p\r\n", (*IocListItr)->GetSubregion()->GetBasic()->BaseAddress);
@@ -278,7 +278,7 @@ int32_t IocMap::Filter(uint64_t qwFilterFlags) {
 					case Ioc::Type::UNSIGNED_MODULE: {
 						if ((qwFilterFlags & FILTER_FLAG_UNSIGNED_MODULES)) {
 							bReWalkMap = true;
-							this->EraseIoc(&RefSuspList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
+							this->EraseIoc(&RefIocList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
 						}
 
 						break;
@@ -293,7 +293,7 @@ int32_t IocMap::Filter(uint64_t qwFilterFlags) {
 								if (_wcsicmp(PeEntity->GetFileBase()->GetPath().c_str() + PeEntity->GetFileBase()->GetPath().length() - wcslen(WinmdExt), WinmdExt) == 0) {
 									if (PeEntity->GetPeFile() != nullptr && PeEntity->GetPeFile()->GetEntryPoint() == 0) {
 										bReWalkMap = true;
-										this->EraseIoc(&RefSuspList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
+										this->EraseIoc(&RefIocList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
 									}
 								}
 							}
@@ -312,7 +312,7 @@ int32_t IocMap::Filter(uint64_t qwFilterFlags) {
 									if ((*IocListItr)->GetSubregion()->GetBasic()->BaseAddress == W64SvcSection->GetStartVa()) { // There's an edge case where the section preceeding W64SVC is also +x, resulting in the subregion for this IOC starting prior to this section address
 										Interface::Log(Interface::VerbosityLevel::Debug, "... found disk permission mismatch suspicion on signed %ws overlapping with W64SVC section at 0x%p\r\n", PeEntity->GetFileBase()->GetPath().c_str(), W64SvcSection->GetStartVa());
 										bReWalkMap = true;
-										this->EraseIoc(&RefSuspList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
+										this->EraseIoc(&RefIocList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
 									}
 								}
 							}
@@ -331,7 +331,7 @@ int32_t IocMap::Filter(uint64_t qwFilterFlags) {
 									if ((*IocListItr)->GetSubregion()->GetBasic()->BaseAddress == W64SvcSection->GetStartVa()) {
 										Interface::Log(Interface::VerbosityLevel::Debug, "... found modified code IOC overlapping with signed %ws .text section at 0x%p\r\n", PeEntity->GetFileBase()->GetPath().c_str(), W64SvcSection->GetStartVa());
 										bReWalkMap = true;
-										this->EraseIoc(&RefSuspList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
+										this->EraseIoc(&RefIocList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
 									}
 								}
 							}

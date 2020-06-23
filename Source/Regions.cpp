@@ -128,8 +128,8 @@ vector<PeVm::Section*> PeVm::Body::FindOverlapSect(Subregion& Address) {
 	vector<PeVm::Section*> OverlappingSections;
 
 	for (vector<Section*>::const_iterator SectItr = this->Sections.begin(); SectItr != this->Sections.end(); ++SectItr) {
-		vector<Subregion*> SbList = (*SectItr)->GetSubregions();
-		for (vector<Subregion*>::const_iterator SbrItr = SbList.begin(); SbrItr != SbList.end(); ++SbrItr) {
+		vector<Subregion*> SbrVec = (*SectItr)->GetSubregions();
+		for (vector<Subregion*>::const_iterator SbrItr = SbrVec.begin(); SbrItr != SbrVec.end(); ++SbrItr) {
 			if (Address.GetBasic()->BaseAddress == (*SbrItr)->GetBasic()->BaseAddress) {
 				OverlappingSections.push_back(*SectItr);
 			}

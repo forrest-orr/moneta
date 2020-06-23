@@ -4,7 +4,7 @@ public:
 		Invalid,
 		Block,
 		All,
-		Suspicious,
+		Ioc,
 		Referenced
 	};
 

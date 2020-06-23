@@ -79,7 +79,7 @@ bool VerifyEmbeddedSignature(const wchar_t *FilePath) {
     return bSigned;
 }
 
-wchar_t* GetWindowsPECatalogIssuer(const wchar_t* FilePath) {
+wchar_t* GetPeCatalogIssuer(const wchar_t* FilePath) {
     uint32_t dwEncoding = 0, dwContentType = 0, dwFormatType = 0, dwHashSize = 0, dwSignerInfoSize, dwCertNameLength;
     HCERTSTORE hCertStore = nullptr;
     HCRYPTMSG hMsg = nullptr;
@@ -151,7 +151,7 @@ bool IsCatalogSigned(const wchar_t* FilePath) {
     wchar_t* CertIssuer;
     bool bIsSigned = false;
 
-    if ((CertIssuer = GetWindowsPECatalogIssuer(FilePath)) != nullptr) {
+    if ((CertIssuer = GetPeCatalogIssuer(FilePath)) != nullptr) {
         bIsSigned = true;
         delete CertIssuer;
     }

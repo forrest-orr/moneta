@@ -410,11 +410,11 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 	for (map<uint8_t*, Entity*>::const_iterator Itr = this->Entities.begin(); Itr != this->Entities.end(); ++Itr) {
 		auto IocRegionMapItr = Iocs.GetMap()->find(static_cast<unsigned char *>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main region map which points to the entry for the sb map.
 		auto RefIocRegionMapItr = ReferencesMap.find(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa()))); // An iterator into the main region map which points to the entry for the sb map.
-		map<uint8_t*, list<Ioc *>>* SuspSbrMap = nullptr;
+		map<uint8_t*, list<Ioc *>>* IocSbrMap = nullptr;
 		vector<uint8_t*>* RefSbrVec = nullptr;
 
 		if (IocRegionMapItr != Iocs.GetMap()->end()) {
-			SuspSbrMap = &Iocs.GetMap()->at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
+			IocSbrMap = &Iocs.GetMap()->at(static_cast<unsigned char*>(const_cast<void*>(Itr->second->GetStartVa())));
 		}
 
 		if (RefIocRegionMapItr != ReferencesMap.end()) {
@@ -425,7 +425,7 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 
 		if (ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::All ||
 			(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Block && ((ScannerCtx.GetAddress() >= Itr->second->GetStartVa()) && (ScannerCtx.GetAddress() < Itr->second->GetEndVa()))) ||
-			(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Suspicious && IocRegionMapItr != Iocs.GetMap()->end()) ||
+			(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Ioc && IocRegionMapItr != Iocs.GetMap()->end()) ||
 			(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Referenced && RefIocRegionMapItr != ReferencesMap.end())) {
 
 			// Display process and/or entity information: the criteria has already been met for this to be done without further checks
@@ -508,7 +508,7 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 
 			// Display suspicions associated with the entity, if the current entity has any suspicions associated with it
 
-			AppendOverlapIoc(SuspSbrMap, static_cast<uint8_t*>(const_cast<void *>(Itr->second->GetStartVa())), true, SelectedIocs);
+			AppendOverlapIoc(IocSbrMap, static_cast<uint8_t*>(const_cast<void *>(Itr->second->GetStartVa())), true, SelectedIocs);
 			Interface::Log(Interface::VerbosityLevel::Surface, "\r\n");
 
 			if (Interface::GetVerbosity() == Interface::VerbosityLevel::Detail) {
@@ -559,10 +559,10 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 
 				if (ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::All ||
 					(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Block && (ScannerCtx.GetAddress() == (*SbrItr)->GetBasic()->BaseAddress || (ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE))) ||
-					(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Suspicious && ((ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE) || 
-																		  (SuspSbrMap != nullptr &&
-																		   SuspSbrMap->count(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress))) &&
-																		   SubEntityIocCount(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress)) > 0)) || 
+					(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Ioc && ((ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE) || 
+																		  (IocSbrMap != nullptr &&
+																		   IocSbrMap->count(static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress))) &&
+																		   SubEntityIocCount(IocSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress)) > 0)) || 
 					(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Referenced && (ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE) ||
 																		  (RefSbrVec != nullptr &&
 																		  find(RefSbrVec->begin(), RefSbrVec->end(), static_cast<uint8_t*>((*SbrItr)->GetBasic()->BaseAddress)) != RefSbrVec->end()))) { // mselect == referenced and this subregion contains one or more reference or the "from base" option is set
@@ -578,7 +578,7 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 						if (OverlapSections.empty()) {
 							Interface::Log(Interface::VerbosityLevel::Surface, "    0x%p:0x%08x | %ws | ?        | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
 							AppendSubregionAttributes(*SbrItr);
-							AppendOverlapIoc(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
+							AppendOverlapIoc(IocSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
 							Interface::Log(Interface::VerbosityLevel::Surface, "\r\n");
 						}
 						else{
@@ -592,7 +592,7 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 
 								Interface::Log(Interface::VerbosityLevel::Surface, "    0x%p:0x%08x | %ws | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, AlignedSectName, (*SbrItr)->GetPrivateSize());
 								AppendSubregionAttributes(*SbrItr);
-								AppendOverlapIoc(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
+								AppendOverlapIoc(IocSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
 								Interface::Log(Interface::VerbosityLevel::Surface, "\r\n");
 
 							}
@@ -601,7 +601,7 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 					else {
 						Interface::Log(Interface::VerbosityLevel::Surface, "    0x%p:0x%08x | %ws | 0x%08x", (*SbrItr)->GetBasic()->BaseAddress, (*SbrItr)->GetBasic()->RegionSize, AlignedAttribDesc, (*SbrItr)->GetPrivateSize());
 						AppendSubregionAttributes(*SbrItr);
-						AppendOverlapIoc(SuspSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
+						AppendOverlapIoc(IocSbrMap, static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress), false, SelectedIocs);
 						Interface::Log(Interface::VerbosityLevel::Surface, "\r\n");
 					}
 
@@ -661,14 +661,14 @@ int32_t Process::AppendOverlapIoc(map<uint8_t*, list<Ioc*>>* Iocs, uint8_t* pSub
 	if (Iocs != nullptr && Iocs->count(pSubregionAddress)) {
 		list<Ioc*>& IocsList = Iocs->at(pSubregionAddress);
 
-		for (list<Ioc*>::const_iterator SuspItr = IocsList.begin(); SuspItr != IocsList.end(); ++SuspItr) {
-			if (bEntityTop == (*SuspItr)->IsFullEntityIoc()) {
+		for (list<Ioc*>::const_iterator IocItr = IocsList.begin(); IocItr != IocsList.end(); ++IocItr) {
+			if (bEntityTop == (*IocItr)->IsFullEntityIoc()) {
 				Interface::Log(Interface::VerbosityLevel::Surface, " | ");
-				Interface::Log(Interface::VerbosityLevel::Surface, Interface::ConsoleColor::Red, "%ws", (*SuspItr)->GetDescription((*SuspItr)->GetType()).c_str());
+				Interface::Log(Interface::VerbosityLevel::Surface, Interface::ConsoleColor::Red, "%ws", (*IocItr)->GetDescription((*IocItr)->GetType()).c_str());
 				nCount++;
 
 				if (SelectedIocs != nullptr) {
-					SelectedIocs->push_back(*SuspItr);
+					SelectedIocs->push_back(*IocItr);
 				}
 			}
 		}
@@ -720,8 +720,8 @@ int32_t Process::SubEntityIocCount(map<uint8_t*, list<Ioc*>>* Iocs, uint8_t* pSu
 	if (Iocs != nullptr && Iocs->count(pSubregionAddress)) {
 		list<Ioc*>& IocsList = Iocs->at(pSubregionAddress);
 
-		for (list<Ioc*>::const_iterator SuspItr = IocsList.begin(); SuspItr != IocsList.end(); ++SuspItr) {
-			if (!(*SuspItr)->IsFullEntityIoc()) {
+		for (list<Ioc*>::const_iterator IocItr = IocsList.begin(); IocItr != IocsList.end(); ++IocItr) {
+			if (!(*IocItr)->IsFullEntityIoc()) {
 				nCount++;
 			}
 		}

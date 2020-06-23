@@ -83,7 +83,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				Mst = ScannerContext::MemorySelection_t::All;
 			}
 			else if (*(i + 1) == L"ioc") {
-				Mst = ScannerContext::MemorySelection_t::Suspicious;
+				Mst = ScannerContext::MemorySelection_t::Ioc;
 			}
 			else if (*(i + 1) == L"referenced") {
 				Mst = ScannerContext::MemorySelection_t::Referenced;
