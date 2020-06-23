@@ -311,10 +311,10 @@ int32_t Process::SearchReferences(map <uint8_t*, vector<uint8_t*>> &ReferencesMa
 				if((nOffset = ScanChunkForAddress<uint64_t>(pDmpBuf, dwDmpSize, pReferencedAddress, dwRegionSize)) != -1) {
 					// In the event that an entry does not already exist in the reference map for this entity, create one with an empty vector. Otherwise, point the vector reference at the existing vector
 
-					auto AbMapItr = ReferencesMap.find(static_cast<unsigned char*>(const_cast<void*>(EntItr->second->GetStartVa()))); // An iterator into the main region map which points to the entry for the sub-region vector.
+					auto RegionMapItr = ReferencesMap.find(static_cast<unsigned char*>(const_cast<void*>(EntItr->second->GetStartVa()))); // An iterator into the main region map which points to the entry for the sub-region vector.
 					vector<uint8_t*>* SbrMap = nullptr;
 
-					if (AbMapItr == ReferencesMap.end()) {
+					if (RegionMapItr == ReferencesMap.end()) {
 						ReferencesMap.insert(make_pair(static_cast<unsigned char*>(const_cast<void*>(EntItr->second->GetStartVa())), vector<uint8_t*>()));
 					}
 
