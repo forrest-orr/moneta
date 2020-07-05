@@ -47,8 +47,11 @@ OPTIONAL
                     The default is "surface"
 --filter            The filters to apply when eliminating suspicions associated with selected memory.
                     
+                    *                   Apply all filters. Only malware and unknown false positives shown.
                     unsigned-module     Regions of image memory associated with unsigned PE files.
                     metadata-modules    Regions of image memory stemming from signed Windows metadata PE
                                         files on disk.
                     clr-heap            Native executable heaps created during CLR initialization.
                     clr-prvx            Managed heaps associated with active CLR heaps and JIT code.
+                    wow64-init          IOCs resulting from Wow64 process initialization such as certain
+                                        modified system library code sections
