@@ -125,7 +125,8 @@ bool FileBase::ArchWow64PathExpand(const wchar_t* TargetFilePath, wchar_t* Outpu
 
 	bool bExpandedPath = false;
 	uint64_t qwPathLength, qwMaxEnvVarSize = 32767;
-	wchar_t* ProgFilePath64, * ProgFilePathWow64;
+	unique_ptr<wchar_t[]> ProgFilePath64;
+	unique_ptr<wchar_t[]> ProgFilePathWow64;
 	wchar_t SystemDirectory[MAX_PATH + 1] = { 0 }, SysWow64Directory[MAX_PATH + 1] = { 0 }, ExpandedTargetPath[MAX_PATH + 1] = { 0 };
 	SYSTEM_INFO SystemInfo = { 0 };
 
@@ -146,17 +147,17 @@ bool FileBase::ArchWow64PathExpand(const wchar_t* TargetFilePath, wchar_t* Outpu
 
 			if ((qwPathLength = GetSystemWow64DirectoryW(SysWow64Directory, MAX_PATH + 1))) {
 				if ((qwPathLength = GetSystemDirectoryW(SystemDirectory, MAX_PATH + 1))) {
-					ProgFilePath64 = reinterpret_cast<wchar_t *>(new uint8_t[qwMaxEnvVarSize]); // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
+					ProgFilePath64 = make_unique<wchar_t[]>(qwMaxEnvVarSize / sizeof(wchar_t)); // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
 
-					if ((qwPathLength = GetEnvironmentVariableW(L"ProgramW6432", ProgFilePath64, qwMaxEnvVarSize))) {
-						ProgFilePathWow64 = reinterpret_cast<wchar_t *>(new uint8_t[qwMaxEnvVarSize]); // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
+					if ((qwPathLength = GetEnvironmentVariableW(L"ProgramW6432", ProgFilePath64.get(), qwMaxEnvVarSize))) {
+						ProgFilePathWow64 = make_unique<wchar_t[]>(qwMaxEnvVarSize / sizeof(wchar_t)); // 32,767 is the maximum number of bytes an environment var can be, including the null terminator.
 
-						if ((qwPathLength = GetEnvironmentVariableW(L"ProgramFiles(x86)", ProgFilePathWow64, qwMaxEnvVarSize))) {
+						if ((qwPathLength = GetEnvironmentVariableW(L"ProgramFiles(x86)", ProgFilePathWow64.get(), qwMaxEnvVarSize))) {
 							//
 							// Is the target path within one of the two ambiguous architecture directories?
 							//
 
-							if (_wcsnicmp(ProgFilePathWow64, ExpandedTargetPath, wcslen(ProgFilePathWow64)) == 0) {
+							if (_wcsnicmp(ProgFilePathWow64.get(), ExpandedTargetPath, wcslen(ProgFilePathWow64.get())) == 0) {
 								// The target path is already within the Wow64 program files path. Do nothing.
 							}
 							else if (_wcsnicmp(SysWow64Directory, ExpandedTargetPath, wcslen(SysWow64Directory)) == 0) {
@@ -166,16 +167,12 @@ bool FileBase::ArchWow64PathExpand(const wchar_t* TargetFilePath, wchar_t* Outpu
 								wcscpy_s(OutputPath, ccOutputPathLength, SysWow64Directory);
 								wcscat_s(OutputPath, ccOutputPathLength, ExpandedTargetPath + wcslen(SystemDirectory));
 							}
-							else if (_wcsnicmp(ProgFilePath64, ExpandedTargetPath, wcslen(ProgFilePath64)) == 0) {
-								wcscpy_s(OutputPath, ccOutputPathLength, ProgFilePathWow64);
-								wcscat_s(OutputPath, ccOutputPathLength, ExpandedTargetPath + wcslen(ProgFilePath64));
+							else if (_wcsnicmp(ProgFilePath64.get(), ExpandedTargetPath, wcslen(ProgFilePath64.get())) == 0) {
+								wcscpy_s(OutputPath, ccOutputPathLength, ProgFilePathWow64.get());
+								wcscat_s(OutputPath, ccOutputPathLength, ExpandedTargetPath + wcslen(ProgFilePath64.get()));
 							}
 						}
-
-						delete[] ProgFilePathWow64;
 					}
-
-					delete[] ProgFilePath64;
 				}
 			}
 		}

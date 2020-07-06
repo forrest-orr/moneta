@@ -182,12 +182,10 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 
 						for (uint32_t dwX = 0; dwX < dwNumberOfHeaps; dwX++) {
 							Interface::Log(Interface::VerbosityLevel::Debug, "... 0x%p\r\n", Heaps[dwX]);
-							this->Heaps.push_back(Heaps[dwX]);
+							this->Heaps.push_back(reinterpret_cast<void*>(Heaps[dwX]));
 						}
 					}
 				}
-
-				delete LocalPeb;
 			}
 		}
 
@@ -220,9 +218,9 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 		vector<Subregion*>::iterator Region;
 
 		for (uint8_t* pBaseAddr = nullptr;; pBaseAddr += cbRegionSize) {
-			MEMORY_BASIC_INFORMATION* Mbi = new MEMORY_BASIC_INFORMATION;
+			unique_ptr< MEMORY_BASIC_INFORMATION> Mbi = make_unique<MEMORY_BASIC_INFORMATION>();
 
-			if (VirtualQueryEx(this->Handle, pBaseAddr, Mbi, sizeof(MEMORY_BASIC_INFORMATION)) == sizeof(MEMORY_BASIC_INFORMATION)) {
+			if (VirtualQueryEx(this->Handle, pBaseAddr, Mbi.get(), sizeof(MEMORY_BASIC_INFORMATION)) == sizeof(MEMORY_BASIC_INFORMATION)) {
 				cbRegionSize = Mbi->RegionSize;
 
 				if (!Subregions.empty()) { // If the subregion list is empty then there is no region base for comparison
@@ -232,7 +230,8 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 					}
 				}
 
-				Subregions.push_back(new Subregion(*this, Mbi));
+				Subregions.push_back(new Subregion(*this, Mbi.get()));
+				Mbi.release();
 				Region = Subregions.begin();
 			}
 			else {
@@ -240,7 +239,6 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 					this->Entities.insert(make_pair(static_cast<uint8_t*>((*Region)->GetBasic()->AllocationBase), Entity::Create(*this, Subregions)));
 				}
 
-				delete Mbi;
 				break;
 			}
 		}
