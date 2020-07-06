@@ -339,19 +339,17 @@ int32_t Process::SearchDllDataReferences(const uint8_t* pReferencedAddress, cons
 				PeVm::Section* DataSect = PeEntity->GetSection(".data");
 
 				if (DataSect != nullptr) {
-					uint8_t* Buf = new uint8_t[DataSect->GetEntitySize()];
+					unique_ptr<uint8_t[]> Buf = make_unique<uint8_t[]>(DataSect->GetEntitySize());
 
-					if (ReadProcessMemory(this->GetHandle(), DataSect->GetStartVa(), Buf, DataSect->GetEntitySize(), nullptr)) {
+					if (ReadProcessMemory(this->GetHandle(), DataSect->GetStartVa(), Buf.get(), DataSect->GetEntitySize(), nullptr)) {
 						int32_t nOffset;
 
-						if ((nOffset = ScanChunkForAddress<uint64_t>(Buf, DataSect->GetEntitySize(), pReferencedAddress, dwRegionSize)) != -1) {
+						if ((nOffset = ScanChunkForAddress<uint64_t>(Buf.get(), DataSect->GetEntitySize(), pReferencedAddress, dwRegionSize)) != -1) {
 							Interface::Log(Interface::VerbosityLevel::Debug, "... found private executable region address 0x%p at 0x%p (offset 0x%08x) in %ws .data section\r\n",
 								pReferencedAddress, (uint8_t *)DataSect->GetStartVa() + nOffset, nOffset, PeEntity->GetPebModule().GetName().c_str());
 							nRefTotal++;
 						}
 					}
-
-					delete[] Buf;
 				}
 			}
 		}

@@ -61,10 +61,12 @@ FileBase::FileBase(wstring TargetPath, bool bMemStore, bool bForceOpen) : Path(T
 
 	if ((hFile = CreateFileW(this->Path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE) {
 		if (bMemStore) {
-			uint32_t dwBytesRead;
 			this->FileSize = GetFileSize(hFile, NULL);
-			this->FileData = new uint8_t[this->FileSize];
+			unique_ptr<uint8_t[]> FileData = make_unique<uint8_t[]>(this->FileSize);
+			uint32_t dwBytesRead;
 			if (!ReadFile(hFile, this->FileData, this->FileSize, reinterpret_cast<PDWORD>(&dwBytesRead), 0)) throw 2;
+			this->FileData = FileData.get();
+			FileData.release();
 		}
 
 		CloseHandle(hFile);
