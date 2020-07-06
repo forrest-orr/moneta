@@ -25,7 +25,7 @@ namespace Memory {
 		uint64_t Flags;
 	public:
 		Subregion(Processes::Process& OwnerProc, const MEMORY_BASIC_INFORMATION* Mbi);
-		~Subregion();
+		virtual ~Subregion();
 		const MEMORY_BASIC_INFORMATION* GetBasic() const { return this->Basic; }
 		std::vector<Processes::Thread*> GetThreads() const { return this->Threads; }
 		void SetPrivateSize(uint32_t dwPrivateSize) { this->PrivateSize = dwPrivateSize; }
@@ -58,7 +58,7 @@ namespace Memory {
 		bool Dump(MemDump& DmpCtx) const;
 		void SetSubregions(std::vector<Subregion*>);
 		bool IsPartiallyExecutable() const;
-		~Entity();
+		virtual ~Entity();
 		virtual Entity::Type GetType() = 0;
 	};
 
@@ -75,7 +75,7 @@ namespace Memory {
 		MappedFile(HANDLE hProcess, std::vector<Subregion*> Subregions, const wchar_t* FilePath, bool bMemStore = false);
 		Entity::Type GetType() { return Entity::Type::MAPPED_FILE; }
 		FileBase* GetFileBase() const { return this->MapFileBase; }
-		~MappedFile();
+		virtual ~MappedFile();
 	};
 
 	namespace PeVm {
@@ -128,7 +128,7 @@ namespace Memory {
 			uint32_t GetImageSize() const { return this->ImageSize; }
 			uint32_t GetSigningLevel() const { return this->SigningLevel; }
 			Body(Processes::Process& OwnerProc, std::vector<Subregion*> Subregions, const wchar_t* FilePath);
-			~Body();
+			virtual ~Body();
 		};
 
 		class Section : public Component {

@@ -5,7 +5,7 @@ protected:
 	uint32_t FileSize;
 	bool Phantom;
 public:
-	~FileBase();
+	virtual ~FileBase();
 	FileBase(std::wstring TargetPath, bool bMemStore, bool bForceOpen = true);
 	FileBase(std::wstring DesiredPath, const uint8_t* DataBuf, uint32_t dwSize);
 	const uint8_t* GetData() const { return this->FileData; }

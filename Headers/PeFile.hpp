@@ -34,7 +34,7 @@ public:
 	IMAGE_SECTION_HEADER* GetSectHdrs() const { return this->SectHdrs; }
 	bool IsExe();
 	bool IsDll();
-	~PeFile();
+	virtual ~PeFile();
 	static PeFile* Load(const uint8_t* pPeBuf, uint32_t dwPeFileSize); // Factory
 	static PeFile* Load(const std::wstring PeFilePath); // Factory
 };

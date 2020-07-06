@@ -45,5 +45,5 @@ public:
 	void Enumerate();
 	void EraseIoc(std::list<Ioc*>* RefIocList, std::list<Ioc*>::const_iterator IocListItr, std::map <uint8_t*, std::list<Ioc*>>* RefSubregionMap, std::map<uint8_t*, std::list<Ioc*>>::const_iterator SubregionMapItr, std::map <uint8_t*, std::map<uint8_t*, std::list<Ioc*>>>::const_iterator RegionMapItr);
 	IocMap();
-	~IocMap();
+	virtual ~IocMap();
 };

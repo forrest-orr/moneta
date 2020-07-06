@@ -31,7 +31,7 @@ namespace Processes {
 		const void* GetTebAddress() const { return this->TebAddress; }
 		HANDLE GetHandle() const { return this->Handle; }
 		Thread(uint32_t dwTid, Processes::Process& OwnerProc);
-		~Thread();
+		virtual ~Thread();
 	protected:
 		uint32_t Id;
 		HANDLE Handle;
@@ -55,7 +55,7 @@ namespace Processes {
 		std::map<uint8_t*, Memory::Entity*> Entities; // A region can only map to one entity by design. If an allocation range has multiple entities in it (such as a PE) then these entities must be encompassed within the parent entity itself by design (such as PE sections)
 	public:
 		Process(uint32_t);
-		~Process();
+		virtual ~Process();
 		HANDLE GetHandle() const { return this->Handle; }
 		uint32_t GetPid() const { return this->Pid; }
 		void* GetImageBase() const { return this->ImageBase; }
