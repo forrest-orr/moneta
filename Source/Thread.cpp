@@ -63,10 +63,10 @@ Thread::Thread(uint32_t dwTid, Processes::Process &OwnerProc) : Id(dwTid) {
 				this->TebAddress = Tbi.TebBaseAddress;
 
 				if (OwnerProc.IsWow64()) {
-					TEB32* LocalTeb = new TEB32;
+					unique_ptr<TEB32> LocalTeb = make_unique<TEB32>();
 					uint32_t dwTebSize = sizeof(TEB32);
 
-					if (ReadProcessMemory(OwnerProc.GetHandle(), Tbi.TebBaseAddress, LocalTeb, dwTebSize, nullptr)) {
+					if (ReadProcessMemory(OwnerProc.GetHandle(), Tbi.TebBaseAddress, LocalTeb.get(), dwTebSize, nullptr)) {
 						Interface::Log(Interface::VerbosityLevel::Debug, "... successfully read remote TEB to local memory.\r\n");
 						Interface::Log(Interface::VerbosityLevel::Debug, "... stack base: 0x%08x\r\n", LocalTeb->StackBase);
 						this->StackAddress = reinterpret_cast<void*>(LocalTeb->StackBase);
@@ -74,14 +74,12 @@ Thread::Thread(uint32_t dwTid, Processes::Process &OwnerProc) : Id(dwTid) {
 					else {
 						throw 4;
 					}
-
-					delete LocalTeb;
 				}
 				else {
-					TEB64* LocalTeb = new TEB64;
+					unique_ptr<TEB64> LocalTeb = make_unique<TEB64>();
 					uint32_t dwTebSize = sizeof(TEB64);
 
-					if (ReadProcessMemory(OwnerProc.GetHandle(), Tbi.TebBaseAddress, LocalTeb, dwTebSize, nullptr)) {
+					if (ReadProcessMemory(OwnerProc.GetHandle(), Tbi.TebBaseAddress, LocalTeb.get(), dwTebSize, nullptr)) {
 						Interface::Log(Interface::VerbosityLevel::Debug, "... successfully read remote TEB to local memory.\r\n");
 						Interface::Log(Interface::VerbosityLevel::Debug, "... stack base: 0x%p\r\n", LocalTeb->StackBase);
 						this->StackAddress = LocalTeb->StackBase;
@@ -89,8 +87,6 @@ Thread::Thread(uint32_t dwTid, Processes::Process &OwnerProc) : Id(dwTid) {
 					else {
 						throw 4;
 					}
-
-					delete LocalTeb;
 				}
 			}
 			else {

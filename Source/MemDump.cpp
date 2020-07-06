@@ -47,15 +47,14 @@ bool MemDump::Create(wstring Folder, const MEMORY_BASIC_INFORMATION *Mbi,  wchar
 	assert(DumpFilePath != nullptr);
 
 	SIZE_T cbBytesRead = 0;
-	uint8_t* Buf = new uint8_t[Mbi->RegionSize];
+	unique_ptr<uint8_t[]> Buf = make_unique<uint8_t[]>(Mbi->RegionSize);
 	wstring TargetDmpFolder;
 
-	if (ReadProcessMemory(this->Handle, Mbi->BaseAddress, Buf, Mbi->RegionSize, static_cast<SIZE_T*>(&cbBytesRead))) {
+	if (ReadProcessMemory(this->Handle, Mbi->BaseAddress, Buf.get(), Mbi->RegionSize, static_cast<SIZE_T*>(&cbBytesRead))) {
 		if (!Folder.empty()) {
 			TargetDmpFolder = MemDump::Folder + L"\\" + Folder;
 
 			if (!CreateDirectoryW(TargetDmpFolder.c_str(), nullptr) && GetLastError() != ERROR_ALREADY_EXISTS) {
-				delete [] Buf;
 				return false;
 			}
 		}
@@ -64,13 +63,11 @@ bool MemDump::Create(wstring Folder, const MEMORY_BASIC_INFORMATION *Mbi,  wchar
 		}
 
 		swprintf_s(DumpFilePath, ccDumpFilePathLen, L"%ws\\%d_%p_%ws_%ws.dat", TargetDmpFolder.c_str(), this->Pid, Mbi->BaseAddress, Subregion::AttribDesc(Mbi), Subregion::TypeSymbol(Mbi->Type));
-		FileBase DumpFile(DumpFilePath, Buf, cbBytesRead);
+		FileBase DumpFile(DumpFilePath, Buf.get(), cbBytesRead);
 		return DumpFile.ToDisk();
 	}
-	else {
-		delete[] Buf;
-		return false;
-	}
+
+	return false;
 }
 
 bool MemDump::Create(const MEMORY_BASIC_INFORMATION* Mbi, wchar_t* DumpFilePath, size_t ccDumpFilePathLen) const {
@@ -82,15 +79,13 @@ bool MemDump::Create(const MEMORY_BASIC_INFORMATION* Mbi, uint8_t** ppDmpBuf, ui
 	assert(pdwDmpSize != nullptr);
 
 	SIZE_T cbBytesRead = 0;
-	uint8_t* Buf = new uint8_t[Mbi->RegionSize];
+	unique_ptr<uint8_t[]> Buf = make_unique<uint8_t[]>(Mbi->RegionSize);
 
-	if (ReadProcessMemory(this->Handle, Mbi->BaseAddress, Buf, Mbi->RegionSize, static_cast<SIZE_T*>(&cbBytesRead))) {
+	if (ReadProcessMemory(this->Handle, Mbi->BaseAddress, Buf.get(), Mbi->RegionSize, static_cast<SIZE_T*>(&cbBytesRead))) {
 		*pdwDmpSize = cbBytesRead;
-		*ppDmpBuf = Buf;
+		*ppDmpBuf = Buf.get();
+		Buf.release();
 		return true;
-	}
-	else {
-		delete[] Buf;
 	}
 
 	return false;

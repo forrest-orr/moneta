@@ -182,9 +182,9 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			if ((hResourceData = LoadResource(hSelfModule, hResourceInfo))) {
 				dwRsrcSize = SizeofResource(hSelfModule, hResourceInfo);
 				pRsrcData = (char*)LockResource(hResourceData);
-				uint8_t* RsrcBuf = new uint8_t[dwRsrcSize + 1](); // Otherwise the resource text may bleed in to the rest of the .rsrc section
-				memcpy(RsrcBuf, pRsrcData, dwRsrcSize);
-				Interface::Log(Interface::VerbosityLevel::Surface, "%s\r\n", pRsrcData);
+				unique_ptr<uint8_t[]> RsrcBuf = make_unique<uint8_t[]>(dwRsrcSize + 1); // Otherwise the resource text may bleed in to the rest of the .rsrc section
+				memcpy(RsrcBuf.get(), pRsrcData, dwRsrcSize);
+				Interface::Log(Interface::VerbosityLevel::Surface, "%s\r\n", RsrcBuf.get());
 			}
 		}
 	}
@@ -238,11 +238,11 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				TargetProc.Enumerate(ScannerCtx, &SelectedIocs, &SelectedSbrs);
 
 				if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
-					PermissionRecord* PermissionRecords = new PermissionRecord(SelectedSbrs);
-					IocRecord* IocRecords = new IocRecord(&SelectedIocs);
+					PermissionRecord PermissionRecords(SelectedSbrs);
+					IocRecord IocRecords(&SelectedIocs);
 					Interface::SetVerbosity(Interface::VerbosityLevel::Surface); // Override the verbosity level now that the scan is over to ensure statistics and scan time are displayed (if applicable)
-					PermissionRecords->ShowRecords();
-					IocRecords->ShowRecords();
+					PermissionRecords.ShowRecords();
+					IocRecords.ShowRecords();
 				}
 			}
 			catch (int32_t nError) {
@@ -252,8 +252,9 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		else {
 			PROCESSENTRY32W ProcEntry = { 0 };
 			HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-			PermissionRecord* PermissionRecords = nullptr;
-			IocRecord* IocRecords = nullptr;
+
+			unique_ptr<PermissionRecord> PermissionRecords = nullptr;
+			unique_ptr<IocRecord> IocRecords = nullptr;
 
 			if (hSnapshot != nullptr) {
 				ProcEntry.dwSize = sizeof(PROCESSENTRY32W);
@@ -270,14 +271,14 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 
 								if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
 									if (PermissionRecords == nullptr) {
-										PermissionRecords = new PermissionRecord(SelectedSbrs);
+										PermissionRecords = make_unique<PermissionRecord>(SelectedSbrs);
 									}
 									else {
 										PermissionRecords->UpdateMap(SelectedSbrs);
 									}
 
 									if (IocRecords == nullptr) {
-										IocRecords = new IocRecord(&SelectedIocs);
+										IocRecords = make_unique<IocRecord>(&SelectedIocs);
 									}
 									else {
 										IocRecords->UpdateMap(&SelectedIocs);

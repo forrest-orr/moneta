@@ -144,18 +144,18 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 			Interface::Log(Interface::VerbosityLevel::Debug, "... PEB of 0x%p\r\n", RemotePeb);
 
 			if (this->IsWow64()) {
-				PEB32* LocalPeb = new PEB32;
+				unique_ptr<PEB32> LocalPeb = make_unique<PEB32>();
 				dwPebSize = sizeof(PEB32);
 
-				if (ReadProcessMemory(this->Handle, RemotePeb, LocalPeb, dwPebSize, nullptr)) {
+				if (ReadProcessMemory(this->Handle, RemotePeb, LocalPeb.get(), dwPebSize, nullptr)) {
 					uint32_t dwNumberOfHeaps = LocalPeb->NumberOfHeaps;
 					uint32_t dwHeapsSize = dwNumberOfHeaps * sizeof(uint32_t);
-					uint32_t* Heaps = new uint32_t[dwNumberOfHeaps];
+					unique_ptr<uint32_t[]> Heaps = make_unique<uint32_t[]>(dwNumberOfHeaps);
 
 					this->ImageBase = reinterpret_cast<void*>(LocalPeb->ImageBaseAddress);
 					Interface::Log(Interface::VerbosityLevel::Debug, "... successfully read remote PEB to local memory (%d heaps) - image base 0x%p\r\n", dwNumberOfHeaps, this->ImageBase);
 
-					if (ReadProcessMemory(this->Handle, reinterpret_cast<void*>(LocalPeb->ProcessHeaps), Heaps, dwHeapsSize, nullptr)) {
+					if (ReadProcessMemory(this->Handle, reinterpret_cast<void*>(LocalPeb->ProcessHeaps), Heaps.get(), dwHeapsSize, nullptr)) {
 						Interface::Log(Interface::VerbosityLevel::Debug, "... successfully read remote heaps to local memory.\r\n");
 
 						for (uint32_t dwX = 0; dwX < dwNumberOfHeaps; dwX++) {
@@ -164,22 +164,20 @@ Process::Process(uint32_t dwPid) : Pid(dwPid) {
 						}
 					}
 				}
-
-				delete LocalPeb;
 			}
 			else {
-				PEB64* LocalPeb = new PEB64;
+				unique_ptr<PEB64> LocalPeb = make_unique<PEB64>();
 				dwPebSize = sizeof(PEB64);
 
-				if (ReadProcessMemory(this->Handle, RemotePeb, LocalPeb, dwPebSize, nullptr)) {
+				if (ReadProcessMemory(this->Handle, RemotePeb, LocalPeb.get(), dwPebSize, nullptr)) {
 					uint32_t dwNumberOfHeaps = LocalPeb->NumberOfHeaps;
 					uint32_t dwHeapsSize = dwNumberOfHeaps * sizeof(void*);
-					void** Heaps = new void* [dwNumberOfHeaps];
+					unique_ptr<uint64_t[]> Heaps = make_unique<uint64_t[]>(dwNumberOfHeaps);
 
 					this->ImageBase = reinterpret_cast<void*>(LocalPeb->ImageBaseAddress);
 					Interface::Log(Interface::VerbosityLevel::Debug, "... successfully read remote PEB to local memory (%d heaps) - image base 0x%p\r\n", dwNumberOfHeaps, this->ImageBase);
 
-					if (ReadProcessMemory(this->Handle, reinterpret_cast<void*>(LocalPeb->ProcessHeaps), Heaps, dwHeapsSize, nullptr)) {
+					if (ReadProcessMemory(this->Handle, reinterpret_cast<void*>(LocalPeb->ProcessHeaps), Heaps.get(), dwHeapsSize, nullptr)) {
 						Interface::Log(Interface::VerbosityLevel::Debug, "... successfully read remote heaps to local memory.\r\n");
 
 						for (uint32_t dwX = 0; dwX < dwNumberOfHeaps; dwX++) {
