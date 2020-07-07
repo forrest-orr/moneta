@@ -55,3 +55,32 @@ OPTIONAL
                     clr-prvx            Managed heaps associated with active CLR heaps and JIT code.
                     wow64-init          IOCs resulting from Wow64 process initialization such as certain
                                         modified system library code sections
+										
+EXAMPLES
+
+Enumerate a detailed log of all committed memory in all processes on the OS:
+
+    Moneta64.exe -m * -p * -v detail
+
+Enumerate surface level information related to suspicious memory in a specific process:
+
+    Moneta64.exe -m ioc -p 1234
+	
+Enumerate surface level information related to suspicious memory in a specific process from its allocation
+base:
+
+    Moneta64.exe -m ioc -p 1234 --option from-base
+
+Dump a specific memory region by address within a specific process from its allocation base:
+
+    Moneta64.exe -m region -p 1234 --option from-base --address 0x0000000077DD0000 -d
+    
+Enumerate surface level information related to suspicious memory in all processes and show memory
+statistics on IOCs and region types when the scan is complete:
+
+    Moneta64.exe -m ioc -p * --option statistics
+	
+Enumerate surface level information related to suspicious memory in all processes but exclude IOCs
+stemming from unsigned modules and metadata modules:
+
+    Moneta64.exe -m ioc -p * --filter unsigned-modules metadata-modules
