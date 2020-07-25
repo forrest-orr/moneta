@@ -253,8 +253,8 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			PROCESSENTRY32W ProcEntry = { 0 };
 			HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 
-			unique_ptr<PermissionRecord> PermissionRecords = nullptr;
-			unique_ptr<IocRecord> IocRecords = nullptr;
+			unique_ptr<PermissionRecord> PermissionRecords;
+			unique_ptr<IocRecord> IocRecords;
 
 			if (hSnapshot != nullptr) {
 				ProcEntry.dwSize = sizeof(PROCESSENTRY32W);
@@ -270,14 +270,14 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 								TargetProc.Enumerate(ScannerCtx, &SelectedIocs, &SelectedSbrs);
 
 								if ((qwOptFlags & PROCESS_ENUM_FLAG_STATISTICS)) {
-									if (PermissionRecords == nullptr) {
+									if (!PermissionRecords) {
 										PermissionRecords = make_unique<PermissionRecord>(SelectedSbrs);
 									}
 									else {
 										PermissionRecords->UpdateMap(SelectedSbrs);
 									}
 
-									if (IocRecords == nullptr) {
+									if (!IocRecords) {
 										IocRecords = make_unique<IocRecord>(&SelectedIocs);
 									}
 									else {
@@ -302,11 +302,11 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 
 			Interface::SetVerbosity(Interface::VerbosityLevel::Surface); // Override the verbosity level now that the scan is over to ensure statistics and scan time are displayed (if applicable)
 
-			if (PermissionRecords != nullptr) {
+			if (PermissionRecords) {
 				PermissionRecords->ShowRecords();
 			}
 
-			if (IocRecords != nullptr) {
+			if (IocRecords) {
 				IocRecords->ShowRecords();
 			}
 		}
