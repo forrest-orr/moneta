@@ -3,7 +3,7 @@ protected:
 	IMAGE_DOS_HEADER* DosHdr;
 	IMAGE_FILE_HEADER* FileHdr;
 	IMAGE_SECTION_HEADER* SectHdrs;
-	uint8_t* Data;
+	std::unique_ptr<uint8_t[]> Data;
 	uint32_t Size;
 	uint16_t PeMagic;
 	uint16_t PeArch;
@@ -27,16 +27,15 @@ public:
 	virtual void SetDllCharacteristics(uint16_t wDllCharacteristics) = 0;
 	virtual uint32_t GetImageSize() = 0;
 	virtual bool IsDotNet() = 0;
-	uint8_t* GetData() const { return this->Data; }
+	uint8_t* GetData() const { return this->Data.get(); }
 	uint32_t GetSize() const { return this->Size; }
 	PIMAGE_DOS_HEADER GetDosHdr() const { return this->DosHdr; }
 	IMAGE_FILE_HEADER* GetFileHdr() const { return this->FileHdr; }
 	IMAGE_SECTION_HEADER* GetSectHdrs() const { return this->SectHdrs; }
 	bool IsExe();
 	bool IsDll();
-	virtual ~PeFile();
-	static PeFile* Load(const uint8_t* pPeBuf, uint32_t dwPeFileSize); // Factory
-	static PeFile* Load(const std::wstring PeFilePath); // Factory
+	static std::unique_ptr<PeFile> Load(const uint8_t* pPeBuf, uint32_t dwPeFileSize); // Factory
+	static std::unique_ptr<PeFile> Load(const std::wstring PeFilePath); // Factory
 };
 
 template<typename NtHdrType> class PeArch : public PeFile {

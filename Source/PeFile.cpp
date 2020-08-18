@@ -1,33 +1,3 @@
-/*
-____________________________________________________________________________________________________
-| _______  _____  __   _ _______ _______ _______                                                   |
-| |  |  | |     | | \  | |______    |    |_____|                                                   |
-| |  |  | |_____| |  \_| |______    |    |     |                                                   |
-|__________________________________________________________________________________________________|
-| Moneta ~ Usermode memory scanner & malware hunter                                                |
-|--------------------------------------------------------------------------------------------------|
-| https://www.forrest-orr.net/post/masking-malicious-memory-artifacts-part-ii-insights-from-moneta |
-|--------------------------------------------------------------------------------------------------|
-| Author: Forrest Orr - 2020                                                                       |
-|--------------------------------------------------------------------------------------------------|
-| Contact: forrest.orr@protonmail.com                                                              |
-|--------------------------------------------------------------------------------------------------|
-| Licensed under GNU GPLv3                                                                         |
-|__________________________________________________________________________________________________|
-| ## Features                                                                                      |
-|                                                                                                  |
-| ~ Query the memory attributes of any accessible process(es).                                     |
-| ~ Identify private, mapped and image memory.                                                     |
-| ~ Correlate regions of memory to their underlying file on disks.                                 |
-| ~ Identify PE headers and sections corresponding to image memory.                                |
-| ~ Identify modified regions of mapped image memory.                                              |
-| ~ Identify abnormal memory attributes indicative of malware.                                     |
-| ~ Create memory dumps of user-specified memory ranges                                            |
-| ~ Calculate memory permission/type statistics                                                    |
-|__________________________________________________________________________________________________|
-
-*/
-
 #include "StdAfx.h"
 #include "PeFile.hpp"
 
@@ -35,40 +5,36 @@ ________________________________________________________________________________
 
 using namespace std;
 
-PeFile::PeFile(const uint8_t* pPeBuf, uint32_t dwPeFileSize) : Data(new uint8_t[dwPeFileSize]), Size(dwPeFileSize) {
+PeFile::PeFile(const uint8_t* pPeBuf, uint32_t dwPeFileSize) : Size(dwPeFileSize) {
 	assert(pPeBuf != nullptr);
 	assert(dwPeFileSize);
 
-	memcpy(this->Data, pPeBuf, dwPeFileSize);
-	this->DosHdr = reinterpret_cast<IMAGE_DOS_HEADER*>(this->Data);
+	this->Data = make_unique<uint8_t[]>(dwPeFileSize);
+	memcpy(this->Data.get(), pPeBuf, dwPeFileSize);
+	this->DosHdr = reinterpret_cast<IMAGE_DOS_HEADER*>(this->Data.get());
 	this->FileHdr = reinterpret_cast<IMAGE_FILE_HEADER*>((reinterpret_cast<uint8_t *>(this->DosHdr) + this->DosHdr->e_lfanew + sizeof(LONG)));
 }
 
-PeFile::~PeFile() {
-	delete this->Data;
-}
-
-PeFile* PeFile::Load(const uint8_t* pPeBuf, uint32_t dwPeFileSize) {
+unique_ptr<PeFile> PeFile::Load(const uint8_t* pPeBuf, uint32_t dwPeFileSize) {
 	assert(pPeBuf != nullptr);
 	assert(dwPeFileSize);
 
-	PeFile* NewPe = nullptr;
+	unique_ptr<PeFile> NewPe;
 
 	if (*(uint16_t*)&pPeBuf[0] == 'ZM') {
 		PIMAGE_DOS_HEADER pDosHdr = reinterpret_cast<IMAGE_DOS_HEADER*>(const_cast<uint8_t *>(pPeBuf));
 		IMAGE_FILE_HEADER* pFileHdr = reinterpret_cast<IMAGE_FILE_HEADER*>((const_cast<uint8_t *>(pPeBuf) + pDosHdr->e_lfanew + sizeof(LONG)));
 
 		if (pFileHdr->Machine == IMAGE_FILE_MACHINE_I386) {
-			NewPe = new PeArch32(pPeBuf, dwPeFileSize);
+			NewPe = make_unique<PeArch32>(pPeBuf, dwPeFileSize);
 		}
 		else if (pFileHdr->Machine == IMAGE_FILE_MACHINE_AMD64) {
-			NewPe = new PeArch64(pPeBuf, dwPeFileSize);
+			NewPe = make_unique<PeArch64>(pPeBuf, dwPeFileSize);
 		}
 
-		if (NewPe != nullptr) {
-			if (!NewPe->Validate()) { // Validate method is needed to call template-specific derived methods not present in the base class, such as GetNtHdrs (which in turn also cannot be called from the constructor since it relies on virtual methods which will not exist until the class is initialized post-constructor)
-				delete NewPe;
-				NewPe = nullptr;
+		if (NewPe) {
+			if (!NewPe->Validate()) {
+				NewPe.reset();
 			}
 		}
 	}
@@ -76,9 +42,9 @@ PeFile* PeFile::Load(const uint8_t* pPeBuf, uint32_t dwPeFileSize) {
 	return NewPe;
 }
 
-PeFile* PeFile::Load(const wstring PeFilePath) {
+unique_ptr<PeFile> PeFile::Load(const wstring PeFilePath) {
 	HANDLE hFile;
-	PeFile* NewPe = nullptr;
+	unique_ptr<PeFile> NewPe;
 
 	if ((hFile = CreateFileW(PeFilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL)) != INVALID_HANDLE_VALUE) {
 		uint32_t dwBytesRead;
@@ -186,7 +152,7 @@ template<typename NtHdrType> void  PeArch<NtHdrType>::SetCrc32(uint32_t dwCrc32)
 template<typename NtHdrType> uint32_t PeArch<NtHdrType>::RefreshCrc32() {
 	uint32_t dwOriginalCRC32 = 0, dwNewCRC32 = 0;
 
-	if (CheckSumMappedFile(this->Data, this->Size, reinterpret_cast<PDWORD>(&dwOriginalCRC32), reinterpret_cast<PDWORD>(&dwNewCRC32))) {
+	if (CheckSumMappedFile(this->Data.get(), this->Size, reinterpret_cast<PDWORD>(&dwOriginalCRC32), reinterpret_cast<PDWORD>(&dwNewCRC32))) {
 		GetNtHdrs()->OptionalHeader.CheckSum = dwNewCRC32;
 	}
 	else {

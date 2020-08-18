@@ -91,7 +91,7 @@ namespace Memory {
 		class Body : public MappedFile, public Component {
 		protected:
 			std::vector<Section*> Sections;
-			::PeFile* FilePe;
+			std::unique_ptr<::PeFile> FilePe;
 			Signing_t Signed;
 			bool NonExecutableImage;
 			bool PartiallyMapped;
@@ -116,7 +116,7 @@ namespace Memory {
 			} PebMod;
 		public:
 			Entity::Type GetType() { return Entity::Type::PE_FILE; }
-			::PeFile* GetPeFile() const { return this->FilePe; }
+			::PeFile* GetPeFile() const { return this->FilePe.get(); }
 			bool IsSigned() const;
 			Signing_t GetSisningType() const;
 			bool IsNonExecutableImage() const { return this->NonExecutableImage; }
