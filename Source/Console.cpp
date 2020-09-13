@@ -252,7 +252,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		else {
 			PROCESSENTRY32W ProcEntry = { 0 };
 			HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-
 			unique_ptr<PermissionRecord> PermissionRecords;
 			unique_ptr<IocRecord> IocRecords;
 

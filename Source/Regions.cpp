@@ -59,7 +59,7 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 
 	if (!this->GetFileBase()->IsPhantom()) {
 		this->Signed = CheckSigning(FilePath);
-		this->FilePe = PeFile::Load(FilePath);
+		this->FilePe = PeFile::Load(FilePath, true);
 
 		if (this->FilePe) {
 			// Identify which subregions within this parent entity overlap with each section header. Create an entity child object for each section and copy associated subregions into it.

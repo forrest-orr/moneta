@@ -7,14 +7,16 @@ protected:
 	uint32_t Size;
 	uint16_t PeMagic;
 	uint16_t PeArch;
+	bool FullPeLoaded;
 	PeFile(const uint8_t* pPeBuf, uint32_t dwPeFileSize);
 public:
+	virtual std::wstring GetPeFileArchStr() const = 0;
 	virtual bool IsPe32() = 0;
 	virtual bool IsPe64() = 0;
 	virtual uint16_t GetPeFileMagic() = 0;
 	virtual uint16_t GetPeFileArch() = 0;
 	virtual bool Validate() = 0;
-	virtual bool GetDataDir(int8_t nIndex, uint32_t* pdwRva, uint32_t* pdwSize) = 0;
+	virtual bool GetDataDir(int8_t nIndex, uint32_t& rdwRva, uint32_t& rdwSize) = 0;
 	virtual uint32_t RefreshCrc32() = 0;
 	virtual void SetCrc32(uint32_t dwCrc32) = 0;
 	virtual void SetDataDir(int8_t nIndex, uint32_t dwRva, uint32_t dwSize) = 0;
@@ -27,6 +29,8 @@ public:
 	virtual void SetDllCharacteristics(uint16_t wDllCharacteristics) = 0;
 	virtual uint32_t GetImageSize() = 0;
 	virtual bool IsDotNet() = 0;
+	virtual void* GetPAFromRVA(uint64_t qwRVA) = 0;
+	virtual IMAGE_SECTION_HEADER* GetContainerSectHdr(uint64_t qwRVA) = 0;
 	uint8_t* GetData() const { return this->Data.get(); }
 	uint32_t GetSize() const { return this->Size; }
 	PIMAGE_DOS_HEADER GetDosHdr() const { return this->DosHdr; }
@@ -35,7 +39,7 @@ public:
 	bool IsExe();
 	bool IsDll();
 	static std::unique_ptr<PeFile> Load(const uint8_t* pPeBuf, uint32_t dwPeFileSize); // Factory
-	static std::unique_ptr<PeFile> Load(const std::wstring PeFilePath); // Factory
+	static std::unique_ptr<PeFile> Load(const std::wstring &PeFilePath, bool bHdrOnly); // Factory
 };
 
 template<typename NtHdrType> class PeArch : public PeFile {
@@ -49,7 +53,7 @@ public:
 	NtHdrType* GetNtHdrs();
 	uint32_t RefreshCrc32();
 	void SetCrc32(uint32_t dwCrc32);
-	bool GetDataDir(int8_t nIndex, uint32_t* pdwRva, uint32_t* pdwSize);
+	bool GetDataDir(int8_t nIndex, uint32_t& rdwRva, uint32_t& rdwSize);
 	void SetDataDir(int8_t nIndex, uint32_t dwRva, uint32_t dwSize);
 	uint32_t GetSubsystem();
 	void SetSubsystem(uint32_t dwSubSystem);
@@ -60,6 +64,8 @@ public:
 	void SetDllCharacteristics(uint16_t wDllCharacteristics);
 	uint32_t GetImageSize();
 	bool IsDotNet();
+	void* GetPAFromRVA(uint64_t qwRVA);
+	IMAGE_SECTION_HEADER* GetContainerSectHdr(uint64_t qwRVA);
 };
 
 class PeArch32 : public PeArch<IMAGE_NT_HEADERS32> {
@@ -68,6 +74,7 @@ public:
 	bool IsPe64() { return false; }
 	uint16_t GetPeFileMagic() { return IMAGE_NT_OPTIONAL_HDR32_MAGIC; }
 	uint16_t GetPeFileArch() { return IMAGE_FILE_MACHINE_I386; }
+	std::wstring GetPeFileArchStr() const { return L"32-bit"; }
 	PeArch32(const uint8_t* pPeBuf, uint32_t dwPeFileSize);
 };
 
@@ -77,5 +84,6 @@ public:
 	bool IsPe64() { return true; }
 	uint16_t GetPeFileMagic() { return IMAGE_NT_OPTIONAL_HDR64_MAGIC; }
 	uint16_t GetPeFileArch() { return IMAGE_FILE_MACHINE_AMD64; }
+	std::wstring GetPeFileArchStr() const { return L"64-bit"; }
 	PeArch64(const uint8_t* pPeBuf, uint32_t dwPeFileSize);
 };
