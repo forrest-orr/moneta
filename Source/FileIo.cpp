@@ -91,9 +91,6 @@ FileBase::~FileBase() {
 }
 
 bool FileBase::TranslateDevicePath(const wchar_t* DevicePath, wchar_t* TranslatedPath) {
-	assert(DevicePath != nullptr);
-	assert(TranslatedPath != nullptr);
-
 	wchar_t DriveLetters[MAX_PATH + 1] = { 0 };
 	bool bTranslated = false;
 
@@ -114,7 +111,7 @@ bool FileBase::TranslateDevicePath(const wchar_t* DevicePath, wchar_t* Translate
 				}
 			}
 
-			p++;
+			p += (wcslen(p) + 1);
 		} while (!bTranslated && *p);
 	}
 

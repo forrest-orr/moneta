@@ -87,7 +87,7 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 				for (vector<Subregion*>::const_iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
 					uint8_t* pSubregionStartVa = static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress);
 					uint8_t* pSubregionEndVa = static_cast<uint8_t *>((*SbrItr)->GetBasic()->BaseAddress) + (*SbrItr)->GetBasic()->RegionSize;
-
+					
 					if ((pSubregionStartVa >= pSectStartVa && pSubregionStartVa < pSectEndVa) || (pSubregionEndVa > pSectStartVa&& pSubregionEndVa <= pSectEndVa) || (pSubregionStartVa < pSectStartVa && pSubregionEndVa > pSectEndVa)) {
 						Interface::Log(Interface::VerbosityLevel::Debug, "... section %s [0x%p:0x%p] corresponds to subregion [0x%p:0x%p]\r\n", ArtificialPeHdr.Name, pSectStartVa, pSectEndVa, pSubregionStartVa, pSubregionEndVa);
 						MEMORY_BASIC_INFORMATION* Mbi = new MEMORY_BASIC_INFORMATION; // When duplicating subregions, all heap allocated memory must be cloned so that no addresses are double referenced/double freed
@@ -95,8 +95,10 @@ PeVm::Body::Body(Processes::Process& OwnerProc, vector<Subregion*> Subregions, c
 						OverlapSubregion.push_back(new Subregion(OwnerProc, Mbi));
 					}
 				}
-
-				this->Sections.push_back(new Section(OwnerProc.GetHandle(), OverlapSubregion, &ArtificialPeHdr, this->PeData));
+				
+				if (!OverlapSubregion.empty()) { // Apisetschema.dll on Windows 7 loaded into taskhost.exe has this
+					this->Sections.push_back(new Section(OwnerProc.GetHandle(), OverlapSubregion, &ArtificialPeHdr, this->PeData));
+				}
 			}
 		}
 		else {
@@ -184,6 +186,8 @@ Region::Region(HANDLE hProcess, vector<Subregion*> Subregions) {
 
 Entity* Entity::Create(Processes::Process& OwnerProc, std::vector<Subregion*> Subregions) {
 	Entity* NewEntity = nullptr;
+
+	Interface::Log(Interface::VerbosityLevel::Debug, "... creating new entity from subregions at 0x%p\r\n", Subregions.front()->GetBasic()->AllocationBase);
 
 	if (Subregions.front()->GetBasic()->Type == MEM_MAPPED || Subregions.front()->GetBasic()->Type == MEM_IMAGE) {
 		wchar_t DevFilePath[MAX_PATH + 1] = { 0 };
