@@ -9,7 +9,7 @@ typedef unsigned long long  QWORD;
 typedef long long           INT64;
 #endif
 typedef QWORD                   PTR64;
-//typedef QWORD                   HANDLE64;
+typedef QWORD                   HANDLE64;
 
 //UNCOMMENT line below if you are not including windows.h
 //#define WANT_ALL_WINDOWS_H_DEFINITIONS
