@@ -125,16 +125,31 @@ const wchar_t* Subregion::TypeSymbol(uint32_t dwType) {
 }
 
 uint32_t Subregion::QueryPrivateSize() const {
+	static RtlGetVersion_t RtlGetVersion = reinterpret_cast<RtlGetVersion_t>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlGetVersion"));
+	static RTL_OSVERSIONINFOW osvi = { 0 };
 	uint32_t dwPrivateSize = 0;
 
+	if (RtlGetVersion && !osvi.dwBuildNumber) {
+		osvi.dwOSVersionInfoSize = sizeof(osvi);
+		RtlGetVersion(&osvi);
+	}
+
 	if (this->Basic->State == MEM_COMMIT && this->Basic->Protect != PAGE_NOACCESS && this->Basic->Type == MEM_IMAGE) { // Optimize performance by skipping working set scan for non-image memory, as this data is not valuable for private and mapped types.
-		PSAPI_WORKING_SET_EX_INFORMATION WorkingSets = { 0 };
+		MEMORY_WORKING_SET_EX_INFORMATION WorkingSets = { 0 };
 
 		for (uint32_t dwPageOffset = 0; dwPageOffset < this->Basic->RegionSize; dwPageOffset += 0x1000) {
 			WorkingSets.VirtualAddress = (static_cast<uint8_t *>(this->Basic->BaseAddress) + dwPageOffset);
-			if (K32QueryWorkingSetEx(this->ProcessHandle, &WorkingSets, sizeof(PSAPI_WORKING_SET_EX_INFORMATION))) {
-				if (!WorkingSets.VirtualAttributes.Shared) {
-					dwPrivateSize += 0x1000;
+			if (K32QueryWorkingSetEx(this->ProcessHandle, &WorkingSets, sizeof(MEMORY_WORKING_SET_EX_INFORMATION))) {
+				// Use SharedOriginal after RS3/1709
+				// https://windows-internals.com/understanding-a-new-mitigation-module-tampering-protection/
+				if (osvi.dwBuildNumber >= 16299) {
+					if (!WorkingSets.VirtualAttributes.SharedOriginal) {
+						dwPrivateSize += 0x1000;
+					}
+				} else {
+					if (!WorkingSets.VirtualAttributes.Shared) {
+						dwPrivateSize += 0x1000;
+					}
 				}
 			}
 			else {
