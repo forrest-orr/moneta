@@ -238,10 +238,10 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 		uint64_t qwStartTick = GetTickCount64();
 
 		if(!Enclave::ValidateSupport()) {
-			Interface::Log(Interface::VerbosityLevel::Surface, "... failed to validate enclave support; certain enclaves may be inaccessible.\r\n");
+			Interface::Log(Interface::VerbosityLevel::Debug, "... failed to validate enclave support; certain enclaves may be inaccessible.\r\n");
 		}
 		else {
-			Interface::Log(Interface::VerbosityLevel::Surface, "... successfully validated enclave support.\r\n");
+			Interface::Log(Interface::VerbosityLevel::Debug, "... successfully validated enclave support.\r\n");
 		}
 
 		if (ProcType == SelectedProcess_t::SelfPid || ProcType == SelectedProcess_t::SpecificPid) {
