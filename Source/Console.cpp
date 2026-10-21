@@ -157,7 +157,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			"\\____|__  /\\____/|___|  /\\___  >__| (____  /\r\n"
 			"        \\/            \\/     \\/          \\/ \r\n"
 			"\r\n"
-			"Moneta v1.0.1 | Forrest Orr | 2024\r\n\r\n"
+			"Moneta v1.1.0 | Forrest Orr | 2020-2026\r\n\r\n"
 		);
 	}
 
@@ -244,7 +244,6 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			Interface::Log(Interface::VerbosityLevel::Surface, "... successfully validated enclave support.\r\n");
 		}
 
-		system("pause");
 		if (ProcType == SelectedProcess_t::SelfPid || ProcType == SelectedProcess_t::SpecificPid) {
 			try {
 				Process TargetProc(dwSelectedPid);

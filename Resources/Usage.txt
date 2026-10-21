@@ -8,7 +8,7 @@ OPTIONAL
 -v {detail|debug|surface}
 -d
 --option {from-base|statistics}
---filter {unsigned-module|clr-prvx|clr-heap|metadata-modules}
+--filter {unsigned-module|clr-prvx|clr-heap|metadata-modules|enclave}
 --address <memory address>
 --region-size <memory region size>
 
@@ -21,6 +21,8 @@ OPTIONAL
                                         through the --address and --region-size arguments.
                     referenced          Select only regions which are referenced within the region(s)
                                         associated with the provided --address and --region-size arguments
+                    enclave			    Select only regions which are associated with a VBS enclave image.
+                                        These also count as IOC and can be negated by filters.
 -p                  The process(es) to scan. In the event that * is used, all accessible processes will
                     be enumerated and scanned.
 --option            Additional actions to optionally apply to the memory selected from the scan.
@@ -46,3 +48,4 @@ OPTIONAL
                     clr-prvx            Managed heaps associated with active CLR heaps and JIT code.
                     wow64-init          IOCs resulting from Wow64 process initialization such as certain
                                         modified system library code sections
+                    enclave             Regions of image memory associated with a VBS enclave image.

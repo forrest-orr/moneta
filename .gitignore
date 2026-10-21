@@ -42,3 +42,5 @@ x64/Release/Moneta.log
 .vs/Moneta/v18/Browse.VC.opendb
 /Moneta/x64/Debug
 /Tests/DotNetFrameworkDll/bin
+*.command
+*.json
