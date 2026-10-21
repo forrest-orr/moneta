@@ -26,4 +26,7 @@
 #include <vector>
 #include <algorithm>
 #include <codecvt>
+#include <enclaveium.h>
+#include <	ntenclv.h>
+#include <winenclaveapi.h>
 #include "Typedefs.h"

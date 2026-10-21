@@ -19,6 +19,8 @@ ________________________________________________________________________________
 #include "Memory.hpp"
 #include "Interface.hpp"
 
+#pragma comment(lib, "vertdll.lib")
+
 using namespace std;
 using namespace Memory;
 
@@ -106,15 +108,14 @@ Enclave::Enclave(Processes::Process& OwnerProc, vector<Subregion*> Subregions, :
 	////////////////////////////////////////////////////////////
 	// Query the underlying enclave image information.
 
-	NtQueryVirtualMemory_t NtQueryVirtualMemory = GetNtQvm();
-	NTSTATUS NtStatus = NtQueryVirtualMemory(OwnerProc.GetHandle(), pMainEnclaveSubregion->GetBasic()->AllocationBase, MemoryEnclaveImageInformation, &this->ImageInfo, sizeof(this->ImageInfo), nullptr);
-	Interface::Log(Interface::VerbosityLevel::Surface, "... NtQueryVirtualMemory MemoryEnclaveImageInformation returned 0x%08x\r\n", NtStatus);
+	ENCLAVE_INFORMATION EnclaveInformation = { 0 };
+	HRESULT Hr = EnclaveGetEnclaveInformation(sizeof(EnclaveInformation), &EnclaveInformation);
 
-	if (NtStatus != STATUS_INVALID_INFO_CLASS) {
+	if (SUCCEEDED(Hr)) {
 		Interface::Log(Interface::VerbosityLevel::Surface, "... Enclave information for PID %d | Address 0x%p\r\n", OwnerProc.GetPid(), pMainEnclaveSubregion->GetBasic()->BaseAddress);
-		wstring AuthorID = EnclaveImageInfoIdToString(this->ImageInfo.AuthorID);
-		wstring UniqueID = EnclaveImageInfoIdToString(this->ImageInfo.UniqueID);
-		Interface::Log(Interface::VerbosityLevel::Surface, "    AuthorID %ws | UniqueID %ws | SizeOfImage 0x%zx | ImageBase: 0x%p | Flags 0x%x | ImagePartialMap %d | ImageNotExecutable %d | ImageSigningLevel %u\r\n",
-			AuthorID.c_str(), UniqueID.c_str(), this->ImageInfo.ImageInfo.SizeOfImage, this->ImageInfo.ImageInfo.ImageBase, this->ImageInfo.ImageInfo.ImageFlags, this->ImageInfo.ImageInfo.ImagePartialMap, this->ImageInfo.ImageInfo.ImageNotExecutable, this->ImageInfo.ImageInfo.ImageSigningLevel);
+		wstring AuthorID = EnclaveImageInfoIdToString(EnclaveInformation.Identity.AuthorId);
+		wstring UniqueID = EnclaveImageInfoIdToString(EnclaveInformation.Identity.UniqueId);
+		Interface::Log(Interface::VerbosityLevel::Surface, "    AuthorID %ws | UniqueID %ws | SizeOfImage 0x%zx | ImageBase: 0x%p | Flags 0x%x | EnclaveType %d | SigningLevel %d\r\n",
+			AuthorID.c_str(), UniqueID.c_str(), EnclaveInformation.Size, EnclaveInformation.BaseAddress, EnclaveInformation.Identity.Flags, EnclaveInformation.Identity.EnclaveType, EnclaveInformation.Identity.SigningLevel);
 	}
 }

@@ -43,6 +43,7 @@ typedef struct _MEMORY_ENCLAVE_IMAGE_INFORMATION {
 	UCHAR AuthorID[32];
 } MEMORY_ENCLAVE_IMAGE_INFORMATION, * PMEMORY_ENCLAVE_IMAGE_INFORMATION;
 
+
 // RegionType bitfield returned by MemoryRegionInformation (class 3) / MemoryRegionInformationEx (class 7).
 // The SoftwareEnclave bit (bit 6) is the enclave signal; on current builds it is only reliably populated by
 // the Ex class (7), so the enclave probe queries class 7.
