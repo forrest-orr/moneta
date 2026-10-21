@@ -103,11 +103,12 @@ Enclave::Enclave(Processes::Process& OwnerProc, vector<Subregion*> Subregions, :
 		this->ModulePath = ModPath;
 	}
 
-	Interface::Log(Interface::VerbosityLevel::Debug, "... creating enclave entity at alloc base 0x%p/base 0x%p within %ws (PID %d)\r\n", Subregions.front()->GetBasic()->AllocationBase, pMainEnclaveSubregion->GetBasic()->BaseAddress, OwnerProc.GetName().c_str(), OwnerProc.GetPid());
+	Interface::Log(Interface::VerbosityLevel::Detail, "... creating enclave entity at alloc base 0x%p/base 0x%p within %ws (PID %d)\r\n", Subregions.front()->GetBasic()->AllocationBase, pMainEnclaveSubregion->GetBasic()->BaseAddress, OwnerProc.GetName().c_str(), OwnerProc.GetPid());
 
 	////////////////////////////////////////////////////////////
 	// Query the underlying enclave image information.
 
+	/*
 	ENCLAVE_INFORMATION EnclaveInformation = { 0 };
 	HRESULT Hr = EnclaveGetEnclaveInformation(sizeof(EnclaveInformation), &EnclaveInformation);
 
@@ -117,5 +118,5 @@ Enclave::Enclave(Processes::Process& OwnerProc, vector<Subregion*> Subregions, :
 		wstring UniqueID = EnclaveImageInfoIdToString(EnclaveInformation.Identity.UniqueId);
 		Interface::Log(Interface::VerbosityLevel::Surface, "    AuthorID %ws | UniqueID %ws | SizeOfImage 0x%zx | ImageBase: 0x%p | Flags 0x%x | EnclaveType %d | SigningLevel %d\r\n",
 			AuthorID.c_str(), UniqueID.c_str(), EnclaveInformation.Size, EnclaveInformation.BaseAddress, EnclaveInformation.Identity.Flags, EnclaveInformation.Identity.EnclaveType, EnclaveInformation.Identity.SigningLevel);
-	}
+	}*/
 }
