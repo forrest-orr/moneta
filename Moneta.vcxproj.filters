@@ -54,6 +54,9 @@
     <ClCompile Include="Source\Subregions.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Enclave.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Thread.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

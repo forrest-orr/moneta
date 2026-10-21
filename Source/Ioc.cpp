@@ -145,6 +145,20 @@ bool Ioc::InspectEntity(Process &ParentProc, Entity &ParentObj, map <uint8_t*, m
 
 			break;
 		}
+		case Entity::Type::ENCLAVE: {
+			// The enclave is deliberately not subjected to the private +x / non-image heuristics. Only this entity-level IOC is raised (keyed
+			// under the entity start VA); the enclave's subregions - which mirror the module's PE sections - remain benign.
+
+			RegionIocList.push_back(new Ioc(&ParentProc, &ParentObj, nullptr, ENCLAVE));
+
+			const Enclave* EnclaveEntity = dynamic_cast<const Enclave*>(&ParentObj);
+
+			if (EnclaveEntity->HasConfig() && EnclaveEntity->IsDebuggable()) { // A debuggable enclave exposes its VTL1 memory to VTL0 - a strong IOC outside of development
+				RegionIocList.push_back(new Ioc(&ParentProc, &ParentObj, nullptr, DEBUGGABLE_ENCLAVE));
+			}
+
+			break;
+		}
 		case Entity::Type::UNKNOWN: {
 			vector<Subregion*> Subregions = ParentObj.GetSubregions(); // This must be done explicitly, otherwise each time GetSubregions is called a temporary copy of the list is created and the begin/end iterators will become useless in identifying the end of the list, causing an exception as it loops out of bounds.
 
@@ -201,6 +215,8 @@ wstring Ioc::GetDescription(Ioc::Type Type) {
 	case XPRV: return L"Abnormal private executable memory";
 	case NON_IMAGE_THREAD: return L"Thread within non-image memory region";
 	case NON_IMAGE_IMAGEBASE: return L"Non-image primary image base";
+	case ENCLAVE: return L"VBS enclave module";
+	case DEBUGGABLE_ENCLAVE: return L"Debuggable VBS enclave (VTL1 memory exposed to VTL0)";
 	default: return L"?";
 	}
 }
@@ -277,6 +293,14 @@ int32_t IocMap::Filter(uint64_t qwFilterFlags) {
 					}
 					case Ioc::Type::UNSIGNED_MODULE: {
 						if ((qwFilterFlags & FILTER_FLAG_UNSIGNED_MODULES)) {
+							bReWalkMap = true;
+							this->EraseIoc(&RefIocList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
+						}
+
+						break;
+					}
+					case Ioc::Type::ENCLAVE: {
+						if ((qwFilterFlags & FILTER_FLAG_ENCLAVES)) { // Suppress the presence IOC alone: an unchecked signing level within an enclave is never filtered
 							bReWalkMap = true;
 							this->EraseIoc(&RefIocList, IocListItr, &RefSubregionMap, SubregionMapItr, RegionMapItr);
 						}

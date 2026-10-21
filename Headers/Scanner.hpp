@@ -5,7 +5,8 @@ public:
 		Block,
 		All,
 		Ioc,
-		Referenced
+		Referenced,
+		Enclave // Select only VBS enclave entities (and all of their subregions), independent of the IOC map and filters
 	};
 
 	uint64_t GetFlags() const { return this->Flags; }

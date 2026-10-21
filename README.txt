@@ -7,9 +7,28 @@
 
 Moneta v1.0 | Forrest Orr | 2020
 
+VBS ENCLAVE SUPPORT
+
+From VTL0 a VBS enclave is the CreateEnclave reservation: a MEM_PRIVATE allocation whose subregions
+mirror the enclave module's PE sections, with state alternating MEM_COMMIT/MEM_RESERVE and protection
+alternating PAGE_READWRITE/PAGE_NOACCESS. State is therefore not a usable detection filter.
+
+Detection: at startup Enclave::ValidateSupport() probes whether NtQueryVirtualMemory supports
+MemoryEnclaveImageInformation (class 9); it returns STATUS_INVALID_INFO_CLASS on current builds. Each
+non-free subregion is then tested with the SoftwareEnclave flag of MemoryRegionInformationEx (class 7)
+- and with class 9 where it is supported. A hit on any subregion promotes the whole allocation to a
+single "Enclave" entity, which is excluded from the private +x / non-image heuristics.
+
+Only the enclave entity raises an IOC (presence, filterable with --filter enclaves); its subregions
+remain benign. When the enclave module's backing image file is available (e.g. a debuggable enclave,
+whose module is also a readable MEM_IMAGE), the entity is enriched from the PE's IMAGE_ENCLAVE_CONFIG
+and -v detail additionally reports policy flags, debuggable/primary-image flags, enclave size, thread
+and import counts, image/security versions and the Family/Image IDs; a debuggable enclave raises a
+second IOC, since it exposes its VTL1 memory to VTL0 and has no place outside development.
+
 REQUIRED
 
--m {*|region|referenced|ioc}
+-m {*|region|referenced|ioc|enclave}
 -p {*|PID}
 
 OPTIONAL
@@ -17,12 +36,14 @@ OPTIONAL
 -v {detail|debug|surface}
 -d
 --option {from-base|statistics}
---filter {unsigned-module|clr-prvx|clr-heap|metadata-modules}
+--filter {unsigned-module|clr-prvx|clr-heap|metadata-modules|wow64-init|enclaves}
 --address <memory address>
 --region-size <memory region size>
 
 
--m                  The memory to select and apply scanner settings to.
+-m                  The memory to select and apply scanner settings to. "enclave" selects every VBS
+                    enclave entity (and all of its subregions) on the OS or in the given PID, and
+                    nothing else; it ignores the IOC map and filters.
 
                     *                   Select all regions of committed memory.
                     ioc                 Select only regions which have suspicions associated with them.
@@ -55,8 +76,16 @@ OPTIONAL
                     clr-prvx            Managed heaps associated with active CLR heaps and JIT code.
                     wow64-init          IOCs resulting from Wow64 process initialization such as certain
                                         modified system library code sections
+                    enclaves            The presence IOC raised for every VBS enclave. Useful once a
+                                        baseline of legitimate enclave hosts (Edge, Recall, etc.) is
+                                        established. Unchecked enclave image signing levels are never
+                                        filtered.
 										
 EXAMPLES
+
+Enumerate every VBS enclave on the OS with per-image detail:
+
+    Moneta64.exe -m enclave -p * -v detail
 
 Enumerate a detailed log of all committed memory in all processes on the OS:
 

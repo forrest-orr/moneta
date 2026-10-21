@@ -1,8 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-m * -p * -v detail</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-m enclave -p 49056 -v debug</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerCommandArgumentsHistory>-m * -p * -v detail|Moneta64.exe -m enclave -p 26528 -v debug|-m enclave -p 26528 -v debug|-m enclave -p 49056 -v debug|</LocalDebuggerCommandArgumentsHistory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LocalDebuggerCommandArguments>Moneta32.exe --target * --output-type raw -v 5</LocalDebuggerCommandArguments>
@@ -15,5 +16,6 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LocalDebuggerCommandArguments>-m suspicious -p 7316</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerCommandArgumentsHistory>-m suspicious -p 7316|</LocalDebuggerCommandArgumentsHistory>
   </PropertyGroup>
 </Project>

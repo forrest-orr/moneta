@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "Moneta\\x64\\Release\\Typedefs.obj",
+            "outputs": [
+                "Moneta\\x64\\Release\\Typedefs.h.obj.dt.module.json",
+                "Moneta\\x64\\Release\\Typedefs.h.obj.dt.d.json"
+            ],
+            "requires": []
+        }
+    ]
+}

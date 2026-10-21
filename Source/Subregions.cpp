@@ -37,7 +37,7 @@ using namespace std;
 using namespace Memory;
 using namespace Processes;
 
-Subregion::Subregion(Processes::Process &OwnerProc, const MEMORY_BASIC_INFORMATION* Mbi) : ProcessHandle(OwnerProc.GetHandle()), Basic(Mbi) {
+Subregion::Subregion(Processes::Process &OwnerProc, const MEMORY_BASIC_INFORMATION* Mbi) : Basic(Mbi), PrivateSize(0), ProcessHandle(OwnerProc.GetHandle()), Flags(0) {
 	vector<Processes::Thread*> Threads = OwnerProc.GetThreads();
 	vector<void*> Heaps = OwnerProc.GetHeaps();
 
@@ -65,6 +65,12 @@ Subregion::Subregion(Processes::Process &OwnerProc, const MEMORY_BASIC_INFORMATI
 
 	if (Mbi->State == MEM_COMMIT && Mbi->Type != MEM_PRIVATE) {
 		this->PrivateSize = this->QueryPrivateSize(); // Querying the working set is one of the greatest performance drains in the tool and should be done sparingly
+	}
+
+	// Enclave detection: class 7 SoftwareEnclave (or class 9 when supported), with no State filter - enclave subregions appear as
+	// both MEM_COMMIT and MEM_RESERVE. A hit on any subregion promotes the whole allocation to an enclave entity in Entity::Create.
+	if (Enclave::IsEnclaveRegion(this->ProcessHandle, Mbi)) {
+		this->Flags |= MEMORY_SUBREGION_FLAG_ENCLAVE;
 	}
 }
 
@@ -163,4 +169,16 @@ uint32_t Subregion::QueryPrivateSize() const {
 
 bool Subregion::PageExecutable(uint32_t dwProtect) {
 	return (dwProtect == PAGE_EXECUTE || dwProtect == PAGE_EXECUTE_READ || dwProtect == PAGE_EXECUTE_READWRITE);
+}
+
+wstring Subregion::HexBlob(const uint8_t* pBuf, size_t cbLength) {
+	wstring Hex;
+	wchar_t Byte[3] = { 0 };
+
+	for (size_t cbOffset = 0; cbOffset < cbLength; cbOffset++) {
+		swprintf_s(Byte, 3, L"%02x", pBuf[cbOffset]);
+		Hex += Byte;
+	}
+
+	return Hex;
 }

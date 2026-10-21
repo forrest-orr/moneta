@@ -88,6 +88,9 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			else if (*(i + 1) == L"referenced") {
 				Mst = ScannerContext::MemorySelection_t::Referenced;
 			}
+			else if (*(i + 1) == L"enclave") {
+				Mst = ScannerContext::MemorySelection_t::Enclave;
+			}
 		}
 		else if (Arg == L"--address") {
 			pAddress = reinterpret_cast<uint8_t*>(wcstoull((*(i + 1)).c_str(), NULL, 0));
@@ -138,6 +141,9 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 				else if (FilterArg == L"wow64-init") {
 					qwFilterFlags |= FILTER_FLAG_WOW64_INIT;
 				}
+				else if (FilterArg == L"enclaves") {
+					qwFilterFlags |= FILTER_FLAG_ENCLAVES;
+				}
 			}
 		}
 	}
@@ -157,7 +163,7 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 
 	SYSTEM_INFO SystemInfo = { 0 };
 	static IsWow64Process_t IsWow64Process = reinterpret_cast<IsWow64Process_t>(GetProcAddress(GetModuleHandleW(L"Kernel32.dll"), "IsWow64Process"));
-	
+
 	if (IsWow64Process != nullptr) {
 		BOOL bSelfWow64 = FALSE;
 
@@ -224,11 +230,21 @@ int32_t wmain(int32_t nArgc, const wchar_t* pArgv[]) {
 			MemDump::Initialize();
 		}
 
+		Memory::Enclave::ValidateSupport(); // Probe once whether MemoryEnclaveImageInformation is implemented; enclave detection adapts accordingly.
+
 		// Analyze processes and generate memory maps/suspicions
 
 		ScannerContext ScannerCtx(qwOptFlags, Mst, pAddress, dwRegionSize, qwFilterFlags);
 		uint64_t qwStartTick = GetTickCount64();
 
+		if(!Enclave::ValidateSupport()) {
+			Interface::Log(Interface::VerbosityLevel::Surface, "... failed to validate enclave support; certain enclaves may be inaccessible.\r\n");
+		}
+		else {
+			Interface::Log(Interface::VerbosityLevel::Surface, "... successfully validated enclave support.\r\n");
+		}
+
+		system("pause");
 		if (ProcType == SelectedProcess_t::SelfPid || ProcType == SelectedProcess_t::SpecificPid) {
 			try {
 				Process TargetProc(dwSelectedPid);

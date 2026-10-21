@@ -33,3 +33,12 @@ x64/Release/Moneta.log
 *.ilk
 *.db-wal
 *.db-shm
+.vs/Moneta/FileContentIndex/3bdcebed-5387-4ef4-b579-f7dfd1899b98.vsidx
+*.vsidx
+.vs/Moneta/v18/.suo
+.vs/Moneta/v18/Upgrade.VC.txt
+.vs/Moneta/v18/DocumentLayout.json
+.vs/Moneta/v18/DocumentLayout.backup.json
+.vs/Moneta/v18/Browse.VC.opendb
+/Moneta/x64/Debug
+/Tests/DotNetFrameworkDll/bin

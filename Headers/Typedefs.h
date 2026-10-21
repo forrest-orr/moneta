@@ -1,6 +1,12 @@
 #define ThreadQuerySetWin32StartAddress 9
 #define ThreadBasicInformation 0
 
+// Returned by NtQueryVirtualMemory when an information class is not implemented on the running build. Used by
+// Enclave::ValidateSupport to decide whether MemoryEnclaveImageInformation (class 9) can be relied upon.
+#ifndef STATUS_INVALID_INFO_CLASS
+#define STATUS_INVALID_INFO_CLASS ((NTSTATUS)0xC0000003L)
+#endif
+
 typedef enum _MEMORY_INFORMATION_CLASS {
 	MemoryBasicInformation, // MEMORY_BASIC_INFORMATION
 	MemoryWorkingSetInformation, // MEMORY_WORKING_SET_INFORMATION
@@ -28,6 +34,68 @@ typedef struct _MEMORY_IMAGE_INFORMATION {
 		};
 	};
 } MEMORY_IMAGE_INFORMATION, * PMEMORY_IMAGE_INFORMATION;
+
+// Output of NtQueryVirtualMemory(MemoryEnclaveImageInformation) for an address within a VBS enclave image. The two IDs are the
+// VBS analogues of SGX MRENCLAVE/MRSIGNER: UniqueID is the measurement of the loaded enclave image, AuthorID derives from its signer.
+typedef struct _MEMORY_ENCLAVE_IMAGE_INFORMATION {
+	MEMORY_IMAGE_INFORMATION ImageInfo;
+	UCHAR UniqueID[32];
+	UCHAR AuthorID[32];
+} MEMORY_ENCLAVE_IMAGE_INFORMATION, * PMEMORY_ENCLAVE_IMAGE_INFORMATION;
+
+// RegionType bitfield returned by MemoryRegionInformation (class 3) / MemoryRegionInformationEx (class 7).
+// The SoftwareEnclave bit (bit 6) is the enclave signal; on current builds it is only reliably populated by
+// the Ex class (7), so the enclave probe queries class 7.
+typedef union _MEMORY_REGION_INFORMATION_TYPE {
+	ULONG RegionType;
+	struct {
+		ULONG Private : 1;
+		ULONG MappedDataFile : 1;
+		ULONG MappedImage : 1;
+		ULONG MappedPageFile : 1;
+		ULONG MappedPhysical : 1;
+		ULONG DirectMapped : 1;
+		ULONG SoftwareEnclave : 1; // since REDSTONE3
+		ULONG PageSize64K : 1;
+		ULONG PlaceholderReservation : 1; // since REDSTONE4
+		ULONG MappedAwe : 1; // since 21H1
+		ULONG MappedWriteWatch : 1;
+		ULONG PageSizeLarge : 1;
+		ULONG PageSizeHuge : 1;
+		ULONG Reserved : 19;
+	};
+} MEMORY_REGION_INFORMATION_TYPE;
+
+// MEMORY_REGION_INFORMATION in its extended (class 7) form. The trailing PartitionId/NodePreference fields are
+// what class 7 adds over class 3; the buffer must be this size for the Ex query to succeed. The union is inline
+// and anonymous so RegionType / SoftwareEnclave are accessed directly off the struct.
+typedef struct _MEMORY_REGION_INFORMATION {
+	PVOID AllocationBase;
+	ULONG AllocationProtect;
+	union {
+		ULONG RegionType;
+		struct {
+			ULONG Private : 1;
+			ULONG MappedDataFile : 1;
+			ULONG MappedImage : 1;
+			ULONG MappedPageFile : 1;
+			ULONG MappedPhysical : 1;
+			ULONG DirectMapped : 1;
+			ULONG SoftwareEnclave : 1; // since REDSTONE3
+			ULONG PageSize64K : 1;
+			ULONG PlaceholderReservation : 1;
+			ULONG MappedAwe : 1;
+			ULONG MappedWriteWatch : 1;
+			ULONG PageSizeLarge : 1;
+			ULONG PageSizeHuge : 1;
+			ULONG Reserved : 19;
+		};
+	};
+	SIZE_T RegionSize;
+	SIZE_T CommitSize;
+	ULONG_PTR PartitionId;            // Ex (class 7)
+	ULONG_PTR NodePreference;         // Ex (class 7)
+} MEMORY_REGION_INFORMATION, * PMEMORY_REGION_INFORMATION;
 
 // c/o SystemInformer: https://github.com/winsiderss/systeminformer/blob/e01be6536a74464446687e75b0e34c3988d875d8/phnt/include/ntmmapi.h#L168C1-L229C74
 typedef struct _MEMORY_WORKING_SET_EX_BLOCK

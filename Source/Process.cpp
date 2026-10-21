@@ -1,4 +1,4 @@
-/*
+﻿/*
 ____________________________________________________________________________________________________
 | _______  _____  __   _ _______ _______ _______                                                   |
 | |  |  | |     | | \  | |______    |    |_____|                                                   |
@@ -70,7 +70,7 @@ Process::~Process() {
 }
 
 Process::Process(uint32_t dwPid) : Pid(dwPid) {
-	this->Handle = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
+	this->Handle = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, dwPid);
 
 	if (this->Handle != nullptr) {
 		wchar_t ImageName[MAX_PATH + 1] = { 0 }, DevFilePath[MAX_PATH + 1] = { 0 };
@@ -420,7 +420,8 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 		if (ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::All ||
 			(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Block && ((ScannerCtx.GetAddress() >= Itr->second->GetStartVa()) && (ScannerCtx.GetAddress() < Itr->second->GetEndVa()))) ||
 			(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Ioc && IocRegionMapItr != Iocs.GetMap()->end()) ||
-			(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Referenced && RefIocRegionMapItr != ReferencesMap.end())) {
+			(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Referenced && RefIocRegionMapItr != ReferencesMap.end()) ||
+			(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Enclave && Itr->second->GetType() == Entity::Type::ENCLAVE)) {
 
 			// Display process and/or entity information: the criteria has already been met for this to be done without further checks
 
@@ -490,6 +491,15 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 				Interface::Log(Interface::VerbosityLevel::Surface, Interface::ConsoleColor::Gold, "Mapped");
 				Interface::Log(Interface::VerbosityLevel::Surface, "   | %ws", dynamic_cast<MappedFile*>(Itr->second)->GetFileBase()->GetPath().c_str());
 			}
+			else if (Itr->second->GetType() == Entity::Type::ENCLAVE) {
+				Enclave* EnclaveEntity = dynamic_cast<Enclave*>(Itr->second);
+				Interface::Log(Interface::VerbosityLevel::Surface, "| ");
+				Interface::Log(Interface::VerbosityLevel::Surface, Interface::ConsoleColor::Gold, "Enclave");
+				Interface::Log(Interface::VerbosityLevel::Surface, "  | VBS enclave%ws", EnclaveEntity->IsDebuggable() ? L" [debuggable]" : L"");
+				if (!EnclaveEntity->GetModulePath().empty()) {
+					Interface::Log(Interface::VerbosityLevel::Surface, " | %ws", EnclaveEntity->GetModulePath().c_str());
+				}
+			}
 			else {
 				if (Itr->second->GetSubregions().front()->GetBasic()->Type == MEM_PRIVATE) {
 					Interface::Log(Interface::VerbosityLevel::Surface, "| ");
@@ -542,6 +552,28 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 					Interface::Log(Interface::VerbosityLevel::Surface, "    | Mapped file size: %d\r\n", Itr->second->GetEntitySize());
 					Interface::Log(Interface::VerbosityLevel::Surface, "    | Mapped file path: %ws\r\n", dynamic_cast<MappedFile*>(Itr->second)->GetFileBase()->GetPath().c_str());
 				}
+				else if (Itr->second->GetType() == Entity::Type::ENCLAVE) {
+					Enclave* EnclaveEntity = dynamic_cast<Enclave*>(Itr->second);
+
+					Interface::Log(Interface::VerbosityLevel::Surface, "  |__ Enclave base: 0x%p\r\n", EnclaveEntity->GetStartVa());
+					Interface::Log(Interface::VerbosityLevel::Surface, "    | Reservation size: %d\r\n", EnclaveEntity->GetEntitySize());
+
+					if (!EnclaveEntity->GetModulePath().empty()) {
+						Interface::Log(Interface::VerbosityLevel::Surface, "    | Module path: %ws\r\n", EnclaveEntity->GetModulePath().c_str());
+					}
+
+					if (EnclaveEntity->HasConfig()) {
+						Interface::Log(Interface::VerbosityLevel::Surface, "    | Primary image: %ws\r\n", EnclaveEntity->IsPrimaryImage() ? L"yes" : L"no");
+						Interface::Log(Interface::VerbosityLevel::Surface, "    | Debuggable policy: %ws\r\n", EnclaveEntity->IsDebuggable() ? L"yes" : L"no");
+						Interface::Log(Interface::VerbosityLevel::Surface, "    | Policy flags: 0x%08x\r\n", EnclaveEntity->GetPolicyFlags());
+						Interface::Log(Interface::VerbosityLevel::Surface, "    | Enclave size: 0x%llx\r\n", static_cast<unsigned long long>(EnclaveEntity->GetEnclaveSize()));
+						Interface::Log(Interface::VerbosityLevel::Surface, "    | Threads: %d\r\n", EnclaveEntity->GetNumberOfThreads());
+						Interface::Log(Interface::VerbosityLevel::Surface, "    | Imports: %d\r\n", EnclaveEntity->GetNumberOfImports());
+						Interface::Log(Interface::VerbosityLevel::Surface, "    | Image version: %d  Security version: %d\r\n", EnclaveEntity->GetImageVersion(), EnclaveEntity->GetSecurityVersion());
+						Interface::Log(Interface::VerbosityLevel::Surface, "    | Family ID: %ws\r\n", Subregion::HexBlob(EnclaveEntity->GetFamilyId(), 16).c_str());
+						Interface::Log(Interface::VerbosityLevel::Surface, "    | Image ID: %ws\r\n", Subregion::HexBlob(EnclaveEntity->GetImageId(), 32).c_str());
+					}
+				}
 			}
 
 			// Display the section/subregion information associated with this entity provided it meets the selection criteria
@@ -552,6 +584,7 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 				// Select this subregion?
 
 				if (ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::All ||
+					ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Enclave || // The entity itself was already selected by type; every subregion of an enclave is shown
 					(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Block && (ScannerCtx.GetAddress() == (*SbrItr)->GetBasic()->BaseAddress || (ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE))) ||
 					(ScannerCtx.GetMst() == ScannerContext::MemorySelection_t::Ioc && ((ScannerCtx.GetFlags() & PROCESS_ENUM_FLAG_FROM_BASE) || 
 																		  (IocSbrMap != nullptr &&
@@ -603,7 +636,7 @@ void Process::Enumerate(ScannerContext& ScannerCtx, vector<Ioc*> *SelectedIocs, 
 						Interface::Log(Interface::VerbosityLevel::Surface, "    |__ Base address: 0x%p\r\n", (*SbrItr)->GetBasic()->BaseAddress);
 						Interface::Log(Interface::VerbosityLevel::Surface, "      | Size: %d\r\n", (*SbrItr)->GetBasic()->RegionSize);
 						Interface::Log(Interface::VerbosityLevel::Surface, "      | Permissions: %ws\r\n", Subregion::ProtectSymbol((*SbrItr)->GetBasic()->Protect));
-						Interface::Log(Interface::VerbosityLevel::Surface, "      | Type: %ws\r\n", Subregion::TypeSymbol((*SbrItr)->GetBasic()->Type));
+						Interface::Log(Interface::VerbosityLevel::Surface, "      | Type: %ws%ws\r\n", Subregion::TypeSymbol((*SbrItr)->GetBasic()->Type), ((*SbrItr)->GetFlags() & MEMORY_SUBREGION_FLAG_ENCLAVE) ? L" (VBS enclave)" : L"");
 						Interface::Log(Interface::VerbosityLevel::Surface, "      | State: %ws\r\n", Subregion::StateSymbol((*SbrItr)->GetBasic()->State));
 						Interface::Log(Interface::VerbosityLevel::Surface, "      | Allocation base: 0x%p\r\n", (*SbrItr)->GetBasic()->AllocationBase);
 						Interface::Log(Interface::VerbosityLevel::Surface, "      | Allocation permissions: %ws\r\n", Subregion::ProtectSymbol((*SbrItr)->GetBasic()->AllocationProtect));

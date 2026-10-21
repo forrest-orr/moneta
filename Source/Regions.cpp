@@ -189,6 +189,18 @@ Entity* Entity::Create(Processes::Process& OwnerProc, std::vector<Subregion*> Su
 
 	Interface::Log(Interface::VerbosityLevel::Debug, "... creating new entity from subregions at 0x%p\r\n", Subregions.front()->GetBasic()->AllocationBase);
 
+	// Enclave check FIRST, before type routing - but not for MEM_IMAGE, which is handled by the PE-config path below so the enclave module's
+	// IMAGE_ENCLAVE_CONFIG metadata is captured. The enclave reservation reports as MEM_PRIVATE and would otherwise fall through to the
+	// generic private/unknown region, so a class-7 SoftwareEnclave hit on any of its subregions promotes the whole allocation here.
+	if (Subregions.front()->GetBasic()->Type != MEM_IMAGE) {
+		for (vector<Subregion*>::const_iterator SbrItr = Subregions.begin(); SbrItr != Subregions.end(); ++SbrItr) {
+			if (((*SbrItr)->GetFlags() & MEMORY_SUBREGION_FLAG_ENCLAVE)) {
+				Interface::Log(Interface::VerbosityLevel::Debug, "... allocation at 0x%p promoted to enclave entity (SoftwareEnclave)\r\n", Subregions.front()->GetBasic()->AllocationBase);
+				return new Enclave(OwnerProc, Subregions);
+			}
+		}
+	}
+
 	if (Subregions.front()->GetBasic()->Type == MEM_MAPPED || Subregions.front()->GetBasic()->Type == MEM_IMAGE) {
 		wchar_t DevFilePath[MAX_PATH + 1] = { 0 };
 		wchar_t MapFilePath[MAX_PATH + 1] = { 0 };
@@ -212,7 +224,18 @@ Entity* Entity::Create(Processes::Process& OwnerProc, std::vector<Subregion*> Su
 			NewEntity = new MappedFile(OwnerProc.GetHandle(), Subregions, MapFilePath);
 		}
 		else if (Subregions.front()->GetBasic()->Type == MEM_IMAGE) {
-			NewEntity = new PeVm::Body(OwnerProc, Subregions, MapFilePath);
+			// An enclave module is a mapped image whose PE load-config carries an IMAGE_ENCLAVE_CONFIG. Probe the backing file; if present,
+			// build an Enclave entity (which re-reads the config for its metadata) instead of a normal PE entity. This is read from disk, so
+			// it works for debuggable enclaves (readable MEM_IMAGE) and production enclaves alike, and does not depend on any NtQueryVirtualMemory class.
+			std::unique_ptr<::PeFile> ProbePe = PeFile::Load(MapFilePath);
+
+			if (ProbePe && Enclave::ImageHasEnclaveConfig(ProbePe.get())) {
+				Interface::Log(Interface::VerbosityLevel::Debug, "... image %ws carries an enclave config -> enclave entity\r\n", MapFilePath);
+				NewEntity = new Enclave(OwnerProc, Subregions, ProbePe.get(), MapFilePath);
+			}
+			else {
+				NewEntity = new PeVm::Body(OwnerProc, Subregions, MapFilePath);
+			}
 		}
 	}
 	else {
