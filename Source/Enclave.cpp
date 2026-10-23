@@ -20,7 +20,7 @@ ________________________________________________________________________________
 #include "Interface.hpp"
 
 #pragma comment(lib, "vertdll.lib")
-
+#pragma comment(lib, "ntdll.lib")
 using namespace std;
 using namespace Memory;
 
@@ -89,6 +89,8 @@ std::wstring EnclaveImageInfoIdToString(const UCHAR *pBuf) {
 	return IdString;
 }
 
+#define ProcessEnclaveInformation 0x56
+
 Enclave::Enclave(Processes::Process& OwnerProc, vector<Subregion*> Subregions, ::PeFile* Pe, const wchar_t* ModPath)
 	: Region(OwnerProc.GetHandle(), Subregions), ConfigValid(false), PolicyFlags(0), EnclaveFlags(0), NumberOfImports(0),
 	  ImageVersion(0), SecurityVersion(0), NumberOfThreads(0), EnclaveSize(0) {
@@ -103,11 +105,29 @@ Enclave::Enclave(Processes::Process& OwnerProc, vector<Subregion*> Subregions, :
 		this->ModulePath = ModPath;
 	}
 
-	Interface::Log(Interface::VerbosityLevel::Detail, "... creating enclave entity at alloc base 0x%p/base 0x%p within %ws (PID %d)\r\n", Subregions.front()->GetBasic()->AllocationBase, pMainEnclaveSubregion->GetBasic()->BaseAddress, OwnerProc.GetName().c_str(), OwnerProc.GetPid());
+	Interface::Log(Interface::VerbosityLevel::Surface, "... creating enclave entity at alloc base 0x%p/base 0x%p within %ws (PID %d)\r\n", Subregions.front()->GetBasic()->AllocationBase, pMainEnclaveSubregion->GetBasic()->BaseAddress, OwnerProc.GetName().c_str(), OwnerProc.GetPid());
 
 	////////////////////////////////////////////////////////////
 	// Query the underlying enclave image information.
 
+	ENCLAVE_INFORMATION EnclaveInformation = { 0 };
+	EnclaveInformation.Size = sizeof(EnclaveInformation);
+	uint32_t SizeOfEnclaveInformation = sizeof(EnclaveInformation);
+	Interface::Log(Interface::VerbosityLevel::Surface, "    Querying enclave information (SizeOfEnclaveInformation 0x%zx == 0xb0?)\r\n", SizeOfEnclaveInformation);
+	system("pause");
+	HANDLE hProcess = OpenProcess(MAXIMUM_ALLOWED, FALSE, OwnerProc.GetPid());
+	NTSTATUS NtStatus = NtQueryInformationProcess(hProcess, (PROCESSINFOCLASS)ProcessEnclaveInformation, &EnclaveInformation, SizeOfEnclaveInformation, nullptr);
+
+	if (NT_SUCCESS(NtStatus)) {
+		wstring AuthorID = EnclaveImageInfoIdToString(EnclaveInformation.Identity.AuthorId);
+		wstring UniqueID = EnclaveImageInfoIdToString(EnclaveInformation.Identity.UniqueId);
+		Interface::Log(Interface::VerbosityLevel::Surface, "    AuthorID %ws | UniqueID %ws | SizeOfImage 0x%zx | ImageBase: 0x%p | Flags 0x%x | EnclaveType %d | SigningLevel %d\r\n",
+			AuthorID.c_str(), UniqueID.c_str(), EnclaveInformation.Size, EnclaveInformation.BaseAddress, EnclaveInformation.Identity.Flags, EnclaveInformation.Identity.EnclaveType, EnclaveInformation.Identity.SigningLevel);
+	}
+	else {
+		Interface::Log(Interface::VerbosityLevel::Surface, "    Failed to query enclave information with NtQueryInformationProcess (NTSTATUS 0x%x)\r\n", NtStatus);
+	}
+	system("pause");
 	/*
 	ENCLAVE_INFORMATION EnclaveInformation = { 0 };
 	HRESULT Hr = EnclaveGetEnclaveInformation(sizeof(EnclaveInformation), &EnclaveInformation);
